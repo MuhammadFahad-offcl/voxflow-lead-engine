@@ -1,0 +1,15 @@
+# Store text with LF in Git; Windows checkouts keep LF too, so Prettier and CI agree.
+* text=auto eol=lf
+
+*.ps1  text eol=crlf
+*.cmd  text eol=crlf
+*.bat  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.gif  binary
+*.ico  binary
+*.mp3  binary
+*.wav  binary
+*.zip  binary
+*.pdf  binary

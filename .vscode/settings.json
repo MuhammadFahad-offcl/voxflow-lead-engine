@@ -1,0 +1,42 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit",
+    "source.organizeImports": "never"
+  },
+  "editor.rulers": [100],
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/coverage": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "eslint.useFlatConfig": true,
+  "eslint.workingDirectories": [{ "mode": "auto" }],
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "[markdown]": {
+    "editor.wordWrap": "on"
+  },
+  "jest.runMode": "on-demand",
+  "coverage-gutters.coverageFileNames": ["lcov.info"],
+  "coverage-gutters.coverageBaseDir": "**/coverage",
+  "errorLens.enabledDiagnosticLevels": ["error", "warning"],
+  "cSpell.language": "en",
+  "cSpell.words": [
+    "voxflow", "hazeljs", "pgvector", "lightpanda", "apify", "vapi", "pplx",
+    "cuid", "knip", "sonarjs", "gitleaks", "commitlint", "Lahore", "Urdu",
+    "Gulberg", "Karachi", "cloudflared", "Cheerio", "dedupe", "hnsw"
+  ],
+  "sonarlint.rules": {
+    "typescript:S1135": { "level": "on" }
+  },
+  "dotenv.enableAutocloaking": true
+}

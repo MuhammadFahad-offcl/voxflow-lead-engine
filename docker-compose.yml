@@ -1,0 +1,33 @@
+# Local infrastructure for development and the live run (ADR-0002, ADR-0004).
+# Both services bind to 127.0.0.1 only — nothing here is reachable from the network.
+name: voxflow
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: voxflow
+      POSTGRES_PASSWORD: voxflow
+      POSTGRES_DB: voxflow
+      TZ: UTC
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U voxflow -d voxflow"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  lightpanda:
+    image: lightpanda/browser:nightly
+    restart: unless-stopped
+    environment:
+      LIGHTPANDA_DISABLE_TELEMETRY: "true"
+    ports:
+      - "127.0.0.1:9222:9222"
+
+volumes:
+  pgdata:

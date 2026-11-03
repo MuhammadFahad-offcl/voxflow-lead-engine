@@ -1,0 +1,100 @@
+{
+  "meta": {
+    "status": "draft",
+    "pendingQuestions": ["PRD Q5: confirm which services VoxFlow will actually sell and deliver in December"],
+    "rule": "expectedResult never contains numbers or guarantees; the founder states figures on the meeting, not the AI caller",
+    "fittingSignals": "keys must exist in config/niches/<niche>.json → signalWeights"
+  },
+  "services": [
+    {
+      "slug": "ai-voice-receptionist",
+      "name": "AI voice receptionist",
+      "nameUrdu": "AI وائس ریسپشنسٹ",
+      "problem": "Patients call and nobody picks up, especially during treatments, lunch and after hours.",
+      "fittingSignals": ["phone_unanswered_reviews", "mobile_number"],
+      "expectedResult": "Every call is answered in Urdu or English, questions are handled and appointments are booked even when staff are busy.",
+      "expectedResultUrdu": "ہر کال کا جواب دیا جاتا ہے اور اپوائنٹمنٹ بُک ہو جاتی ہے، چاہے اسٹاف مصروف ہو"
+    },
+    {
+      "slug": "missed-call-whatsapp-reply",
+      "name": "Missed-call WhatsApp reply",
+      "nameUrdu": "مسڈ کال پر خودکار واٹس ایپ جواب",
+      "problem": "Callers who are not answered go to another clinic.",
+      "fittingSignals": ["phone_unanswered_reviews", "whatsapp_link"],
+      "expectedResult": "Every missed caller gets a WhatsApp message within a minute with a booking option.",
+      "expectedResultUrdu": "ہر مسڈ کال کرنے والے کو فوراً واٹس ایپ پر بکنگ کا آپشن مل جاتا ہے"
+    },
+    {
+      "slug": "whatsapp-booking-assistant",
+      "name": "WhatsApp booking assistant",
+      "nameUrdu": "واٹس ایپ بکنگ اسسٹنٹ",
+      "problem": "Booking needs a phone call during clinic hours, and patients complain about waiting to get an appointment.",
+      "fittingSignals": ["no_online_booking", "booking_wait_reviews", "whatsapp_link"],
+      "expectedResult": "Patients book, reschedule and get answers on WhatsApp at any time without staff involvement.",
+      "expectedResultUrdu": "مریض کسی بھی وقت واٹس ایپ پر خود اپوائنٹمنٹ بُک کر لیتے ہیں"
+    },
+    {
+      "slug": "appointment-reminders",
+      "name": "Appointment reminders and no-show reduction",
+      "nameUrdu": "اپوائنٹمنٹ ریمائنڈرز",
+      "problem": "Booked patients forget and do not show up, leaving empty chair time.",
+      "fittingSignals": ["booking_wait_reviews", "multiple_doctors_services"],
+      "expectedResult": "Patients get automatic reminders and can confirm or reschedule in one reply.",
+      "expectedResultUrdu": "مریضوں کو خودکار یاد دہانی ملتی ہے اور خالی اپوائنٹمنٹس کم ہوتی ہیں"
+    },
+    {
+      "slug": "online-booking-page",
+      "name": "Online booking page",
+      "nameUrdu": "آن لائن بکنگ پیج",
+      "problem": "The website has no way to book; visitors leave without contacting the clinic.",
+      "fittingSignals": ["no_online_booking", "working_website"],
+      "expectedResult": "Website visitors pick a doctor and time slot and get a confirmation automatically.",
+      "expectedResultUrdu": "ویب سائٹ پر آنے والے خود ٹائم سلاٹ منتخب کر کے بکنگ کر لیتے ہیں"
+    },
+    {
+      "slug": "website-chat-assistant",
+      "name": "Website chat assistant",
+      "nameUrdu": "ویب سائٹ چیٹ اسسٹنٹ",
+      "problem": "Visitors have questions about treatments and timings and nobody answers on the website.",
+      "fittingSignals": ["working_website", "no_online_booking", "multiple_doctors_services"],
+      "expectedResult": "An assistant on the website answers common questions and turns visitors into bookings.",
+      "expectedResultUrdu": "ویب سائٹ پر سوالات کا فوری جواب ملتا ہے اور وزیٹر بکنگ کر لیتے ہیں"
+    },
+    {
+      "slug": "review-reply-automation",
+      "name": "Google review reply automation",
+      "nameUrdu": "گوگل ریویوز کے خودکار جوابات",
+      "problem": "Most Google reviews have no reply, which makes the clinic look unattended to new patients.",
+      "fittingSignals": ["reviews_unreplied", "many_reviews"],
+      "expectedResult": "Every review gets a polite, personal reply drafted for approval, so the profile looks active.",
+      "expectedResultUrdu": "ہر ریویو کا مناسب جواب جاتا ہے اور گوگل پروفائل فعال نظر آتا ہے"
+    },
+    {
+      "slug": "review-request-flow",
+      "name": "Post-visit review requests",
+      "nameUrdu": "وزٹ کے بعد ریویو کی درخواست",
+      "problem": "Happy patients rarely leave reviews, while unhappy ones do.",
+      "fittingSignals": ["reviews_unreplied", "active_marketing"],
+      "expectedResult": "After each visit patients get a short WhatsApp asking for a Google review.",
+      "expectedResultUrdu": "ہر وزٹ کے بعد مطمئن مریضوں سے ریویو کی درخواست خودکار طریقے سے جاتی ہے"
+    },
+    {
+      "slug": "patient-recall",
+      "name": "Patient recall campaigns",
+      "nameUrdu": "پرانے مریضوں کو دوبارہ بلانا",
+      "problem": "Past patients are never reminded about check-ups, cleanings or follow-up treatment.",
+      "fittingSignals": ["multiple_doctors_services", "many_reviews"],
+      "expectedResult": "Past patients get timely check-up reminders and book again.",
+      "expectedResultUrdu": "پرانے مریضوں کو چیک اپ کی یاد دہانی ملتی ہے اور وہ دوبارہ آتے ہیں"
+    },
+    {
+      "slug": "inquiry-follow-up",
+      "name": "Ad and social inquiry follow-up",
+      "nameUrdu": "اشتہارات سے آنے والی انکوائریز کا فالو اپ",
+      "problem": "Inquiries from Facebook, Instagram and ads are answered late or not at all.",
+      "fittingSignals": ["active_marketing", "whatsapp_link"],
+      "expectedResult": "Every inquiry is answered within minutes and followed up until it books or declines.",
+      "expectedResultUrdu": "ہر انکوائری کا چند منٹ میں جواب اور فالو اپ ہوتا ہے"
+    }
+  ]
+}

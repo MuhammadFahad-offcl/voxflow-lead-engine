@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "status": "draft",
+    "pendingQuestions": [
+      "PRD Q6: confirm premiumAreas for Lahore",
+      "PRD Q7: confirm Urdu wording of the script after 10 test calls (Cycle 3)"
+    ],
+    "sourceOfTruth": "docs/prd.md → Lead scoring model, Call design"
+  },
+  "slug": "dental-clinic",
+  "version": 1,
+  "name": "Dental clinics",
+  "searchTerms": ["dental clinic", "dentist", "dental surgeon", "orthodontist"],
+  "categoryKeywords": ["dental clinic", "dentist", "dental", "orthodontist", "oral surgeon", "endodontist"],
+  "idealClient": {
+    "privateClinicOnly": true,
+    "minRating": 4.0,
+    "minReviewCount": 30,
+    "excludeNameKeywords": ["hospital", "teaching", "university", "college", "medical complex", "trust", "foundation"],
+    "excludeChains": true,
+    "chainRule": "same normalized name found at 3 or more places in one campaign"
+  },
+  "tiers": {
+    "hot": 70,
+    "warm": 45
+  },
+  "signalWeights": {
+    "PAIN": {
+      "phone_unanswered_reviews": {
+        "points": 15,
+        "rule": "at least 1 review (last 12 months) labelled PHONE_UNANSWERED by the review-labelling task"
+      },
+      "booking_wait_reviews": {
+        "points": 10,
+        "rule": "at least 1 review (last 12 months) labelled BOOKING_OR_WAIT"
+      },
+      "no_online_booking": {
+        "points": 8,
+        "rule": "website read and no booking widget or booking link found; or no website"
+      },
+      "reviews_unreplied": {
+        "points": 7,
+        "rule": "more than half of the stored reviews have no owner reply"
+      }
+    },
+    "FIT": {
+      "category_match": {
+        "points": 10,
+        "rule": "Maps category matches one of categoryKeywords"
+      },
+      "multiple_doctors_services": {
+        "points": 8,
+        "rule": "website or listing names 2+ doctors or 3+ treatments"
+      },
+      "many_reviews": {
+        "points": 7,
+        "rule": "reviewCount >= 100"
+      }
+    },
+    "REACHABILITY": {
+      "mobile_number": {
+        "points": 12,
+        "rule": "listing or website phone normalizes to a Pakistani mobile number (+923…)"
+      },
+      "whatsapp_link": {
+        "points": 4,
+        "rule": "wa.me or api.whatsapp.com link found on the website or listing"
+      },
+      "decision_maker_name": {
+        "points": 4,
+        "rule": "owner or lead doctor name found on the website or in business context"
+      }
+    },
+    "ABILITY_TO_PAY": {
+      "working_website": {
+        "points": 5,
+        "rule": "websiteStatus is READ_FETCH or READ_LIGHTPANDA"
+      },
+      "premium_area": {
+        "points": 5,
+        "rule": "lead area matches one of premiumAreas"
+      },
+      "active_marketing": {
+        "points": 5,
+        "rule": "active social profile linked, or business context mentions paid ads"
+      }
+    }
+  },
+  "reviewLabels": ["PHONE_UNANSWERED", "BOOKING_OR_WAIT", "STAFF_OR_SERVICE", "PRICE", "POSITIVE", "OTHER"],
+  "premiumAreas": ["DHA", "Gulberg", "Model Town", "Johar Town", "Bahria Town", "Cantt", "Garden Town", "Faisal Town", "Valencia", "Wapda Town"],
+  "defaultAreas": ["DHA", "Gulberg", "Model Town", "Johar Town", "Bahria Town"],
+  "scriptTemplateFile": "dental-clinic.script.md"
+}

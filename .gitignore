@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+apps/api/src/generated/
+
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+token*.json
+
+# Real data — never commit (NFR-6, public repo)
+data/
+backups/
+recordings/
+exports/
+*.dump
+*.sql.gz
+*.csv
+!fixtures/**/*.csv
+
+# Test and coverage
+coverage/
+.jest-cache/
+evals/results/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# OS / editors
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+
+# Claude Code local overrides
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Cloudflare tunnel credentials
+.cloudflared/

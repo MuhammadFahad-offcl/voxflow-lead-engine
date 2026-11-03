@@ -1,0 +1,415 @@
+// VoxFlow Lead Engine — database schema (v1)
+// Source of truth for every table. Change it only through a migration (see docs/engineering-standards.md §5).
+// Requirements: docs/prd.md (FR/NFR ids in comments). Design: docs/architecture.md §11.
+//
+// Prisma 7: the connection URL lives in prisma.config.ts, not here.
+// pgvector: the first migration must start with `CREATE EXTENSION IF NOT EXISTS vector;`
+//           and add `CREATE INDEX service_embedding_hnsw ON "Service" USING hnsw (embedding vector_cosine_ops);`
+// HazelJS Agent OS run tables: paste the models from @hazeljs/agent's prisma-schema.example.prisma
+//           into the marked section at the end, in Cycle 1, issue 3.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../apps/api/src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum CampaignStatus {
+  DISCOVERING
+  ENRICHING
+  SCORING
+  SCRIPTING
+  AWAITING_APPROVAL
+  CALLING
+  COMPLETED
+  PAUSED
+  FAILED
+}
+
+enum LeadStatus {
+  DISCOVERED // stored, waiting for its lead graph
+  FILTERED_OUT // failed the ideal-client filter (FR-8)
+  ENRICHED
+  SCORED // scored; COLD leads stop here (FR-15)
+  NO_STRONG_SIGNAL // solution agent found no evidence-backed problem (US-5)
+  NEEDS_REVIEW // solution output failed validation twice (FR-17)
+  READY_TO_CALL // has solution + script, campaign not yet approved
+  IN_CALLING // has a scheduled or active attempt
+  BOOKED // meeting booked (US-11)
+  CLOSED // calling finished for this lead
+  FAILED // a step failed; see failedStep + error (FR-32)
+}
+
+enum Tier {
+  HOT
+  WARM
+  COLD
+}
+
+enum PhoneType {
+  MOBILE
+  LANDLINE
+  UNKNOWN
+}
+
+enum WebsiteStatus {
+  NONE // listing has no website
+  PENDING
+  READ_FETCH
+  READ_LIGHTPANDA
+  UNREADABLE // blocked or broken (FR-9)
+}
+
+enum SignalDimension {
+  PAIN
+  FIT
+  REACHABILITY
+  ABILITY_TO_PAY
+}
+
+enum CallAttemptStatus {
+  SCHEDULED
+  DIALING // call created at Vapi, no result yet
+  ENDED // result recorded
+  DENIED // blocked by a Gatekeeper policy (FR-21)
+  CANCELLED
+}
+
+enum CallResult {
+  BOOKED
+  INTERESTED_NOT_BOOKED
+  CALLBACK_REQUESTED
+  NOT_DECISION_MAKER
+  NOT_INTERESTED
+  NO_ANSWER
+  WRONG_NUMBER
+  DO_NOT_CALL
+  FAILED // never rang; retried, does not use an attempt
+}
+
+enum ReasonCode {
+  NO_BUDGET
+  HAS_SOLUTION
+  NOT_NEEDED
+  BAD_TIMING
+  DISTRUSTS_AI
+  OTHER
+}
+
+enum CallWindow {
+  MORNING
+  AFTERNOON
+}
+
+enum DoNotCallSource {
+  CALL_REQUEST
+  MANUAL
+}
+
+enum CostService {
+  APIFY
+  PERPLEXITY_SEARCH
+  PERPLEXITY_EMBEDDINGS
+  LLM
+  VAPI
+}
+
+// ───────────────────────────── Models ─────────────────────────────
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+
+  settings      Settings?
+  nicheProfiles NicheProfile[]
+  campaigns     Campaign[]
+  leads         Lead[]
+  services      Service[]
+  doNotCall     DoNotCall[]
+  costRecords   CostRecord[]
+}
+
+/// Operator configuration edited on the dashboard. JSON shapes are validated by Zod in packages/shared.
+model Settings {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  callingHours  Json // FR-20: { timezone, days, windows, blocked }
+  booking       Json // FR-26: { workingDays, start, end, meetingMinutes, bufferMinutes, maxPerDay, horizonDays }
+  spendCaps     Json // FR-33: { llmMonthlyUsd: 10, apifyDailyUsd, perplexityDailyUsd, vapiDailyUsd }
+  llmModels     Json // ADR-0006: { REVIEW_LABELLING, SOLUTION, SCRIPT, OUTCOME }
+  retentionDays Int      @default(90) // NFR-6
+  updatedAt     DateTime @updatedAt
+}
+
+/// How a niche is searched, filtered, scored and pitched (FR-4). Rows are immutable versions:
+/// editing creates a new row with version + 1, so old campaigns stay explainable.
+model NicheProfile {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  slug             String // e.g. "dental-clinic"
+  version          Int
+  name             String
+  searchTerms      String[]
+  categoryKeywords String[] // Maps categories that count as a niche match (fit signal)
+  idealClient      Json // FR-8 filter rules
+  signalWeights    Json // scoring model weights (PRD "Lead scoring model")
+  premiumAreas     String[]
+  scriptTemplate   String   @db.Text
+  createdAt        DateTime @default(now())
+
+  campaigns Campaign[]
+
+  @@unique([organizationId, slug, version])
+}
+
+model Campaign {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  nicheProfileId String
+  nicheProfile   NicheProfile @relation(fields: [nicheProfileId], references: [id])
+
+  city                String
+  areas               String[]
+  status              CampaignStatus @default(DISCOVERING)
+  maxResultsPerSearch Int            @default(100) // FR-2, ADR-0010
+  searchCount         Int            @default(0)
+  foundCount          Int            @default(0)
+  duplicateCount      Int            @default(0)
+  filteredCount       Int            @default(0)
+  approvalRunId       String? // HazelJS durable run awaiting approval (FR-19)
+  approvalNote        String?
+  approvedAt          DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  leads       Lead[]
+  costRecords CostRecord[]
+
+  @@index([organizationId, status])
+}
+
+/// One business found on Google Maps. Unique per organization by Google place ID (FR-7).
+model Lead {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  campaignId     String // the campaign that first found it
+  campaign       Campaign     @relation(fields: [campaignId], references: [id])
+
+  placeId     String
+  name        String
+  category    String?
+  address     String?
+  area        String?
+  city        String?
+  mapsUrl     String?
+  rating      Decimal? @db.Decimal(2, 1)
+  reviewCount Int?
+  rawPlace    Json // validated Apify item, kept for audit
+
+  phone             String? // E.164, e.g. +923001234567 (FR-6)
+  phoneType         PhoneType     @default(UNKNOWN)
+  website           String?
+  websiteStatus     WebsiteStatus @default(PENDING)
+  emails            String[]
+  whatsappLinks     String[]
+  socialLinks       String[]
+  hasOnlineBooking  Boolean?
+  hasChatWidget     Boolean?
+  decisionMakerName String?
+  businessContext   Json? // Perplexity summary (FR-12)
+
+  score          Int?
+  scoreBreakdown Json? // { pain, fit, reachability, abilityToPay }
+  tier           Tier?
+  status         LeadStatus @default(DISCOVERED)
+  filterReason   String?
+  failedStep     String?
+  error          String?
+  graphRunId     String? // HazelJS run id for the lead graph (FR-35)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  reviews      Review[]
+  signals      Signal[]
+  solution     Solution?
+  script       Script?
+  callAttempts CallAttempt[]
+  meetings     Meeting[]
+  costRecords  CostRecord[]
+
+  @@unique([organizationId, placeId])
+  @@index([campaignId, status])
+  @@index([organizationId, phone])
+  @@index([tier, score])
+}
+
+model Review {
+  id           String    @id @default(cuid())
+  leadId       String
+  lead         Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  externalId   String?
+  author       String?
+  text         String    @db.Text
+  rating       Int?
+  publishedAt  DateTime?
+  ownerReplied Boolean   @default(false)
+
+  signals Signal[]
+
+  @@unique([leadId, externalId])
+  @@index([leadId])
+}
+
+/// One piece of scored evidence (FR-14). No evidence, no points.
+model Signal {
+  id        String          @id @default(cuid())
+  leadId    String
+  lead      Lead            @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  dimension SignalDimension
+  key       String // matches a key in NicheProfile.signalWeights
+  points    Int
+  evidence  String          @db.Text
+  sourceUrl String?
+  reviewId  String?
+  review    Review?         @relation(fields: [reviewId], references: [id], onDelete: SetNull)
+  createdAt DateTime        @default(now())
+
+  @@unique([leadId, key]) // each signal counts once
+}
+
+/// A catalog entry VoxFlow sells (FR-16).
+model Service {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  slug               String
+  name               String
+  nameUrdu           String
+  problem            String                       @db.Text
+  fittingSignals     String[] // signal keys that suggest this service
+  expectedResult     String                       @db.Text
+  expectedResultUrdu String                       @db.Text // spoken on the call; no numbers or guarantees
+  active             Boolean                      @default(true)
+  embedding          Unsupported("vector(1024)")? // pplx-embed-v1-0.6b, ADR-0006
+  updatedAt          DateTime                     @updatedAt
+
+  solutions Solution[]
+
+  @@unique([organizationId, slug])
+}
+
+model Solution {
+  id        String   @id @default(cuid())
+  leadId    String   @unique
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  serviceId String
+  service   Service  @relation(fields: [serviceId], references: [id])
+  reason    String
+  signalIds String[] // must all belong to the lead (FR-17)
+  model     String
+  createdAt DateTime @default(now())
+}
+
+model Script {
+  id           String   @id @default(cuid())
+  leadId       String   @unique
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  nicheVersion Int // template version used (FR-18)
+  variables    Json
+  text         String   @db.Text
+  model        String
+  createdAt    DateTime @default(now())
+}
+
+/// One dial. At most 2 per business, ever (FR-23, ADR-0011).
+model CallAttempt {
+  id             String            @id @default(cuid())
+  leadId         String
+  lead           Lead              @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  attemptNumber  Int // 1 or 2 — CHECK constraint added in the first migration
+  status         CallAttemptStatus @default(SCHEDULED)
+  window         CallWindow
+  scheduledAt    DateTime
+  idempotencyKey String            @unique
+  vapiCallId     String?           @unique
+  failedRetries  Int               @default(0) // FAILED retries, max 3; do not use an attempt
+  deniedBy       String? // Gatekeeper policy id (FR-21)
+
+  startedAt         DateTime?
+  endedAt           DateTime?
+  result            CallResult?
+  reasonCode        ReasonCode?
+  remarks           String?     @db.Text // 1–3 English sentences (FR-28)
+  callbackAt        DateTime?
+  decisionMakerName String?
+  transcript        String?     @db.Text // cleared after retentionDays (NFR-6)
+  recordingUrl      String?
+  durationSec       Int?
+  costUsd           Decimal?    @db.Decimal(10, 4)
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  meeting Meeting?
+
+  @@unique([leadId, attemptNumber])
+  @@index([status, scheduledAt])
+}
+
+model Meeting {
+  id                 String      @id @default(cuid())
+  leadId             String
+  lead               Lead        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  callAttemptId      String      @unique
+  callAttempt        CallAttempt @relation(fields: [callAttemptId], references: [id])
+  startAt            DateTime
+  endAt              DateTime
+  calendarEventId    String      @unique
+  meetLink           String
+  confirmationSentAt DateTime? // set when the founder uses the Send confirmation button (FR-27)
+  createdAt          DateTime    @default(now())
+}
+
+model DoNotCall {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  phone          String // E.164
+  source         DoNotCallSource
+  addedAt        DateTime        @default(now())
+
+  @@unique([organizationId, phone])
+}
+
+model CostRecord {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  service        CostService
+  amountUsd      Decimal      @db.Decimal(10, 5)
+  units          Int? // tokens, results, seconds — per service
+  note           String?
+  leadId         String?
+  lead           Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  campaignId     String?
+  campaign       Campaign?    @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  at             DateTime     @default(now())
+
+  @@index([organizationId, service, at])
+}
+
+// ─────────── HazelJS Agent OS run tables (paste here in Cycle 1) ───────────
+// Copy the models from @hazeljs/agent's prisma-schema.example.prisma without edits,
+// then run `pnpm prisma migrate dev --name hazeljs_agent_os`.

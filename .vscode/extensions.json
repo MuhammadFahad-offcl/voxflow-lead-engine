@@ -1,0 +1,21 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "sonarsource.sonarlint-vscode",
+    "usernamehw.errorlens",
+    "yoavbls.pretty-ts-errors",
+    "streetsidesoftware.code-spell-checker",
+    "orta.vscode-jest",
+    "ryanluker.vscode-coverage-gutters",
+    "eamodio.gitlens",
+    "github.vscode-pull-request-github",
+    "humao.rest-client",
+    "mikestead.dotenv",
+    "editorconfig.editorconfig",
+    "prisma.prisma",
+    "bradlc.vscode-tailwindcss",
+    "ms-azuretools.vscode-docker"
+  ]
+}
