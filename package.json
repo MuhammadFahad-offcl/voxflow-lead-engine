@@ -1,0 +1,32 @@
+{
+  "name": "voxflow-lead-engine",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@12.16.1",
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "dev": "pnpm --filter @voxflow/shared build && pnpm --recursive --parallel dev",
+    "build": "pnpm --recursive build",
+    "typecheck": "tsc --build",
+    "lint": "eslint . --max-warnings 0",
+    "format": "prettier --write .",
+    "knip": "knip",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@jest/globals": "30.5.2",
+    "@types/node": "26.6.6",
+    "eslint": "10.14.0",
+    "eslint-plugin-sonarjs": "4.2.2",
+    "jest": "30.5.2",
+    "knip": "6.44.1",
+    "prettier": "3.9.10",
+    "ts-jest": "29.4.15",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1"
+  }
+}

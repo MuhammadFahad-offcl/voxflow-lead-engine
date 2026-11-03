@@ -53,8 +53,9 @@ Read first: docs/architecture.md §7 (policy table — authoritative), @hazeljs/
    CallAttempt.status DENIED + deniedBy; calling-hours/spend-cap/health denials reschedule instead of killing the
    attempt (next allowed slot), DNC/attempt-limit/campaign-approved are final.
 3. Health: the worker writes a heartbeat (use the db-change skill: add a small WorkerHeartbeat table or propose a
-   better place — explain). /health becomes { status, db, worker: up if heartbeat < 60 s, demoMode } — tunnel is
-   added in C4-03. health policy denies when db or worker is down.
+   better place — explain). Register a HazelJS health check "worker" (critical; healthy if heartbeat < 60 s) and
+   read it from GET /ready — never extend GET /health; tunnel is added in C4-03. health policy denies when the db
+   or worker check is unhealthy.
 4. Tests: boundaries 09:59/10:00/12:59/13:00/14:59/15:00/17:59/18:00 PKT, Friday 12:30–15:00, Sunday, attempt 2
    allowed / attempt 3 denied, DNC by exact E.164, cap exactly reached. Coverage ≥ 80% for policies/.
 
@@ -175,7 +176,7 @@ Issue #<#>: real voice tests. Trace: PRD risks (Urdu voice quality), NFR-7.
    For each call I fill: understood me (1–5), sounded natural (1–5), latency felt OK (y/n), right result recorded
    (y/n), disclosure heard (y/n).
 3. Between runs, change assistant.json and re-run vapi-sync (one change at a time).
-4. After I fill the matrix: write ADR-0014 with the chosen transcriber + voice, cost per minute measured, and
+4. After I fill the matrix: write an ADR (the next free ADR number) with the chosen transcriber + voice, cost per minute measured, and
    known failure cases; update assistant.json to the winner.
 ```
 

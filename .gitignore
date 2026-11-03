@@ -8,6 +8,9 @@ build/
 .next/
 out/
 *.tsbuildinfo
+next-env.d.ts
+# Rewritten by `next dev` on every start; agent rules live in CLAUDE.md
+apps/web/AGENTS.md
 apps/api/src/generated/
 
 # Secrets — never commit

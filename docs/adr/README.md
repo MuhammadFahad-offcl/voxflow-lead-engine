@@ -17,3 +17,5 @@ Write a new one with `/adr <title>` in Claude Code, or copy [`template.md`](./te
 | [0009](./0009-vapi-webhook-reconciliation.md) | Recover missed Vapi webhooks by polling, not a cloud relay | Accepted |
 | [0010](./0010-apify-search-grid-caps.md) | Cap Apify results per search; actor chosen in Cycle 1 | Accepted (actor pending) |
 | [0011](./0011-call-attempt-and-approval-rules.md) | Max 2 calls per business; one approval per campaign | Accepted |
+| [0012](./0012-pin-typescript-6.md) | Pin TypeScript 6.0.3 until the lint and test tools support 7 | Proposed |
+| [0013](./0013-patch-hazeljs-listen-host.md) | Patch @hazeljs/core: bind to 127.0.0.1 and clear health-check timers | Proposed |

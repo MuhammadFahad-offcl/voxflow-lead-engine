@@ -84,7 +84,8 @@ I run the cloudflared commands myself in PowerShell.
    Test it.
 3. Health (without adding a 4th public path): the worker checks cloudflared's local metrics endpoint
    (127.0.0.1:<metrics port>, set in config.yml) every minute and stores the result with its heartbeat;
-   /health and the health policy include tunnel status.
+   register it as a HazelJS health check "tunnel" (critical) read from GET /ready — never extend GET /health —
+   and include it in the health policy.
 4. Update README and .env.example (PUBLIC_HOOKS_BASE_URL). Re-run vapi-sync so tools and webhook use the tunnel.
 
 Acceptance: from my phone's browser (mobile data) /webhooks/vapi without secret → 401, /campaigns → 404;

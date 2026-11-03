@@ -1,0 +1,72 @@
+diff --git a/dist/hazel-app.d.ts b/dist/hazel-app.d.ts
+index 125fa27035ae0316ff2b263c7cbf01cca4415aeb..4aef9cb3f64c75f7a6752aeec5a95dc8d1ccddd0 100644
+--- a/dist/hazel-app.d.ts
++++ b/dist/hazel-app.d.ts
+@@ -98,7 +98,10 @@ export declare class HazelApp {
+         averageResponseTime?: number;
+     };
+     getActiveRequests(): PerformanceMetrics[];
+-    listen(port: number): Promise<void>;
++    /**
++     * Start the HTTP server. Without `host`, Node listens on every interface.
++     */
++    listen(port: number, host?: string): Promise<void>;
+     private handleRoute;
+     private resolveExceptionFilterInstance;
+     /** @returns true if a filter wrote a response (caller should not send another body). */
+diff --git a/dist/hazel-app.js b/dist/hazel-app.js
+index 15a8ca8cd427daeb8ca639042ec69b2c73e58a40..50ee4c595a2025f7d606e3757606b314e84e566e 100644
+--- a/dist/hazel-app.js
++++ b/dist/hazel-app.js
+@@ -213,7 +213,7 @@ class HazelApp {
+     getActiveRequests() {
+         return this.performanceMonitor.getActiveRequests();
+     }
+-    async listen(port) {
++    async listen(port, host) {
+         await this.container.hydrateAsyncFactoryResults();
+         await this.invokeModuleInitHooks();
+         return new Promise((resolve) => {
+@@ -513,12 +513,16 @@ class HazelApp {
+                     }
+                 }
+             });
+-            this.server.listen(port, async () => {
+-                const localIp = getLocalIp();
++            this.server.listen(port, host, async () => {
++                const address = this.server.address();
++                const boundPort = typeof address === 'object' && address !== null ? address.port : port;
+                 logger_1.default.info(chalk_1.default.green.bold('Server listening on:'));
+                 logger_1.default.info('');
+-                logger_1.default.info(chalk_1.default.green('  → Local:    ') + chalk_1.default.cyan.underline(`http://localhost:${port}`));
+-                logger_1.default.info(chalk_1.default.green('  → Network:  ') + chalk_1.default.cyan.underline(`http://${localIp}:${port}`));
++                logger_1.default.info(chalk_1.default.green('  → Local:    ') + chalk_1.default.cyan.underline(`http://${host ?? 'localhost'}:${boundPort}`));
++                if (host === undefined) {
++                    const localIp = getLocalIp();
++                    logger_1.default.info(chalk_1.default.green('  → Network:  ') + chalk_1.default.cyan.underline(`http://${localIp}:${boundPort}`));
++                }
+                 logger_1.default.info('');
+                 logger_1.default.info(chalk_1.default.gray('Health endpoints:'));
+                 logger_1.default.info(chalk_1.default.gray(`  → /health  - Liveness probe`));
+diff --git a/dist/health.js b/dist/health.js
+index 64a7ab6ba0808536c51bbcc5d8082b2771577568..6f46a52d53ee6961871a7a919569396943b72464 100644
+--- a/dist/health.js
++++ b/dist/health.js
+@@ -30,11 +30,14 @@ class HealthCheckManager {
+         for (const [name, check] of this.checks) {
+             try {
+                 const startTime = Date.now();
+-                // Run check with timeout
++                // Run check with timeout; clear the timer so it cannot outlive the check
++                let timeoutId;
+                 const result = await Promise.race([
+                     check.check(),
+-                    new Promise((_, reject) => setTimeout(() => reject(new Error(`Health check ${name} timeout`)), check.timeout || 5000)),
+-                ]);
++                    new Promise((_, reject) => {
++                        timeoutId = setTimeout(() => reject(new Error(`Health check ${name} timeout`)), check.timeout || 5000);
++                    }),
++                ]).finally(() => clearTimeout(timeoutId));
+                 result.responseTime = Date.now() - startTime;
+                 results[name] = result;
+                 // Update overall status
