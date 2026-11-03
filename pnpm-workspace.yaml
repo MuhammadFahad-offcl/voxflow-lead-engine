@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+saveExact: true
+
+# Prebuilt binaries ship as optional dependencies; never compile from source.
+allowBuilds:
+  '@parcel/watcher': false
+
+patchedDependencies:
+  '@hazeljs/core@2.0.13': patches/@hazeljs__core@2.0.13.patch

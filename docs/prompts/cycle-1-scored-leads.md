@@ -32,15 +32,18 @@ Build the empty-but-working skeleton. Nothing else.
    If that is not the latest TypeScript, pin it and write ADR-0012 explaining why (adr skill).
 4. ESLint flat config: typescript-eslint strictTypeChecked + stylisticTypeChecked, eslint-plugin-sonarjs recommended,
    rules: no-console error, @typescript-eslint/no-non-null-assertion error, @typescript-eslint/ban-ts-comment error.
-5. apps/api: HazelJS app with one HealthModule exposing GET /health → { status: "ok" }, listening on
-   API_HOST/API_PORT (default 127.0.0.1:4000). src/main.ts only. One spec test for the health controller.
+5. apps/api: HazelJS app with no HealthModule — HazelJS's built-in GET /health (liveness → { status: "alive",
+   timestamp }) and GET /ready (readiness checks). src/main.ts parses API_HOST/API_PORT (default 127.0.0.1:4000)
+   and calls startServer(host, port) from src/server.ts; src/main.ts is the only entry point (no worker yet).
+   @hazeljs/core is patched for listen(port, host) and cleared health-check timers (ADR-0013). One integration
+   test starts the app on 127.0.0.1 with a random port: bound address, GET /health, GET /ready shape.
 6. apps/web: Next.js (App Router, TypeScript, Tailwind CSS) with a single page "VoxFlow Lead Engine" that fetches
    /health from the API server-side and shows the status. Dev server bound to 127.0.0.1:3000.
 7. packages/shared: exports one Zod schema `HealthResponse` used by both api and web (proves the wiring).
 8. `pnpm dev` runs api and web together. README "Scripts" table must match the real scripts.
 
 Acceptance: fresh `pnpm install` then `pnpm typecheck && pnpm lint && pnpm knip && pnpm test` all green;
-`pnpm dev` → http://localhost:3000 shows "API: ok".
+`pnpm dev` → http://localhost:3000 shows "API: alive".
 Do not add any other module, port, adapter, Prisma or Docker work — those are later issues.
 Show the plan (≤ 5 bullets + list of files) and wait for "go".
 ```
@@ -120,19 +123,20 @@ Read first: .env.example (never .env), docs/architecture.md §8 and §12–13, A
    services already built are required (for now none — use a refine that is easy to extend per service).
    Parse once at startup; on failure print which variables are missing/invalid (names only) and exit 1.
    Export a typed `Env` and register it in DI.
-2. Logger: choose HazelJS's built-in logger or pino. Write ADR-0012 (or the next free number) with the choice and why.
+2. Logger: choose HazelJS's built-in logger or pino. Write an ADR (the next free ADR number) with the choice and why.
    JSON lines, level from LOG_LEVEL, a child-logger helper that adds campaignId / leadId / attemptId,
    and a `maskPhone("+923001234567") → "+92*******4567"` helper with unit tests. No console.* anywhere.
 3. apps/api/src/adapters/bind.ts: one function that registers, for a port token, the real adapter class or the fake
    adapter class depending on env.DEMO_MODE. Business code must never check DEMO_MODE. Unit test both branches
    with two dummy classes inside the spec file only.
-4. Health: extend GET /health to { status, db: "up"|"down", demoMode } (db = SELECT 1 via Prisma, 1 s timeout).
-   Worker and tunnel status are added in C3-02 / C4-03 — do not stub them.
+4. Health: register a HazelJS health check with app.registerHealthCheck({ name: "db", check, critical: true })
+   (SELECT 1 via Prisma, 1 s timeout) and read it from GET /ready. GET /health stays HazelJS's liveness probe —
+   never extend it. Worker and tunnel checks are added in C3-02 / C4-03 — do not stub them.
 5. apps/api/src/worker.ts: second entry point that loads env + DI, logs "worker started", and shuts down cleanly on
    SIGINT/SIGTERM. Root `pnpm dev` now runs api + worker + web.
 
 Acceptance: deleting DATABASE_URL from the environment makes the API exit with a clear message;
-/health shows db up; all gates green. Show the plan and wait.
+GET /ready shows the db check healthy; all gates green. Show the plan and wait.
 ```
 
 ---

@@ -24,8 +24,8 @@ Every change must trace to an FR/NFR or an ADR. If it doesn't, don't write it �
 
 ## Fixed decisions — do not change without a new ADR
 
-- TypeScript strict, Node 26, pnpm workspaces: `apps/api` (HazelJS), `apps/web` (dashboard), `packages/shared` (Zod schemas, types).
-- HazelJS `@hazeljs/core` + `@hazeljs/agent` (AgentGraph, `@Tool`, `requiresApproval`, durable suspend), Gatekeeper default-deny policies. (ADR-0001)
+- TypeScript strict (6.0.3 pinned, ADR-0012), Node 26, pnpm workspaces: `apps/api` (HazelJS), `apps/web` (dashboard), `packages/shared` (Zod schemas, types).
+- HazelJS `@hazeljs/core` + `@hazeljs/agent` (AgentGraph, `@Tool`, `requiresApproval`, durable suspend), Gatekeeper default-deny policies. (ADR-0001) `@hazeljs/core` carries a local patch: `listen(port, host)` and cleared health-check timers (ADR-0013).
 - PostgreSQL 17 + pgvector + Prisma 7. Connection URL in `prisma.config.ts`. No Redis: DB-as-queue polling. (ADR-0002)
 - Runs on Fahad's laptop. Only 3 public paths through Cloudflare Tunnel: `/vapi/tools/get-slots`, `/vapi/tools/book-slot`, `/webhooks/vapi`. Everything else binds to 127.0.0.1. (ADR-0003)
 - Website reading: fetch + Cheerio → Lightpanda if visible text < 200 chars → `UNREADABLE`. (ADR-0004)

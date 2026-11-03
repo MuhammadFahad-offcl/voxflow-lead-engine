@@ -1,0 +1,15 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignore": ["prisma.config.ts"],
+  "workspaces": {
+    ".": {},
+    "apps/api": {
+      "entry": ["src/main.ts"],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "apps/web": {},
+    "packages/shared": {
+      "includeEntryExports": true
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build && pnpm run \"/^dev:/\"",
+    "dev:compile": "tsc --build --watch --preserveWatchOutput",
+    "dev:start": "node --enable-source-maps --watch dist/main.js"
+  },
+  "dependencies": {
+    "@hazeljs/core": "2.0.13",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@voxflow/shared": "workspace:*"
+  }
+}

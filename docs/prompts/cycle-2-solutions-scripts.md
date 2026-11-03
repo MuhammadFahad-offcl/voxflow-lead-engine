@@ -50,7 +50,7 @@ Issue #<#>: spike — HazelJS RAG vs own pgvector repository. Trace: FR-16. Time
    Perplexity embeddings, cosine distance and filtering out retired rows?
 2. Build a throwaway comparison in scripts/spikes/rag-compare.ts: same 3 queries through @hazeljs/rag and through
    CatalogRepository.searchSimilar. Compare: results, lines of code, extra tables it creates, latency.
-3. Write ADR-0013 (next free number): options, results table, decision. Criteria: HazelJS judging gives 30% to
+3. Write an ADR (the next free ADR number): options, results table, decision. Criteria: HazelJS judging gives 30% to
    "practical use of HazelJS" — prefer @hazeljs/rag if it works without hacks; otherwise keep our repository and
    say why. If @hazeljs/rag wins, list the exact change for C2-03 in the ADR.
 4. Delete the spike script before merge (keep findings in the ADR).
@@ -64,7 +64,7 @@ Branch `feat/<#>-solution-agent` · Trace FR-17, US-5, ADR-0006
 ```text
 Issue #<#>: solution agent. Trace: FR-17, US-5, NFR-9. Feature + hazeljs-conventions + testing-conventions.
 
-Read first: docs/architecture.md §6 (solution-agent row), ADR-0013, @hazeljs/agent docs for @Agent and @Tool,
+Read first: docs/architecture.md §6 (solution-agent row), the ADR from C2-02, @hazeljs/agent docs for @Agent and @Tool,
 docs/prd.md FR-17 and "Lead scoring model".
 
 1. agents/solution.agent.ts: an @Agent with ONE tool `searchCatalog` (@Tool) that embeds the lead's top signals'
