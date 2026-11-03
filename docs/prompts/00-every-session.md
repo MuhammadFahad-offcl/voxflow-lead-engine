@@ -27,7 +27,7 @@ Using the gh CLI, in repo MuhammadFahad-offcl/voxflow-lead-engine:
 Show me the full list of issues you will create and wait for my "go" before creating anything.
 ```
 
-After it runs, write the issue numbers next to each prompt id (C1-01 → #2, …). Branch names use the **GitHub issue number**.
+After it runs, write the issue numbers next to each prompt id (C1-01 → #3, …). Branch names use the **GitHub issue number**.
 
 ---
 

@@ -6,7 +6,7 @@
 - Cycle 1 merged and tagged `v0.1.0`.
 - Answer PRD **Q5** (which services you will really sell): edit `config/catalog/services.json` yourself or tell Claude in C2-01.
 - `OPENAI_API_KEY` in `.env` for C2-06 only.
-- Issue numbers: C2-01 #__ · C2-02 #__ · C2-03 #__ · C2-04 #__ · C2-05 #__ · C2-06 #__ · C2-07 #__ · C2-08 #__
+- Issue numbers: C2-01 #17 · C2-02 #18 · C2-03 #19 · C2-04 #20 · C2-05 #21 · C2-06 #22 · C2-07 #23 · C2-08 #24
 
 Every prompt starts after **S-2** and ends with **S-5 → S-6**.
 

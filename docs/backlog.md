@@ -37,7 +37,7 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 3. feat: `VoicePort` (Vapi + simulated), caller agent, call dispatcher with idempotency — FR-22
 4. feat: Vapi webhook + outcome agent + attempt-2 scheduling + DNC — FR-24, FR-28, FR-29
 5. feat: reconciliation loop — FR-28, ADR-0009
-6. feat: calls-today page, run timeline view, cost page — FR-30, FR-35
+6. feat: calls-today page and run timeline view — FR-30, FR-35
 7. test: 10 real test calls to own phones; pick transcriber + voice — risk mitigation
 8. docs: README, screenshots, demo video; fresh-clone test; tag `v0.3.0`; submit
 
@@ -47,6 +47,6 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 2. feat: Send confirmation button (prefilled WhatsApp link) — FR-27
 3. chore: Cloudflare Tunnel with 3-path ingress; tunnel health — NFR-5, ADR-0003
 4. feat: nightly backup + retention loops; restore test documented — NFR-6, NFR-12
-5. feat: weekly funnel page — FR-31
+5. feat: weekly funnel and costs pages — FR-31, FR-30 (costs), FR-33
 6. feat: daily summary + failure alerts (channel per Q8) — FR-34
 7. release: full regression, tag `v1.0.0`

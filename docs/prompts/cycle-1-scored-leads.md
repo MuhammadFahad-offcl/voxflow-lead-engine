@@ -6,7 +6,7 @@
 - Docker Desktop running; `docker compose up -d` works.
 - `copy .env.example .env` (keep `DEMO_MODE=true` until C1-07).
 - Apify account + API token (needed at C1-07). Perplexity API key (C1-10). Anthropic API key (C1-11). Put keys in `.env` yourself.
-- Prompt S-1 done (issues exist). Write issue numbers here: C1-01 #__ · C1-02 #__ · C1-03 #__ · C1-04 #__ · C1-05 #__ · C1-06 #__ · C1-07 #__ · C1-08 #__ · C1-09 #__ · C1-10 #__ · C1-11 #__ · C1-12 #__ · C1-13 #__ · C1-14 #__
+- Prompt S-1 done (issues exist). Issue numbers: C1-01 #3 · C1-02 #4 · C1-03 #5 · C1-04 #6 · C1-05 #7 · C1-06 #8 · C1-07 #9 · C1-08 #10 · C1-09 #11 · C1-10 #12 · C1-11 #13 · C1-12 #14 · C1-13 #15 · C1-14 #16
 
 Every prompt below starts after **S-2** and ends with **S-5 → S-6**.
 
