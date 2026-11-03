@@ -1,6 +1,6 @@
 # 0012. Pin TypeScript 6.0.3 until the lint and test tools support 7
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-04
 - **Deciders:** Muhammad Fahad
 - **PRD links:** NFR-8

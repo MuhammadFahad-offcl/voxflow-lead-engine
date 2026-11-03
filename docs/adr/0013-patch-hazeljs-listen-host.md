@@ -1,6 +1,6 @@
 # 0013. Patch @hazeljs/core: bind to 127.0.0.1 and clear health-check timers
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-04
 - **Deciders:** Muhammad Fahad
 - **PRD links:** NFR-5, NFR-8, NFR-10; ADR-0001, ADR-0003
