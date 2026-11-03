@@ -60,6 +60,7 @@ To use real services, set `DEMO_MODE=false` and fill the keys in `.env` (see `.e
 - [Product requirements](docs/prd.md)
 - [Architecture](docs/architecture.md) · [Database](docs/database.md) · [ADRs](docs/adr/)
 - [Engineering standards](docs/engineering-standards.md) · [Contributing](CONTRIBUTING.md)
+- [Claude Code prompts, cycle by cycle](docs/prompts/)
 - [Sprint retrospectives — the development log](docs/retros/)
 
 ## Responsible use

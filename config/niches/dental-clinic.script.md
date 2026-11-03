@@ -4,7 +4,7 @@
 Rules for the script agent (FR-18):
 - Fill only the {{variables}}. Do not add claims, prices, statistics or promises.
 - {{evidenceSummary}} must restate a stored signal's evidence in one short Urdu sentence.
-- The assistant always says it is an AI assistant (honest disclosure, PRD Call design).
+- The OPENING always says it is an AI assistant and that the call is recorded (NFR-7). Never remove either.
 - Keep each spoken turn under 2 sentences. The caller asks, then waits.
 - Branch names in [BRACKETS] are read by the caller agent's system prompt, not spoken.
 
@@ -20,7 +20,7 @@ Variables:
 -->
 
 [OPENING]
-السلام علیکم۔ میں VoxFlow AI Solutions کی AI اسسٹنٹ {{assistantName}} ہوں۔ کیا میری بات {{clinicName}} سے ہو رہی ہے؟
+السلام علیکم۔ میں VoxFlow AI Solutions کی AI اسسٹنٹ {{assistantName}} ہوں، اور یہ کال ریکارڈ ہو رہی ہے۔ کیا میری بات {{clinicName}} سے ہو رہی ہے؟
 
 [DECISION_MAKER_CHECK]
 کیا {{doctorName}} یا کلینک کے مالک سے ایک منٹ بات ہو سکتی ہے؟
