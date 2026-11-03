@@ -8,6 +8,7 @@ description: How code is structured in apps/api with HazelJS — modules, DI, po
 Check the installed HazelJS version's docs/types before using an API you have not used in this repo yet; do not invent decorator options.
 
 ## Layout
+
 - `modules/<feature>/` — controller (HTTP only: parse with Zod, call service, map errors), service (use-case logic), `<feature>.module.ts`.
 - `pipeline/` — steps (`discover`, `enrich`, `score`) and `lead.graph.ts` (one `AgentGraph` per lead).
 - `agents/` — one file per agent: `solution`, `script`, `approval`, `caller`, `outcome`.
@@ -17,6 +18,7 @@ Check the installed HazelJS version's docs/types before using an API you have no
 - `db/` — Prisma client provider and repositories.
 
 ## Rules
+
 - Depend on ports, never on SDKs. Only adapters import `apify-client`, `@anthropic-ai/sdk`, Vapi, Google APIs, Perplexity, `puppeteer-core`.
 - Bind real or fake adapters in one place (the adapters module) from `env.DEMO_MODE`.
 - Agents get model ids from `Settings.llmModels[task]`; never hard-code a model name outside `config/`.

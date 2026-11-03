@@ -31,9 +31,26 @@
   "errorLens.enabledDiagnosticLevels": ["error", "warning"],
   "cSpell.language": "en",
   "cSpell.words": [
-    "voxflow", "hazeljs", "pgvector", "lightpanda", "apify", "vapi", "pplx",
-    "cuid", "knip", "sonarjs", "gitleaks", "commitlint", "Lahore", "Urdu",
-    "Gulberg", "Karachi", "cloudflared", "Cheerio", "dedupe", "hnsw"
+    "voxflow",
+    "hazeljs",
+    "pgvector",
+    "lightpanda",
+    "apify",
+    "vapi",
+    "pplx",
+    "cuid",
+    "knip",
+    "sonarjs",
+    "gitleaks",
+    "commitlint",
+    "Lahore",
+    "Urdu",
+    "Gulberg",
+    "Karachi",
+    "cloudflared",
+    "Cheerio",
+    "dedupe",
+    "hnsw"
   ],
   "sonarlint.rules": {
     "typescript:S1135": { "level": "on" }

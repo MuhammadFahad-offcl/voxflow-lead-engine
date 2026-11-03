@@ -12,11 +12,11 @@ services:
       POSTGRES_DB: voxflow
       TZ: UTC
     ports:
-      - "127.0.0.1:5432:5432"
+      - '127.0.0.1:5432:5432'
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U voxflow -d voxflow"]
+      test: ['CMD-SHELL', 'pg_isready -U voxflow -d voxflow']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -25,9 +25,9 @@ services:
     image: lightpanda/browser:nightly
     restart: unless-stopped
     environment:
-      LIGHTPANDA_DISABLE_TELEMETRY: "true"
+      LIGHTPANDA_DISABLE_TELEMETRY: 'true'
     ports:
-      - "127.0.0.1:9222:9222"
+      - '127.0.0.1:9222:9222'
 
 volumes:
   pgdata:

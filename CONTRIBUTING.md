@@ -4,12 +4,12 @@ This repo is run like a small product team, even with one developer. The full ru
 
 ## Scrum rhythm (one-week cycles)
 
-| Day | Ceremony | Output |
-|---|---|---|
-| Monday | Planning | issues for the cycle moved to "In progress" column, cycle goal written in the milestone |
-| Daily | Stand-up note | 3 lines in the cycle milestone: done / next / blocked |
-| Sunday | Review | demo of the cycle deliverable (screen recording), tag `v0.N.0` |
-| Sunday | Retro | `docs/retros/cycle-N.md` |
+| Day    | Ceremony      | Output                                                                                  |
+| ------ | ------------- | --------------------------------------------------------------------------------------- |
+| Monday | Planning      | issues for the cycle moved to "In progress" column, cycle goal written in the milestone |
+| Daily  | Stand-up note | 3 lines in the cycle milestone: done / next / blocked                                   |
+| Sunday | Review        | demo of the cycle deliverable (screen recording), tag `v0.N.0`                          |
+| Sunday | Retro         | `docs/retros/cycle-N.md`                                                                |
 
 ## From issue to merge
 

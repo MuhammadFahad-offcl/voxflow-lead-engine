@@ -10,15 +10,15 @@ v1 STOPS at the call. **Do not build:** email, automated WhatsApp, follow-up seq
 
 ## Read before you code
 
-| Need | File |
-|---|---|
-| Requirements (FR/NFR ids) | `docs/prd.md` |
-| How the parts fit | `docs/architecture.md` |
-| Why a choice was made | `docs/adr/` |
-| Tables and invariants | `prisma/schema.prisma`, `docs/database.md` |
-| Code, Git, PR, test rules | `docs/engineering-standards.md` |
-| Current cycle's issues | `docs/backlog.md` |
-| Ready prompt for each issue | `docs/prompts/` |
+| Need                        | File                                       |
+| --------------------------- | ------------------------------------------ |
+| Requirements (FR/NFR ids)   | `docs/prd.md`                              |
+| How the parts fit           | `docs/architecture.md`                     |
+| Why a choice was made       | `docs/adr/`                                |
+| Tables and invariants       | `prisma/schema.prisma`, `docs/database.md` |
+| Code, Git, PR, test rules   | `docs/engineering-standards.md`            |
+| Current cycle's issues      | `docs/backlog.md`                          |
+| Ready prompt for each issue | `docs/prompts/`                            |
 
 Every change must trace to an FR/NFR or an ADR. If it doesn't, don't write it — propose a PRD/ADR change instead (Change control in `CONTRIBUTING.md`).
 

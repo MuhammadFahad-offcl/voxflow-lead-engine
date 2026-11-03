@@ -37,16 +37,16 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 
 ## Invariants (enforced by the database, not just code)
 
-| Rule | How |
-|---|---|
-| One lead per business per organization | `@@unique([organizationId, placeId])` on `Lead` |
-| Never more than 2 call attempts per business | `@@unique([leadId, attemptNumber])` + `CHECK ("attemptNumber" IN (1, 2))` in the first migration |
-| A call is never placed twice | `idempotencyKey @unique`, `vapiCallId @unique` |
-| A signal counts once per lead | `@@unique([leadId, key])` on `Signal` |
-| One solution and one script per lead | `leadId @unique` on `Solution`, `Script` |
-| One meeting per call, one calendar event per meeting | `callAttemptId @unique`, `calendarEventId @unique` |
-| A blocked number stays blocked | `@@unique([organizationId, phone])` on `DoNotCall`; checked by the do-not-call policy before every dial |
-| Niche settings of old campaigns stay explainable | `NicheProfile` rows are versioned (`@@unique([organizationId, slug, version])`) and never edited |
+| Rule                                                 | How                                                                                                     |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| One lead per business per organization               | `@@unique([organizationId, placeId])` on `Lead`                                                         |
+| Never more than 2 call attempts per business         | `@@unique([leadId, attemptNumber])` + `CHECK ("attemptNumber" IN (1, 2))` in the first migration        |
+| A call is never placed twice                         | `idempotencyKey @unique`, `vapiCallId @unique`                                                          |
+| A signal counts once per lead                        | `@@unique([leadId, key])` on `Signal`                                                                   |
+| One solution and one script per lead                 | `leadId @unique` on `Solution`, `Script`                                                                |
+| One meeting per call, one calendar event per meeting | `callAttemptId @unique`, `calendarEventId @unique`                                                      |
+| A blocked number stays blocked                       | `@@unique([organizationId, phone])` on `DoNotCall`; checked by the do-not-call policy before every dial |
+| Niche settings of old campaigns stay explainable     | `NicheProfile` rows are versioned (`@@unique([organizationId, slug, version])`) and never edited        |
 
 ## Conventions
 

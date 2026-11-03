@@ -1,13 +1,13 @@
 # VoxFlow Lead Engine — Architecture (v1)
 
-| Field | Value |
-| --- | --- |
-| Status | Approved for build |
-| Version | 1.0 (matches PRD v0.2) |
-| Date | 3 Nov 2026 |
-| Owner | Muhammad Fahad |
+| Field                  | Value                                                       |
+| ---------------------- | ----------------------------------------------------------- |
+| Status                 | Approved for build                                          |
+| Version                | 1.0 (matches PRD v0.2)                                      |
+| Date                   | 3 Nov 2026                                                  |
+| Owner                  | Muhammad Fahad                                              |
 | Source of requirements | [`docs/prd.md`](./prd.md) — every FR/NFR below refers to it |
-| Decisions | [`docs/adr/`](./adr/) — each major choice has an ADR |
+| Decisions              | [`docs/adr/`](./adr/) — each major choice has an ADR        |
 
 This document says **how** v1 is built. The PRD says **what** and **why**. If the two disagree, stop and fix one of them through the change process in [`CONTRIBUTING.md`](../CONTRIBUTING.md) before writing code.
 
@@ -37,14 +37,14 @@ Everything except the outside services runs on the founder's Windows laptop (ADR
 
 ## 2. Containers and processes
 
-| Unit | Runs as | Port | Job |
-| --- | --- | --- | --- |
-| `apps/web` | `pnpm --filter web dev` (Next.js) | 3000, localhost only | Dashboard pages (FR-30, FR-31) |
-| `apps/api` — API entry `src/main.ts` | `pnpm --filter api dev` | 4000, bound to 127.0.0.1 | REST for the dashboard, Vapi webhook + tool routes, approvals, calendar slot cache |
-| `apps/api` — worker entry `src/worker.ts` | `pnpm --filter api worker` | none | Pipeline runs, call dispatcher, reconciliation, retention, backups |
-| `postgres` | Docker, image `pgvector/pgvector:pg17` | 5432 | All data, vectors, HazelJS durable runs |
-| `lightpanda` | Docker, image `lightpanda/browser:nightly` | 9222 (CDP) | Renders JavaScript-only websites (ADR-0004) |
-| `cloudflared` | Windows service (Cycle 4) | — | Public HTTPS for 3 paths only (ADR-0003) |
+| Unit                                      | Runs as                                    | Port                     | Job                                                                                |
+| ----------------------------------------- | ------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
+| `apps/web`                                | `pnpm --filter web dev` (Next.js)          | 3000, localhost only     | Dashboard pages (FR-30, FR-31)                                                     |
+| `apps/api` — API entry `src/main.ts`      | `pnpm --filter api dev`                    | 4000, bound to 127.0.0.1 | REST for the dashboard, Vapi webhook + tool routes, approvals, calendar slot cache |
+| `apps/api` — worker entry `src/worker.ts` | `pnpm --filter api worker`                 | none                     | Pipeline runs, call dispatcher, reconciliation, retention, backups                 |
+| `postgres`                                | Docker, image `pgvector/pgvector:pg17`     | 5432                     | All data, vectors, HazelJS durable runs                                            |
+| `lightpanda`                              | Docker, image `lightpanda/browser:nightly` | 9222 (CDP)               | Renders JavaScript-only websites (ADR-0004)                                        |
+| `cloudflared`                             | Windows service (Cycle 4)                  | —                        | Public HTTPS for 3 paths only (ADR-0003)                                           |
 
 There is **no Redis and no message broker** in v1 (ADR-0002). Database state is the queue: the worker polls for due work.
 
@@ -155,13 +155,13 @@ When every lead in a campaign has finished its lead graph, the worker sets `AWAI
 
 ## 6. Agents
 
-| Agent | Model task key | Tools | Output (Zod in `packages/shared`) | FR |
-| --- | --- | --- | --- | --- |
-| `solution-agent` | `SOLUTION` | `searchCatalog` (pgvector top-5) | `{ serviceSlug, reason, signalIds[] }` — serviceSlug must be in the catalog, every signalId must belong to the lead; else retry once, then `NEEDS_REVIEW`; or `NO_STRONG_SIGNAL` | FR-16, FR-17 |
-| `script-agent` | `SCRIPT` | none | `{ problemLine, solutionLine, variables }` — only fills template variables; never rewrites the template | FR-18 |
-| `approval-agent` | none (no LLM step) | `queueCampaignCalls` (requiresApproval) | — | FR-19 |
-| `caller-agent` | none | `placeCall` (Gatekeeper-checked) | — | FR-21–FR-23 |
-| `outcome-agent` | `OUTCOME` | none | `{ result, reasonCode?, remarks, callbackAt?, decisionMakerName? }` | FR-28, FR-29 |
+| Agent            | Model task key     | Tools                                   | Output (Zod in `packages/shared`)                                                                                                                                                | FR           |
+| ---------------- | ------------------ | --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| `solution-agent` | `SOLUTION`         | `searchCatalog` (pgvector top-5)        | `{ serviceSlug, reason, signalIds[] }` — serviceSlug must be in the catalog, every signalId must belong to the lead; else retry once, then `NEEDS_REVIEW`; or `NO_STRONG_SIGNAL` | FR-16, FR-17 |
+| `script-agent`   | `SCRIPT`           | none                                    | `{ problemLine, solutionLine, variables }` — only fills template variables; never rewrites the template                                                                          | FR-18        |
+| `approval-agent` | none (no LLM step) | `queueCampaignCalls` (requiresApproval) | —                                                                                                                                                                                | FR-19        |
+| `caller-agent`   | none               | `placeCall` (Gatekeeper-checked)        | —                                                                                                                                                                                | FR-21–FR-23  |
+| `outcome-agent`  | `OUTCOME`          | none                                    | `{ result, reasonCode?, remarks, callbackAt?, decisionMakerName? }`                                                                                                              | FR-28, FR-29 |
 
 The model for each task key comes from `Settings.llmModels` (default `claude-haiku-5-5` for all; Cycle 2 compares against `gpt-6-luna` for `SCRIPT`, ADR-0006). All LLM calls go through `LlmPort`, which records a `CostRecord` and refuses when the monthly LLM cap would be exceeded (FR-33).
 
@@ -171,39 +171,39 @@ The live call's conversation model is configured in Vapi, not here, and is bille
 
 Checked before every `placeCall` (FR-21). Each denial is stored on the attempt as `deniedBy`.
 
-| Policy id | Rule | Default |
-| --- | --- | --- |
-| `calling-hours` | now (Asia/Karachi) inside an allowed window | Mon–Sat 10:00–13:00, 15:00–18:00; Fri 12:30–15:00 blocked |
-| `do-not-call` | phone not in `DoNotCall` | — |
-| `attempt-limit` | fewer than 2 dialled attempts for this place ID **and** this phone, all campaigns | 2 |
-| `spend-cap` | today's Vapi spend < daily cap; month's LLM spend < $10 | from Settings |
-| `health` | database, worker and tunnel all healthy | — |
-| `campaign-approved` | campaign status is `CALLING` | — |
+| Policy id           | Rule                                                                              | Default                                                   |
+| ------------------- | --------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `calling-hours`     | now (Asia/Karachi) inside an allowed window                                       | Mon–Sat 10:00–13:00, 15:00–18:00; Fri 12:30–15:00 blocked |
+| `do-not-call`       | phone not in `DoNotCall`                                                          | —                                                         |
+| `attempt-limit`     | fewer than 2 dialled attempts for this place ID **and** this phone, all campaigns | 2                                                         |
+| `spend-cap`         | today's Vapi spend < daily cap; month's LLM spend < $10                           | from Settings                                             |
+| `health`            | database, worker and tunnel all healthy                                           | —                                                         |
+| `campaign-approved` | campaign status is `CALLING`                                                      | —                                                         |
 
 ## 8. Adapters (ports and adapters, ADR-0007)
 
-| Port | Real adapter | Fake adapter (demo + tests) | Used by |
-| --- | --- | --- | --- |
-| `LeadSourcePort` | Apify actor (chosen Cycle 1) | `fixtures/places/*.json` | discover |
-| `WebReaderPort` | fetch + Cheerio, Lightpanda via `puppeteer-core` CDP | `fixtures/sites/*.html` | enrich |
-| `WebContextPort` | Perplexity Search API | `fixtures/context/*.json` | enrich |
-| `LlmPort` | `@hazeljs/ai` → Anthropic (and OpenAI for the Cycle 2 comparison) | recorded responses in `fixtures/llm/` | agents |
-| `EmbeddingPort` | Perplexity `pplx-embed-v1-0.6b` (1024 dims) | deterministic hash vectors | catalog, solution |
-| `VoicePort` | Vapi REST (create call, get call) | simulated call that posts a fixture webhook to the API after a delay | caller, reconciliation |
-| `CalendarPort` | Google Calendar API (free/busy, insert event with Meet) | in-memory calendar | booking |
+| Port             | Real adapter                                                      | Fake adapter (demo + tests)                                          | Used by                |
+| ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------- |
+| `LeadSourcePort` | Apify actor (chosen Cycle 1)                                      | `fixtures/places/*.json`                                             | discover               |
+| `WebReaderPort`  | fetch + Cheerio, Lightpanda via `puppeteer-core` CDP              | `fixtures/sites/*.html`                                              | enrich                 |
+| `WebContextPort` | Perplexity Search API                                             | `fixtures/context/*.json`                                            | enrich                 |
+| `LlmPort`        | `@hazeljs/ai` → Anthropic (and OpenAI for the Cycle 2 comparison) | recorded responses in `fixtures/llm/`                                | agents                 |
+| `EmbeddingPort`  | Perplexity `pplx-embed-v1-0.6b` (1024 dims)                       | deterministic hash vectors                                           | catalog, solution      |
+| `VoicePort`      | Vapi REST (create call, get call)                                 | simulated call that posts a fixture webhook to the API after a delay | caller, reconciliation |
+| `CalendarPort`   | Google Calendar API (free/busy, insert event with Meet)           | in-memory calendar                                                   | booking                |
 
 `DEMO_MODE=true` binds every port to its fake. Selection happens once, in the DI module, never with `if (demo)` inside business code.
 
 ## 9. Worker loops
 
-| Loop | Interval | Does | FR / NFR |
-| --- | --- | --- | --- |
-| `campaign-runner` | 10 s | Advances campaigns: discover, start lead graphs, detect completion → approval | FR-3 |
-| `lead-runner` | 10 s | Picks leads with pending steps (max N concurrent), resumes failed-then-retried leads | FR-32 |
-| `call-dispatcher` | 30 s | Due `SCHEDULED` attempts → policies → `placeCall` | FR-20–FR-23 |
-| `reconciliation` | on start + 15 min | Attempts `DIALING` with no result after 20 min → `VoicePort.getCall` → same handler as the webhook | FR-28 |
-| `retention` | daily 03:00 PKT | Clears transcript + recording URL older than `retentionDays` (default 90) | NFR-6 |
-| `backup` | daily 02:00 PKT | `pg_dump` to `BACKUP_DIR` (a Google Drive–synced folder) | NFR-12 |
+| Loop              | Interval          | Does                                                                                               | FR / NFR    |
+| ----------------- | ----------------- | -------------------------------------------------------------------------------------------------- | ----------- |
+| `campaign-runner` | 10 s              | Advances campaigns: discover, start lead graphs, detect completion → approval                      | FR-3        |
+| `lead-runner`     | 10 s              | Picks leads with pending steps (max N concurrent), resumes failed-then-retried leads               | FR-32       |
+| `call-dispatcher` | 30 s              | Due `SCHEDULED` attempts → policies → `placeCall`                                                  | FR-20–FR-23 |
+| `reconciliation`  | on start + 15 min | Attempts `DIALING` with no result after 20 min → `VoicePort.getCall` → same handler as the webhook | FR-28       |
+| `retention`       | daily 03:00 PKT   | Clears transcript + recording URL older than `retentionDays` (default 90)                          | NFR-6       |
+| `backup`          | daily 02:00 PKT   | `pg_dump` to `BACKUP_DIR` (a Google Drive–synced folder)                                           | NFR-12      |
 
 Every loop is idempotent: running it twice does nothing extra (NFR-1). Locking uses `UPDATE … WHERE status = X RETURNING` claims so a restart never double-dials (NFR-2).
 
@@ -213,11 +213,11 @@ Every loop is idempotent: running it twice does nothing extra (NFR-1). Locking u
 
 **In-call tools** (Vapi server tools pointing at the tunnel):
 
-| Path | Purpose | Contract |
-| --- | --- | --- |
-| `POST /vapi/tools/get-slots` | 2 free slots | Answers from the **in-memory slot cache** refreshed every 5 minutes from Google Calendar free/busy (ADR-0008). p95 < 2 s. |
-| `POST /vapi/tools/book-slot` | Book the chosen slot | Live free/busy re-check, then insert event with Meet link; if taken, returns the next free slot. Creates `Meeting`. Idempotent on `attemptId + slotStart`. |
-| `POST /webhooks/vapi` | End-of-call report | Verify shared secret → store transcript, recording URL, duration, cost → outcome agent → update lead (FR-28, FR-29). Respond 200 fast, process after. Idempotent on `vapiCallId`. |
+| Path                         | Purpose              | Contract                                                                                                                                                                          |
+| ---------------------------- | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /vapi/tools/get-slots` | 2 free slots         | Answers from the **in-memory slot cache** refreshed every 5 minutes from Google Calendar free/busy (ADR-0008). p95 < 2 s.                                                         |
+| `POST /vapi/tools/book-slot` | Book the chosen slot | Live free/busy re-check, then insert event with Meet link; if taken, returns the next free slot. Creates `Meeting`. Idempotent on `attemptId + slotStart`.                        |
+| `POST /webhooks/vapi`        | End-of-call report   | Verify shared secret → store transcript, recording URL, duration, cost → outcome agent → update lead (FR-28, FR-29). Respond 200 fast, process after. Idempotent on `vapiCallId`. |
 
 Cloudflare Tunnel ingress allows exactly these three paths; every other path returns 404 (NFR-5). Exact Vapi payload and secret-header names are taken from Vapi's docs at implementation time and pinned in tests.
 
@@ -257,13 +257,13 @@ All configuration is read once from environment variables, validated by a Zod sc
 
 ## 15. Testing strategy
 
-| Level | Tool | What | Gate |
-| --- | --- | --- | --- |
-| Unit | Jest | `scoring/`, policies, phone/URL normalizers, slot math, attempt rules | Coverage ≥ 80% on scoring + adapters (NFR-9) |
-| Integration | Jest + Postgres in Docker | Repositories, pipeline steps with fake adapters, webhook handler | Every PR |
-| Agent | `@hazeljs/testing` `describeAgent` | Agents call the right tools; outputs pass Zod | Every PR |
-| Eval | `evals/` runner | 10 fictional clinics: catalog-only solutions, no invented evidence | Every PR touching agents or prompts |
-| End-to-end | Demo mode script | One campaign from create to logged call result | End of every cycle |
+| Level       | Tool                               | What                                                                  | Gate                                         |
+| ----------- | ---------------------------------- | --------------------------------------------------------------------- | -------------------------------------------- |
+| Unit        | Jest                               | `scoring/`, policies, phone/URL normalizers, slot math, attempt rules | Coverage ≥ 80% on scoring + adapters (NFR-9) |
+| Integration | Jest + Postgres in Docker          | Repositories, pipeline steps with fake adapters, webhook handler      | Every PR                                     |
+| Agent       | `@hazeljs/testing` `describeAgent` | Agents call the right tools; outputs pass Zod                         | Every PR                                     |
+| Eval        | `evals/` runner                    | 10 fictional clinics: catalog-only solutions, no invented evidence    | Every PR touching agents or prompts          |
+| End-to-end  | Demo mode script                   | One campaign from create to logged call result                        | End of every cycle                           |
 
 ## 16. HazelJS features used (for the submission)
 
