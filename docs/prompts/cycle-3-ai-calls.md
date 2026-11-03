@@ -7,7 +7,7 @@
 - Vapi account with credit; a phone number in Vapi that can call Pakistani mobiles (imported Twilio/Telnyx number or Vapi number — confirm international calling to +92 works and its per-minute price).
 - Answer PRD **Q1** (PTA telemarketing rules) before any call to a real business. Test calls go only to your own phones.
 - `VAPI_API_KEY`, `VAPI_PHONE_NUMBER_ID`, `VAPI_WEBHOOK_SECRET` (`openssl rand -hex 32`) in `.env`.
-- Issue numbers: C3-01 #__ · C3-02 #__ · C3-03 #__ · C3-04 #__ · C3-05 #__ · C3-06 #__ · C3-07 #__ · C3-08 #__
+- Issue numbers: C3-01 #25 · C3-02 #26 · C3-03 #27 · C3-04 #28 · C3-05 #29 · C3-06 #30 · C3-07 #31 · C3-08 #32
 
 **Note on webhooks this cycle:** the Cloudflare Tunnel arrives in Cycle 4. In Cycle 3, real test-call results arrive through the **reconciliation loop** (C3-05 polls Vapi's API), and the webhook route is tested with recorded payloads and the simulated voice adapter. That is exactly why ADR-0009 exists.
 
@@ -141,22 +141,21 @@ This is how real test calls get results until the tunnel exists. Show the plan a
 
 ---
 
-## C3-06 · feat: calls-today, run timeline and costs pages
-Branch `feat/<#>-calls-pages` · Trace FR-30, FR-35, FR-33, NFR-10
+## C3-06 · feat: calls-today page and run timeline view
+Branch `feat/<#>-calls-pages` · Trace FR-30, FR-35, NFR-10
 
 ```text
-Issue #<#>: operations pages. Trace: FR-30 (calls today, costs), FR-35 (run timeline), FR-33. Feature skill.
+Issue #<#>: operations pages. Trace: FR-30 (calls today), FR-35 (run timeline). Feature skill.
 
 1. /calls: today's attempts in PKT — time, clinic, attempt #, status, result, reason, remarks, duration, cost,
    play recording link, transcript drawer; filters by result; denied attempts show the policy.
 2. /campaigns/[id]/timeline: every step, tool call, approval and state change for the campaign and its leads,
    from the HazelJS run timeline (read the @hazeljs/agent timeline API) merged with our status changes,
    newest first, paginated.
-3. /costs: month-to-date and today per service (APIFY, PERPLEXITY_*, LLM, VAPI) vs caps, cost per lead and per
-   booked meeting, top 10 most expensive leads.
-4. Lead detail page: show attempts with results and remarks.
+3. Lead detail page: show attempts with results and remarks.
 
-Acceptance: after a demo campaign is called, all three pages show consistent numbers. Show the plan and wait.
+Acceptance: after a demo campaign is called, /calls, the timeline and the lead detail page show the same attempts
+and results. Show the plan and wait.
 ```
 
 ---

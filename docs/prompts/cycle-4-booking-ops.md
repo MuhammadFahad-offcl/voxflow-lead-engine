@@ -7,7 +7,7 @@
 - Google Cloud project with the Calendar API enabled and an OAuth client (Desktop app) — Claude will guide you in C4-01.
 - Cloudflare account with the `voxflow.agency` domain on Cloudflare DNS (needed for C4-03).
 - Decide PRD **Q8** (alert channel) before C4-06.
-- Issue numbers: C4-01 #__ · C4-02 #__ · C4-03 #__ · C4-04 #__ · C4-05 #__ · C4-06 #__ · C4-07 #__
+- Issue numbers: C4-01 #33 · C4-02 #34 · C4-03 #35 · C4-04 #36 · C4-05 #37 · C4-06 #38 · C4-07 #39
 
 Every prompt starts after **S-2** and ends with **S-5 → S-6**.
 
@@ -113,11 +113,12 @@ Acceptance: a dump appears in BACKUP_DIR; restore steps work on a clean volume. 
 
 ---
 
-## C4-05 · feat: weekly funnel page
-Branch `feat/<#>-funnel` · Trace FR-31, US-15, G-goals
+## C4-05 · feat: weekly funnel and costs pages
+Branch `feat/<#>-funnel-costs` · Trace FR-31, FR-30 (costs), FR-33, US-15, G-goals
 
 ```text
-Issue #<#>: weekly funnel. Trace: FR-31, US-15, PRD goals. Feature + db-change skills.
+Issue #<#>: weekly funnel and costs. Trace: FR-31, FR-30 (costs), FR-33, US-15, PRD goals. Feature + db-change
+skills.
 
 1. "Won" is entered by me: use the db-change skill to add Lead.wonAt (DateTime?) and Lead.wonNote; a
    "Mark as won" action on booked leads.
@@ -125,8 +126,10 @@ Issue #<#>: weekly funnel. Trace: FR-31, US-15, PRD goals. Feature + db-change s
    (attempt dialled), answered (any result except NO_ANSWER/FAILED), booked, won — plus conversion % between steps
    and cost per booked meeting.
 3. Dashboard /funnel: this week vs last 4 weeks (bar per stage), goal line for 2 clients/month from the PRD.
+4. Dashboard /costs: month-to-date and today per service (APIFY, PERPLEXITY_*, LLM, VAPI) vs caps, cost per lead,
+   cost per booked meeting, top 10 most expensive leads.
 
-Acceptance: numbers match a hand count on demo data in the PR description. Show the plan and wait.
+Acceptance: funnel and cost numbers match a hand count on demo data in the PR description. Show the plan and wait.
 ```
 
 ---
@@ -136,7 +139,7 @@ Branch `feat/<#>-alerts` · Trace FR-34 (should), NFR-10
 
 ```text
 Issue #<#>: daily summary and alerts. Trace: FR-34 (should — time-box 3 h), NFR-10.
-Channel = my answer to PRD Q8: <write it here, e.g. "email to myself via Gmail SMTP" or "Telegram bot to me">.
+Channel = my answer to PRD Q8: <write it here: "Telegram bot to me" or "Windows desktop notifications">.
 This sends messages ONLY to me, the founder — never to leads (CLAUDE.md "Do not build").
 
 1. ports/notifier.port.ts with the chosen real adapter + a fake that writes to the log.
