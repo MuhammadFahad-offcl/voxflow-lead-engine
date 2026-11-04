@@ -71,4 +71,30 @@ export class CampaignsRepository {
   create(data: NewCampaign): Promise<CampaignWithNiche> {
     return this.prisma.campaign.create({ data, include: WITH_NICHE });
   }
+
+  /**
+   * Lists campaigns, newest first.
+   *
+   * Does not paginate: v1 runs a handful of campaigns.
+   * @param organizationId - Owner of the campaigns.
+   * @returns Every campaign with its niche.
+   */
+  list(organizationId: string): Promise<CampaignWithNiche[]> {
+    return this.prisma.campaign.findMany({
+      where: { organizationId },
+      // id breaks ties, so two campaigns created in the same millisecond keep one order.
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      include: WITH_NICHE,
+    });
+  }
+
+  /**
+   * Finds one campaign.
+   * @param organizationId - Owner of the campaign.
+   * @param id - Campaign id.
+   * @returns The campaign with its niche, or null when it does not exist for this organization.
+   */
+  find(organizationId: string, id: string): Promise<CampaignWithNiche | null> {
+    return this.prisma.campaign.findFirst({ where: { id, organizationId }, include: WITH_NICHE });
+  }
 }

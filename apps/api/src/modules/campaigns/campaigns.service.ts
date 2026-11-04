@@ -1,5 +1,5 @@
 /**
- * Campaign use cases: create a campaign with its search grid (list and get follow in part 2b of #8).
+ * Campaign use cases: create with its search grid, list and get.
  *
  * Serves: FR-1 (create), FR-2 (grid size, cap, duplicate rate).
  * Used by: apps/api/src/modules/campaigns/campaigns.controller.ts.
@@ -77,6 +77,32 @@ export class CampaignsService {
       searchCount: niche.searchTerms.length * input.areas.length,
     });
     return toSummary(campaign);
+  }
+
+  /**
+   * Lists every campaign, newest first.
+   * @returns The summaries.
+   * @throws HttpError (503) when the database is not seeded.
+   */
+  async list(): Promise<CampaignSummary[]> {
+    const campaigns = await this.repository.list(await this.organizationId());
+    return campaigns.map(toSummary);
+  }
+
+  /**
+   * Gets one campaign.
+   * @param id - Campaign id.
+   * @returns Its summary.
+   * @throws NotFoundError when it does not exist; HttpError (503) when the database is not seeded.
+   */
+  async get(id: string): Promise<CampaignSummary> {
+    return toSummary(await this.find(id));
+  }
+
+  private async find(id: string): Promise<CampaignWithNiche> {
+    const campaign = await this.repository.find(await this.organizationId(), id);
+    if (campaign === null) throw new NotFoundError(`Campaign "${id}" not found`);
+    return campaign;
   }
 
   private async organizationId(): Promise<string> {
