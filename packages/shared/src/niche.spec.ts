@@ -25,6 +25,14 @@ describe('NicheFile', () => {
     expect(NicheFile.safeParse(dental).success).toBe(true);
   });
 
+  it('rejects a repeated search term, in any case, because it would pay twice', () => {
+    const repeated = { ...structuredClone(dental), searchTerms: ['dentist', 'Dentist '] };
+
+    expect(NicheFile.safeParse(repeated).error?.issues.map((issue) => issue.message)).toEqual([
+      'search terms must be unique: a repeat pays for the same search twice',
+    ]);
+  });
+
   it('rejects weights that do not add up to 100', () => {
     const heavier = structuredClone(dental);
     // Change only the points: a missing `rule` would fail first and never reach the sum check.

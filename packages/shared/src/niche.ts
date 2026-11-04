@@ -69,7 +69,13 @@ export const NicheFile = z
     slug: z.string().regex(/^[a-z0-9-]+$/),
     version: z.number().int().positive(),
     name: z.string().min(1),
-    searchTerms: z.array(z.string().min(1)).min(1),
+    searchTerms: z
+      .array(z.string().min(1))
+      .min(1)
+      .refine(
+        (terms) => new Set(terms.map((term) => term.trim().toLowerCase())).size === terms.length,
+        'search terms must be unique: a repeat pays for the same search twice',
+      ),
     categoryKeywords: z.array(z.string().min(1)).min(1),
     idealClient: IdealClient,
     tiers: z
