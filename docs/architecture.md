@@ -244,7 +244,7 @@ All configuration is read once from environment variables, validated by a Zod sc
 
 - Outside calls: 3 retries, exponential backoff with jitter, timeout per adapter (NFR-1).
 - Lead failures store `failedStep` + `error`; the dashboard shows a retry button (FR-32).
-- Structured JSON logs with `campaignId`, `leadId`, `attemptId` on every line (NFR-10). Logger choice (HazelJS's or pino) recorded in a Cycle 1 ADR.
+- Structured JSON logs with `campaignId`, `leadId`, `attemptId` on every line (NFR-10). Logger: pino, JSON lines, phones masked to the last 4 digits ([ADR-0014](adr/0014-pino-logger-env-before-di.md)).
 - `GET /health` is HazelJS's built-in liveness probe (`{ status: "alive", timestamp }`) and is never extended. Database, worker heartbeat (written each loop), tunnel reachability and Lightpanda are registered as HazelJS health checks with `app.registerHealthCheck({ name, check, critical })` and reported by `GET /ready` (NFR-10). `/ready` answers 200 only when its overall status is `healthy`: any `degraded` check — including HazelJS's built-in `memory` (heap > 500 MB) and `eventLoop` (lag > 100 ms) checks — or an unhealthy critical check gives 503. The `health` policy therefore reads the individual `db`, `worker` and `tunnel` results, not the status code.
 - Run timeline per campaign from HazelJS's timeline store (FR-35).
 
