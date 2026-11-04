@@ -399,12 +399,25 @@ const summarize = (pass1: Pass1[], pass2: Pass2[], spent: number): string => {
 
 // ── Main ───────────────────────────────────────────────────────────────────────────────────────
 const dryRun = process.argv.includes('--dry-run');
-const token = process.env['APIFY_TOKEN'];
+// Trimmed, because a stray space or line ending copied into .env makes Apify answer 401.
+const token = process.env['APIFY_TOKEN']?.trim();
 if (!dryRun && (token === undefined || token === '')) {
   process.stderr.write(
     'APIFY_TOKEN is not set. Run with: pnpm exec tsx --env-file=.env scripts/spikes/apify-compare.ts\n',
   );
   process.exit(1);
+}
+// Checked once before any run, so a bad token stops here instead of failing every run one by one.
+if (!dryRun && token !== undefined) {
+  const me = await fetch(`${API}/users/me`, { headers: { Authorization: `Bearer ${token}` } });
+  if (me.status === 401) {
+    process.stderr.write(
+      'Apify refused APIFY_TOKEN (HTTP 401). Copy the token from Apify Console → Settings → ' +
+        'API & Integrations → Personal API tokens (it starts with apify_api_) into .env as ' +
+        'APIFY_TOKEN=apify_api_..., with no quotes or spaces. Nothing was run or charged.\n',
+    );
+    process.exit(1);
+  }
 }
 const runActor = dryRun || token === undefined ? dryRunner : realRunner(token);
 const outDir = join(
