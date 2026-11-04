@@ -21,6 +21,7 @@
     "@jest/globals": "30.5.2",
     "@types/node": "26.6.6",
     "eslint": "10.14.0",
+    "eslint-plugin-jsdoc": "65.4.2",
     "eslint-plugin-sonarjs": "4.2.2",
     "jest": "30.5.2",
     "knip": "6.44.1",

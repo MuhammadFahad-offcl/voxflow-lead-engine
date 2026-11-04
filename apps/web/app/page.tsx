@@ -1,3 +1,9 @@
+/**
+ * Dashboard home page: shows whether the API is reachable.
+ *
+ * Serves: ADR-0001, NFR-8 (issue #3: proves web, API and the shared schema work together).
+ * Used by: Next.js App Router, which serves this file at `/`.
+ */
 import { HealthResponse } from '@voxflow/shared';
 import { connection } from 'next/server';
 import { z } from 'zod';
@@ -11,10 +17,17 @@ const ApiAddressEnv = z.object({
 const env = ApiAddressEnv.parse(process.env);
 const apiBaseUrl = `http://${env.API_HOST}:${String(env.API_PORT)}`;
 
+/**
+ * Reads the API's liveness status.
+ *
+ * Does not throw or retry: any failure, including a body that fails the schema, is `unreachable`.
+ * @returns The status from `GET /health`, or `unreachable`.
+ */
 async function readApiStatus(): Promise<string> {
   try {
     const response = await fetch(`${apiBaseUrl}/health`, {
       cache: 'no-store',
+      // A hung API must show as unreachable, not stall the page.
       signal: AbortSignal.timeout(2000),
     });
     const health = HealthResponse.safeParse(await response.json());
@@ -24,6 +37,12 @@ async function readApiStatus(): Promise<string> {
   }
 }
 
+/**
+ * Renders the API status line.
+ *
+ * Does not cache: the status is read again on every request.
+ * @returns The home page.
+ */
 export default async function HomePage() {
   // Render on each request so `next build` never needs a running API.
   await connection();

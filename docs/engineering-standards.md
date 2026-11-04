@@ -5,7 +5,7 @@ These rules apply to every line of code, whether written by a person or by Claud
 ## 1. Code
 
 - TypeScript `strict` plus `noUncheckedIndexedAccess`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `exactOptionalPropertyTypes`.
-- ESLint: `typescript-eslint` strict + type-checked, `eslint-plugin-sonarjs`. Zero errors, zero warnings on merge.
+- ESLint: `typescript-eslint` strict + type-checked, `eslint-plugin-sonarjs`, `eslint-plugin-jsdoc`. Zero errors, zero warnings on merge.
 - Prettier formats everything; no style debates.
 - Knip reports zero unused files, exports and dependencies.
 - **Write only what the current issue needs.** No speculative features, no "future-proof" abstractions, no helper used once, no unused parameters or exports.
@@ -17,6 +17,27 @@ These rules apply to every line of code, whether written by a person or by Claud
 - Outside services only through a port in `apps/api/src/adapters/` (ADR-0007).
 - Money as `Decimal`, times stored in UTC, shown in Asia/Karachi.
 - No new dependency without the founder's approval in the PR description.
+
+### Code comments
+
+- **File header.** Every source file starts with a short header comment: what the file is for, which FR/NFR/ADR it serves, and what uses it.
+- **TSDoc.** Every exported function, class, method, type and constant has a TSDoc block: one-line summary, `@param` for each parameter (meaning and unit), `@returns`, `@throws`, and a "Does not ..." line where a reader could assume more.
+- **Why comments.** Non-obvious lines get a one-line "why" comment.
+- **Tests.** Each test `describe()` gets one line saying which rule it proves.
+- **No noise.** No comments that only repeat the code.
+
+A header looks like this, with a blank line after it when the next line is an export, so it is not read as that export's TSDoc block:
+
+```ts
+/**
+ * Creates the HazelJS app and binds it to one network address.
+ *
+ * Serves: ADR-0001, ADR-0003, ADR-0013, NFR-5.
+ * Used by: apps/api/src/main.ts, apps/api/test/server.int.spec.ts.
+ */
+```
+
+`eslint-plugin-jsdoc` checks TypeScript files: a block with a summary on exported declarations, and for each signature that every `@param` matches and is described, that `@returns` is present and described when a value is returned, and that tags carry no types. Review checks the rest: file headers, `@throws`, "Does not ..." lines, "why" comments, `describe()` lines, public class fields, abstract methods, and constants, interfaces and enums exported through an `export { x }` list.
 
 ## 2. Git and GitHub
 

@@ -1,1 +1,7 @@
+/*
+ * Global stylesheet of the dashboard: loads Tailwind CSS for every page.
+ *
+ * Serves: NFR-8 (issue #3, monorepo scaffold).
+ * Used by: apps/web/app/layout.tsx.
+ */
 @import 'tailwindcss';
