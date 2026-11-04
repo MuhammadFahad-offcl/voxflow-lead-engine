@@ -1,0 +1,247 @@
+[
+  {
+    "placeId": "fictional-place-p01",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p01-review-01",
+        "text": "Called five times to book a cleaning and nobody picked up the phone.",
+        "stars": 2,
+        "publishedAtDate": "2026-10-28T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p01-review-02",
+        "text": "Phone koi nahi uthata, teen din se call kar raha hoon.",
+        "stars": 2,
+        "publishedAtDate": "2026-10-20T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "ur",
+        "originalLanguage": "ur"
+      },
+      {
+        "reviewId": "fictional-place-p01-review-03",
+        "text": "Very gentle filling, the doctor explained everything.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-11T10:00:00.000Z",
+        "responseFromOwnerText": "Thank you for your kind words!",
+        "responseFromOwnerDate": "2026-10-11T18:00:00.000Z",
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p02",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p02-review-01",
+        "text": "Hard to reach on the phone, but the treatment was good.",
+        "stars": 4,
+        "publishedAtDate": "2026-10-25T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p02-review-02",
+        "text": "Clean clinic and friendly staff.",
+        "stars": 5,
+        "publishedAtDate": "2026-09-30T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p03",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p03-review-01",
+        "text": "Booked online in a minute and was seen on time.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-27T10:00:00.000Z",
+        "responseFromOwnerText": "We are glad the booking was easy.",
+        "responseFromOwnerDate": "2026-10-27T18:00:00.000Z",
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p03-review-02",
+        "text": "Doctor sahib bohat achay hain, dard bilkul nahi hua.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-15T10:00:00.000Z",
+        "responseFromOwnerText": "Shukriya!",
+        "responseFromOwnerDate": "2026-10-15T18:00:00.000Z",
+        "language": "ur",
+        "originalLanguage": "ur"
+      },
+      {
+        "reviewId": "fictional-place-p03-review-03",
+        "text": null,
+        "stars": 4,
+        "publishedAtDate": "2026-10-02T10:00:00.000Z",
+        "responseFromOwnerText": "Thank you for the stars.",
+        "responseFromOwnerDate": "2026-10-02T18:00:00.000Z",
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p06",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p06-review-01",
+        "text": "Waited two hours past my appointment time for a five minute check.",
+        "stars": 2,
+        "publishedAtDate": "2026-10-26T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p06-review-02",
+        "text": "Appointment ke liye do ghante intezar karna para.",
+        "stars": 2,
+        "publishedAtDate": "2026-10-18T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "ur",
+        "originalLanguage": "ur"
+      },
+      {
+        "reviewId": "fictional-place-p06-review-03",
+        "text": "Braces result is excellent.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-05T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p07",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p07-review-01",
+        "text": "There is no online booking, you can only call during clinic hours.",
+        "stars": 3,
+        "publishedAtDate": "2026-10-24T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p07-review-02",
+        "text": "Online booking ka koi option nahi, sirf phone pe.",
+        "stars": 3,
+        "publishedAtDate": "2026-10-12T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "ur",
+        "originalLanguage": "ur"
+      },
+      {
+        "reviewId": "fictional-place-p07-review-03",
+        "text": "Painless extraction, thank you.",
+        "stars": 5,
+        "publishedAtDate": "2026-09-28T10:00:00.000Z",
+        "responseFromOwnerText": "Thank you, get well soon.",
+        "responseFromOwnerDate": "2026-09-28T18:00:00.000Z",
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p08",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p08-review-01",
+        "text": "Whitening looked great.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-22T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p09",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p09-review-01",
+        "text": "Best root canal I have had.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-21T10:00:00.000Z",
+        "responseFromOwnerText": "Thank you!",
+        "responseFromOwnerDate": "2026-10-21T18:00:00.000Z",
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p09-review-02",
+        "text": "Staff ka rawayya bohat acha tha.",
+        "stars": 5,
+        "publishedAtDate": "2026-10-09T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "ur",
+        "originalLanguage": "ur"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p10",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p10-review-01",
+        "text": "Nobody answers the phone after 5 PM.",
+        "stars": 3,
+        "publishedAtDate": "2026-10-19T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      },
+      {
+        "reviewId": "fictional-place-p10-review-02",
+        "text": "Good dentist, a bit expensive.",
+        "stars": 4,
+        "publishedAtDate": "2026-10-03T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-p11",
+    "reviews": [
+      {
+        "reviewId": "fictional-place-p11-review-01",
+        "text": "Quick check-up, no waiting.",
+        "stars": 4,
+        "publishedAtDate": "2026-10-17T10:00:00.000Z",
+        "responseFromOwnerText": null,
+        "responseFromOwnerDate": null,
+        "language": "en",
+        "originalLanguage": "en"
+      }
+    ]
+  }
+]
