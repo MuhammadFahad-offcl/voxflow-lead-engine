@@ -9,20 +9,23 @@ import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { HazelApp } from '@hazeljs/core';
 import { HealthResponse } from '@voxflow/shared';
 import { startServer } from '../src/server.js';
+import { testEnv } from './test-env.js';
+
+const baseUrlOf = (app: HazelApp): string => {
+  const address = app.getServer()?.address();
+  if (address === null || address === undefined || typeof address === 'string') {
+    throw new Error('API server is not listening on a TCP port');
+  }
+  return `http://127.0.0.1:${String(address.port)}`;
+};
 
 // Proves 127.0.0.1-only binding (ADR-0003, ADR-0013) and the probes in docs/architecture.md §13.
 describe('API server', () => {
   let app: HazelApp;
-  let baseUrl: string;
 
   beforeAll(async () => {
     // Port 0 lets the OS pick a free port, so the test never clashes with a running API.
-    app = await startServer('127.0.0.1', 0);
-    const address = app.getServer()?.address();
-    if (address === null || address === undefined || typeof address === 'string') {
-      throw new Error('API server is not listening on a TCP port');
-    }
-    baseUrl = `http://127.0.0.1:${String(address.port)}`;
+    app = await startServer(testEnv(), 0);
   });
 
   afterAll(async () => {
@@ -34,7 +37,7 @@ describe('API server', () => {
   });
 
   it('answers GET /health with the HazelJS liveness body', async () => {
-    const response = await fetch(`${baseUrl}/health`);
+    const response = await fetch(`${baseUrlOf(app)}/health`);
 
     expect(response.status).toBe(200);
     expect(HealthResponse.parse(await response.json()).status).toBe('alive');
@@ -42,7 +45,7 @@ describe('API server', () => {
 
   // Overall status depends on machine load (memory, event-loop lag); from #6 on, assert our own checks.
   it('answers GET /ready with a HealthStatus body that includes the built-in checks', async () => {
-    const response = await fetch(`${baseUrl}/ready`);
+    const response = await fetch(`${baseUrlOf(app)}/ready`);
     const status = expect.stringMatching(/^(healthy|degraded|unhealthy)$/);
 
     expect(await response.json()).toMatchObject({
