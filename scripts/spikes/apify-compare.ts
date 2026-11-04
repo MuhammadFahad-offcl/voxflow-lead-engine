@@ -20,8 +20,7 @@ const PLACES = 20;
 const REVIEWS = 30;
 // Pass 2 fetches reviews for this many survivors per actor: enough to measure, cheap enough to repeat.
 const PASS2_PLACES = 8;
-// Apify stops any single run at this charge; the script stops starting runs past the total.
-const RUN_LIMIT_USD = 0.25;
+// The script refuses a run whose worst case could take the total past this.
 const SPEND_LIMIT_USD = 0.9;
 const API = 'https://api.apify.com/v2';
 const repoRoot = resolve(import.meta.dirname, '../..');
@@ -31,6 +30,41 @@ const ACTORS = {
   compassReviews: 'compass~Google-Maps-Reviews-Scraper',
   scraperlink: 'scraperlink~google-maps-scraper',
 } as const;
+
+// Apify's own per-run stop, only a backstop: Compass refuses anything below its $0.50 minimum.
+const RUN_CHARGE_CAP_USD: Record<string, number> = {
+  [ACTORS.compass]: 0.5,
+  [ACTORS.compassReviews]: 0.5,
+  [ACTORS.scraperlink]: 0.25,
+};
+
+const count = (value: unknown, fallback: number): number =>
+  typeof value === 'number' ? value : fallback;
+
+/**
+ * The most a run can charge, from its input size and each actor's free-plan prices (checked in the
+ * Apify Store on 2026-11-04), plus 20%. This, not the cap above, keeps the spike under $1.
+ * @param actorId - Actor to run.
+ * @param input - The run's input.
+ * @returns Worst-case charge in US dollars.
+ */
+const worstCaseUsd = (actorId: string, input: Json): number => {
+  const ids = Array.isArray(input['placeIds']) ? input['placeIds'].length : null;
+  const places = ids ?? count(input['maxCrawledPlacesPerSearch'] ?? input['num'], PLACES);
+  const reviews = places * count(input['maxReviews'], 0);
+  const start = 0.00005;
+  let usd = start;
+  if (actorId === ACTORS.compass) {
+    usd +=
+      places * (0.004 + (input['scrapePlaceDetailPage'] === true ? 0.002 : 0)) + reviews * 0.0005;
+  } else if (actorId === ACTORS.compassReviews) {
+    usd += reviews * 0.0006;
+  } else {
+    usd += places * (0.0005 + (input['placeDetails'] === true ? 0.00025 : 0));
+    usd += input['reviews'] === true ? reviews * 0.00025 : 0;
+  }
+  return usd * 1.2;
+};
 
 type Json = Record<string, unknown>;
 
@@ -167,10 +201,13 @@ const realRunner = (token: string): RunActor => {
   };
   return async (actorId, input) => {
     const started = (
-      await call(`/acts/${actorId}/runs?maxTotalChargeUsd=${String(RUN_LIMIT_USD)}&timeout=900`, {
-        method: 'POST',
-        body: JSON.stringify(input),
-      })
+      await call(
+        `/acts/${actorId}/runs?maxTotalChargeUsd=${String(RUN_CHARGE_CAP_USD[actorId] ?? 0.5)}&timeout=900`,
+        {
+          method: 'POST',
+          body: JSON.stringify(input),
+        },
+      )
     )['data'] as Json;
     let run = started;
     while (['READY', 'RUNNING'].includes(String(run['status']))) {
@@ -442,11 +479,12 @@ await mkdir(outDir, { recursive: true });
 
 let spent = alreadySpent;
 const run = async (name: string, actorId: string, input: Json): Promise<RunResult> => {
-  if (spent + RUN_LIMIT_USD > SPEND_LIMIT_USD)
+  const worst = worstCaseUsd(actorId, input);
+  if (spent + worst > SPEND_LIMIT_USD)
     throw new Error(
-      `Spend limit: ${usd(spent)} spent, next run could pass ${usd(SPEND_LIMIT_USD)}`,
+      `Spend limit: ${usd(spent)} spent; this run could cost up to ${usd(worst)}, passing ${usd(SPEND_LIMIT_USD)}`,
     );
-  process.stdout.write(`running ${name}…\n`);
+  process.stdout.write(`running ${name} (at most ${usd(worst)})…\n`);
   const result = await runActor(actorId, input);
   spent += result.costUsd;
   await writeFile(join(outDir, `${name}.json`), JSON.stringify(result, null, 2));
