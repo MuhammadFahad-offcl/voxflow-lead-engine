@@ -42,6 +42,25 @@ describe('config/areas', () => {
       [74.37, 31.43],
     ]);
   });
+
+  it.each([
+    ['Model Town', 92],
+    ['Bahria Town', 180],
+  ])('holds the OpenStreetMap ring of %s, inside Lahore', (area, points) => {
+    const ring = findAreaPolygon(polygons, 'Lahore', area)?.coordinates[0] ?? [];
+
+    expect(ring).toHaveLength(points);
+    expect(ring.every(([lng, lat]) => lng > 74.1 && lng < 74.6 && lat > 31.3 && lat < 31.7)).toBe(
+      true,
+    );
+  });
+
+  it('has no made-up shape for the two areas OpenStreetMap has no boundary for', () => {
+    expect(missingAreas(polygons, 'Lahore', ['Gulberg', 'Johar Town'])).toEqual([
+      'Gulberg',
+      'Johar Town',
+    ]);
+  });
 });
 
 // Proves a lookup ignores case and spacing, and says which areas have no polygon.
