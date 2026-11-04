@@ -1,12 +1,14 @@
 /**
  * Creates the HazelJS app and binds it to one network address.
  *
- * Serves: ADR-0001, ADR-0002, ADR-0003, ADR-0013, NFR-5.
+ * Serves: ADR-0001, ADR-0002, ADR-0003, ADR-0013, NFR-5, NFR-10 (`db` readiness check).
  * Used by: apps/api/src/main.ts, apps/api/test/db.int.spec.ts, apps/api/test/server.int.spec.ts.
  */
 import type { HazelApp } from '@hazeljs/core';
 import { createApp, registerPrismaShutdown } from './bootstrap.js';
 import type { Env } from './config/env.js';
+import { createDbHealthCheck } from './db/db-health.js';
+import { PrismaProvider } from './db/prisma.provider.js';
 
 /**
  * Starts the API server on `env.API_HOST` and resolves once it is listening.
@@ -19,7 +21,8 @@ import type { Env } from './config/env.js';
  * error and the server still starts.
  * Does not reject when an async provider factory rejects and no class provider depends on it: the
  * server binds, then HazelJS shuts it down on the unhandled rejection.
- * Does not check the database: a server with an unreachable database still starts.
+ * Does not check the database at startup: a server with an unreachable database still starts, and
+ * `GET /ready` reports `db` as unhealthy.
  * Does not disconnect Prisma on `app.close()`: only the shutdown path does (a signal, or an uncaught
  * error), because `close()` runs no shutdown handlers.
  * @param env - Parsed configuration. `API_HOST` should be 127.0.0.1 so only this laptop can reach
@@ -30,6 +33,7 @@ import type { Env } from './config/env.js';
  */
 export async function startServer(env: Env, port: number): Promise<HazelApp> {
   const app = await createApp(env);
+  app.registerHealthCheck(createDbHealthCheck(app.getContainer().resolve(PrismaProvider)));
   // The host argument exists only through our @hazeljs/core patch (ADR-0013); unpatched, Node
   // would listen on every interface.
   await app.listen(port, env.API_HOST);
