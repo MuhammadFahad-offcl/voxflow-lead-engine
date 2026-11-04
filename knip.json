@@ -2,7 +2,9 @@
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "ignore": ["prisma.config.ts"],
   "workspaces": {
-    ".": {},
+    ".": {
+      "commitlint": true
+    },
     "apps/api": {
       "entry": ["src/main.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"]

@@ -15,7 +15,7 @@ This repo is run like a small product team, even with one developer. The full ru
 
 1. Pick an issue from the current milestone. It must name an FR/NFR or ADR.
 2. Branch from `main`: `feat/12-apify-adapter`.
-3. Commit with Conventional Commits: `feat(discover): normalise Pakistani phone numbers`.
+3. Commit with Conventional Commits: `feat(discover): normalise Pakistani phone numbers`. `pnpm install` sets up the Git hooks that check the message and format staged files.
 4. Run `pnpm typecheck && pnpm lint && pnpm knip && pnpm test`.
 5. Open a PR with the template. Keep it under 400 changed lines.
 6. CI green + self-review with the checklist (or the `reviewer` agent) → squash merge → delete branch.

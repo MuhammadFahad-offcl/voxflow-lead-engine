@@ -1,0 +1,12 @@
+# Secret scan rules: gitleaks' default rules, with one allowlisted file.
+#
+# Serves: NFR-5.
+# Used by: the gitleaks step in .github/workflows/ci.yml, which finds this file in the repo root.
+
+[extend]
+useDefault = true
+
+# `[allowlist]`, not `[[allowlists]]`: gitleaks-action v3 runs gitleaks 8.24.3 by default.
+[allowlist]
+description = "The variable template holds fake values only (NFR-5)"
+paths = ['''^\.env\.example$''']

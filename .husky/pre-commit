@@ -1,0 +1,5 @@
+# Formats and lints the staged files.
+#
+# Serves: NFR-8.
+# Used by: git, through the core.hooksPath that `pnpm install` sets (the `prepare` script).
+pnpm exec lint-staged
