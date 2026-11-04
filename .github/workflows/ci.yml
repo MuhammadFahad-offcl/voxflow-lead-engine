@@ -28,7 +28,8 @@ jobs:
     timeout-minutes: 15
 
     services:
-      # Same image and credentials as docker-compose.yml, for the integration tests (ADR-0002).
+      # Same image as docker-compose.yml, for the integration tests (ADR-0002). The password is a
+      # throwaway: this container lives for one run and is unreachable outside the runner (#47).
       postgres:
         image: pgvector/pgvector:pg17
         env:

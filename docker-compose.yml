@@ -1,5 +1,6 @@
 # Local infrastructure for development and the live run (ADR-0002, ADR-0004).
 # Both services bind to 127.0.0.1 only — nothing here is reachable from the network.
+# The Postgres password comes from .env (NFR-5); Compose reads that file itself, the app never does.
 name: voxflow
 
 services:
@@ -8,7 +9,8 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: voxflow
-      POSTGRES_PASSWORD: voxflow
+      # Used only when the volume is first created; see README "Change the database password".
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
       POSTGRES_DB: voxflow
       TZ: UTC
     ports:

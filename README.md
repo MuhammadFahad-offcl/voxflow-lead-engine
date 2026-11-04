@@ -36,7 +36,7 @@ Requirements: Node 26, pnpm 12, Docker.
 ```bash
 git clone https://github.com/MuhammadFahad-offcl/voxflow-lead-engine.git
 cd voxflow-lead-engine
-cp .env.example .env          # DEMO_MODE=true is the default
+cp .env.example .env          # DEMO_MODE=true is the default; set your own POSTGRES_PASSWORD
 docker compose up -d          # Postgres + pgvector, Lightpanda
 pnpm install
 pnpm db:migrate && pnpm db:generate && pnpm db:seed
@@ -46,6 +46,26 @@ pnpm dev                      # dashboard http://localhost:3000, API http://127.
 Demo mode replaces Apify, Perplexity, the LLM, Vapi and Google Calendar with fake adapters that use fictional clinics from `fixtures/`, so the whole pipeline — including a simulated call and booking — runs offline.
 
 To use real services, set `DEMO_MODE=false` and fill the keys in `.env` (see `.env.example`).
+
+### Change the database password
+
+Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so changing it in `.env` does not change the password of a database that already exists. Apply a new password in one of two ways:
+
+1. **Keep the data.** Set the database's password, then put the same one in both `POSTGRES_PASSWORD` and `DATABASE_URL` in `.env`:
+
+   ```bash
+   docker compose exec postgres psql -U voxflow -d voxflow -c "\password voxflow"
+   ```
+
+   `\password` asks for the new password twice and sends it hashed, so it stays out of your shell history and the Postgres log.
+
+2. **Start from an empty database.** This **deletes all data** in it. Update both lines in `.env` first, then:
+
+   ```bash
+   docker compose down -v
+   docker compose up -d
+   pnpm db:migrate
+   ```
 
 ## Scripts
 
