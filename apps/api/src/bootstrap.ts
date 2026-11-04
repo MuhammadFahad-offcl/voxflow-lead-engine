@@ -5,10 +5,14 @@
  * Used by: apps/api/src/main.ts, apps/api/src/worker.ts, apps/api/src/seed.ts, apps/api/src/server.ts.
  */
 import { Container, HazelApp } from '@hazeljs/core';
+import { bindAdapter } from './adapters/bind.js';
+import { ApifyLeadSourceAdapter } from './adapters/lead-source/apify.adapter.js';
+import { FakeLeadSourceAdapter } from './adapters/lead-source/fake.adapter.js';
 import { AppModule } from './app.module.js';
 import { ENV, InvalidEnvError, loadEnv, type Env } from './config/env.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createLogger, LOGGER } from './logging/logger.js';
+import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
 
 /**
  * Validates the environment, or logs the bad variable names and ends the process with exit code 1.
@@ -51,6 +55,10 @@ export async function createApp(env: Env): Promise<HazelApp> {
   const container = Container.getInstance();
   container.registerProvider<Env>({ token: ENV, useValue: env });
   container.registerProvider({ token: LOGGER, useValue: createLogger(env.LOG_LEVEL) });
+  bindAdapter<LeadSourcePort>(container, env, LEAD_SOURCE, {
+    real: ApifyLeadSourceAdapter,
+    fake: FakeLeadSourceAdapter,
+  });
   return HazelApp.create(AppModule);
 }
 

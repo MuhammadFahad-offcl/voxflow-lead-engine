@@ -16,6 +16,7 @@
     "@hazeljs/core": "2.0.13",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
+    "apify-client": "2.25.0",
     "libphonenumber-js": "1.13.15",
     "pino": "10.4.0",
     "zod": "4.6.7"
