@@ -22,6 +22,8 @@ const EnvShape = z.object({
   TZ_DISPLAY: z.string().min(1).default('Asia/Karachi'),
 
   DATABASE_URL: z.url(),
+  // Read by docker compose, not by the app: the app connects with DATABASE_URL.
+  POSTGRES_PASSWORD: z.string().optional(),
   LIGHTPANDA_CDP_URL: z.url().default('ws://127.0.0.1:9222'),
   API_HOST: z.string().min(1).default('127.0.0.1'),
   API_PORT: port(4000),
