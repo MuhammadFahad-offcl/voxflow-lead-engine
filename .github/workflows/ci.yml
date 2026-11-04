@@ -59,6 +59,8 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # The client is git-ignored; typecheck, Knip and the tests all import it.
+      - run: pnpm db:generate
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm knip

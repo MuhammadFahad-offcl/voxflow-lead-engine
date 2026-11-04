@@ -1,11 +1,11 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "ignore": ["prisma.config.ts"],
   "workspaces": {
     ".": {},
     "apps/api": {
       "entry": ["src/main.ts"],
-      "project": ["src/**/*.ts", "test/**/*.ts"]
+      "project": ["src/**/*.ts", "test/**/*.ts"],
+      "ignoreDependencies": ["@prisma/client"]
     },
     "apps/web": {},
     "packages/shared": {

@@ -3,10 +3,10 @@
 // Requirements: docs/prd.md (FR/NFR ids in comments). Design: docs/architecture.md §11.
 //
 // Prisma 7: the connection URL lives in prisma.config.ts, not here.
-// pgvector: the first migration must start with `CREATE EXTENSION IF NOT EXISTS vector;`
-//           and add `CREATE INDEX service_embedding_hnsw ON "Service" USING hnsw (embedding vector_cosine_ops);`
-// HazelJS Agent OS run tables: paste the models from @hazeljs/agent's prisma-schema.example.prisma
-//           into the marked section at the end, in Cycle 1, issue 3.
+// pgvector: the first migration starts with `CREATE EXTENSION IF NOT EXISTS vector;`
+//           and adds `CREATE INDEX service_embedding_hnsw ON "Service" USING hnsw (embedding vector_cosine_ops);`
+// HazelJS Agent OS run tables: the models from @hazeljs/agent's prisma-schema.example.prisma
+//           are in the marked section at the end.
 
 generator client {
   provider = "prisma-client"
@@ -309,6 +309,9 @@ model Service {
   solutions Solution[]
 
   @@unique([organizationId, slug])
+  // The real index is HNSW, created by hand in the first migration. Prisma has no HNSW index type;
+  // without this line it reads that index as drift and every new migration would drop it.
+  @@index([embedding], map: "service_embedding_hnsw")
 }
 
 model Solution {
@@ -410,6 +413,147 @@ model CostRecord {
   @@index([organizationId, service, at])
 }
 
-// ─────────── HazelJS Agent OS run tables (paste here in Cycle 1) ───────────
-// Copy the models from @hazeljs/agent's prisma-schema.example.prisma without edits,
-// then run `pnpm prisma migrate dev --name hazeljs_agent_os`.
+// ─────────── HazelJS Agent OS run tables ───────────
+// Copied from @hazeljs/agent 2.0.13's prisma-schema.example.prisma. One edit, because Prisma rejects
+// optional lists: `agentSteps AgentStep[]?` became `agentSteps AgentStep[]` (a list can already be empty).
+model AgentContext {
+  id                  String      @id @default(uuid())
+  executionId         String      @unique
+  agentId             String
+  sessionId           String
+  userId              String?
+  input               String
+  state               String // AgentState enum as string
+  steps               Json // AgentStep[]
+  conversationHistory Json // ConversationMessage[]
+  workingMemory       Json // Record<string, unknown>
+  facts               Json // string[]
+  entities            Json // Entity[]
+  ragContext          Json? // string[]
+  metadata            Json // Record<string, unknown>
+  createdAt           DateTime    @default(now())
+  updatedAt           DateTime    @updatedAt
+  deletedAt           DateTime? // For soft deletes
+  agentSteps          AgentStep[] // Optional: relation to steps table
+
+  @@index([sessionId])
+  @@index([userId])
+  @@index([agentId])
+  @@index([state])
+  @@index([createdAt])
+  @@index([deletedAt])
+  @@map("agent_contexts")
+}
+
+// Optional: Separate table for execution steps (for better querying)
+model AgentStep {
+  id          String   @id @default(uuid())
+  executionId String
+  stepNumber  Int
+  state       String
+  action      Json?
+  result      Json?
+  error       String?
+  timestamp   DateTime @default(now())
+  duration    Int?
+
+  context AgentContext @relation(fields: [executionId], references: [executionId], onDelete: Cascade)
+
+  // Note: If you don't want a separate steps table, remove this model
+  // and store steps as JSON in AgentContext.steps field
+
+  @@index([executionId])
+  @@index([timestamp])
+  @@map("agent_steps")
+}
+
+// Optional: Session tracking
+model AgentSession {
+  id          String    @id @default(uuid())
+  sessionId   String    @unique
+  userId      String?
+  agentId     String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@index([userId])
+  @@index([agentId])
+  @@index([createdAt])
+  @@map("agent_sessions")
+}
+
+// ---------------------------------------------------------------------------
+// Agent OS — durable process store (AOS-014)
+// Used by createSqlDurableRunStore(prisma)
+// ---------------------------------------------------------------------------
+
+model AgentRun {
+  id             String    @id
+  agentName      String
+  agentVersion   String?
+  status         String
+  input          Json?
+  output         Json?
+  error          Json?
+  tenantId       String?
+  userId         String?
+  parentRunId    String?
+  rootRunId      String
+  attempt        Int       @default(1)
+  checkpointId   String?
+  leaseOwner     String?
+  leaseExpiresAt DateTime?
+  leaseToken     String?
+  createdAt      DateTime  @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  updatedAt      DateTime  @updatedAt
+  metadata       Json?
+
+  @@index([agentName])
+  @@index([status])
+  @@index([tenantId])
+  @@index([rootRunId])
+  @@index([updatedAt])
+  @@index([leaseExpiresAt])
+  @@map("agent_runs")
+}
+
+model AgentRunCheckpoint {
+  id        String   @id
+  runId     String
+  step      Int?
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([runId])
+  @@index([runId, createdAt])
+  @@map("agent_run_checkpoints")
+}
+
+model AgentHumanTask {
+  id         String    @id
+  runId      String
+  type       String
+  status     String
+  toolName   String?
+  payload    Json?
+  createdAt  DateTime  @default(now())
+  resolvedAt DateTime?
+  resolvedBy String?
+  metadata   Json?
+
+  @@index([runId])
+  @@index([status])
+  @@map("agent_human_tasks")
+}
+
+model AgentA2ATask {
+  id          String   @id
+  taskJson    Json?
+  executionId String?
+  updatedAt   DateTime @updatedAt
+
+  @@map("agent_a2a_tasks")
+}
