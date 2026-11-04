@@ -7,8 +7,8 @@
 import { execFileSync } from 'node:child_process';
 import { resolve } from 'node:path';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { z } from 'zod';
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { testEnv } from './test-env.js';
 
 const repoRoot = resolve(import.meta.dirname, '../../..');
 
@@ -18,10 +18,10 @@ const repoRoot = resolve(import.meta.dirname, '../../..');
  * Does not change the database in DATABASE_URL: only "voxflow_test" is dropped and created, so local
  * development data stays.
  * @returns The connection URL of the test database.
- * @throws ZodError when DATABASE_URL is missing, or an error from Postgres or `prisma migrate deploy`.
+ * @throws InvalidEnvError when DATABASE_URL is missing, or an error from Postgres or `prisma migrate deploy`.
  */
 export async function createTestDatabase(): Promise<string> {
-  const { DATABASE_URL } = z.object({ DATABASE_URL: z.url() }).parse(process.env);
+  const { DATABASE_URL } = testEnv();
   const server = new PrismaClient({ adapter: new PrismaPg({ connectionString: DATABASE_URL }) });
   try {
     // Dropped first so every run proves the migrations apply to an empty database.

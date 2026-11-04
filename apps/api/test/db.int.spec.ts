@@ -13,8 +13,8 @@ import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { startServer } from '../src/server.js';
 import { createTestDatabase } from './test-database.js';
+import { testEnv } from './test-env.js';
 
-const databaseUrlBefore = process.env['DATABASE_URL'];
 let testUrl: string;
 let prisma: PrismaClient;
 
@@ -26,7 +26,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await prisma.$disconnect();
-  process.env['DATABASE_URL'] = databaseUrlBefore;
 });
 
 // Proves the hand-added lines of the first migration (docs/database.md checklist) and the run tables.
@@ -140,8 +139,7 @@ describe('PrismaProvider', () => {
   beforeAll(async () => {
     const providerUrl = new URL(testUrl);
     providerUrl.searchParams.set('application_name', applicationName);
-    process.env['DATABASE_URL'] = providerUrl.href;
-    app = await startServer('127.0.0.1', 0);
+    app = await startServer(testEnv({ DATABASE_URL: providerUrl.href }), 0);
   });
 
   afterEach(() => {

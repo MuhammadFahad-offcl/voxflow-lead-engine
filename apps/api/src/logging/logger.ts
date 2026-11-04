@@ -2,7 +2,7 @@
  * The structured logger of the API and worker: pino, one JSON object per line.
  *
  * Serves: NFR-10 (logs carry campaign, lead and attempt IDs), ADR-0014 (pino over HazelJS's logger).
- * Used by: the API and worker entry points, from the next part of #6 on.
+ * Used by: apps/api/src/bootstrap.ts.
  */
 import {
   pino,
@@ -11,6 +11,9 @@ import {
   type LevelWithSilent,
   type Logger,
 } from 'pino';
+
+/** DI token under which the process's root {@link Logger} is registered. */
+export const LOGGER = 'Logger';
 
 /**
  * Creates the root logger.
