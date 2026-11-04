@@ -1,6 +1,6 @@
 # 0015. Apify: Compass for places, Scraperlink for reviews, in two passes
 
-- **Status:** Proposed
+- **Status:** Accepted
 - **Date:** 2026-11-04
 - **Deciders:** Muhammad Fahad
 - **PRD links:** FR-2, FR-5, FR-7, FR-8, FR-11, FR-14; supersedes the pending actor choice in ADR-0010
