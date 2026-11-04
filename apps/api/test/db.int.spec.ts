@@ -117,7 +117,12 @@ describe('database invariants', () => {
   it('rejects a second Lead with the same organizationId and placeId', async () => {
     await expect(
       prisma.lead.create({ data: fictionalLead('place-fictional-1') }),
-    ).rejects.toMatchObject({ code: 'P2002' });
+    ).rejects.toMatchObject({
+      code: 'P2002',
+      meta: {
+        driverAdapterError: { cause: { constraint: { index: 'Lead_organizationId_placeId_key' } } },
+      },
+    });
   });
 });
 

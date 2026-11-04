@@ -2,7 +2,7 @@
  * The Prisma client of this process, registered in HazelJS DI.
  *
  * Serves: ADR-0002 (issue #5, database setup).
- * Used by: apps/api/src/app.module.ts, apps/api/src/server.ts.
+ * Used by: apps/api/src/app.module.ts, apps/api/src/server.ts, apps/api/test/db.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { PrismaPg } from '@prisma/adapter-pg';
