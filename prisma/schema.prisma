@@ -143,7 +143,7 @@ model Settings {
 
   callingHours  Json // FR-20: { timezone, days, windows, blocked }
   booking       Json // FR-26: { workingDays, start, end, meetingMinutes, bufferMinutes, maxPerDay, horizonDays }
-  spendCaps     Json // FR-33: { llmMonthlyUsd: 10, apifyDailyUsd, perplexityDailyUsd, vapiDailyUsd }
+  spendCaps     Json // FR-33: { llmMonthlyUsd: "10.00", apifyDailyUsd, perplexityDailyUsd, vapiDailyUsd }
   llmModels     Json // ADR-0006: { REVIEW_LABELLING, SOLUTION, SCRIPT, OUTCOME }
   retentionDays Int      @default(90) // NFR-6
   updatedAt     DateTime @updatedAt
