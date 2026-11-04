@@ -79,6 +79,7 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm knip`                   | unused files, exports and dependencies                                    |
 | `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running       |
 | `pnpm db:migrate`             | apply migrations in development (`prisma migrate dev`)                    |
+| `pnpm db:seed`                | seed the organization, settings, dental niche and catalog; re-run is safe |
 | `pnpm db:generate`            | write the Prisma client to `apps/api/src/generated/` (git-ignored)        |
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 

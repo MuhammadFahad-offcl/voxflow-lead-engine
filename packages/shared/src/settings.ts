@@ -2,7 +2,7 @@
  * Zod schemas for the JSON columns of the `Settings` table, and the defaults the seed writes.
  *
  * Serves: FR-20 (calling hours), FR-26 (booking), FR-33 (spend caps), ADR-0006 (model per task).
- * Used by: the seed (next part of #7); later the Settings API and page (C3-01).
+ * Used by: apps/api/src/db/seed.ts; later the Settings API and page (C3-01).
  */
 import { z } from 'zod';
 

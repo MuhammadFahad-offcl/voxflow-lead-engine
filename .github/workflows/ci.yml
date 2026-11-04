@@ -1,5 +1,6 @@
 # The checks every pull request and every push to main must pass: install, Prettier, the PR title
-# (pull requests only), typecheck, lint, Knip, tests with coverage and the gitleaks secret scan.
+# (pull requests only), typecheck, lint, Knip, migrate and seed a fresh database, tests with
+# coverage and the gitleaks secret scan.
 #
 # Serves: NFR-5, NFR-8.
 # Used by: GitHub Actions. The job id `ci` is the status check name for branch protection on main.
@@ -75,6 +76,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm knip
+      # Proves a fresh database migrates and seeds, as the README quick start does (#7).
+      - run: pnpm exec prisma migrate deploy
+      - run: pnpm db:seed
       - run: pnpm test:cov
 
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0

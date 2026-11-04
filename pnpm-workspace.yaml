@@ -9,6 +9,8 @@ allowBuilds:
   '@parcel/watcher': false
   # The Prisma CLI fetches its schema engine on first use, so no install script has to run.
   '@prisma/engines': false
+  # tsx's bundler; its prebuilt binary also ships as an optional dependency.
+  esbuild: false
   prisma: false
 
 patchedDependencies:
