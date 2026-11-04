@@ -1,7 +1,7 @@
 /**
  * Integration test of the first migration, the invariants it adds by hand and the Prisma provider.
  *
- * Serves: ADR-0002, docs/database.md "Invariants" (issue #5, database setup).
+ * Serves: ADR-0002, docs/database.md "Invariants" (issue #5, database setup; pausedFrom, issue #8).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
@@ -57,7 +57,8 @@ describe('first migration', () => {
   });
 });
 
-// Proves the database itself refuses a third call attempt and a duplicate business (FR-7, FR-23).
+// Proves the database itself refuses a third call attempt, a duplicate business (FR-7, FR-23) and a
+// paused campaign that does not know where to resume (FR-3).
 describe('database invariants', () => {
   let organizationId: string;
   let campaignId: string;
@@ -122,6 +123,29 @@ describe('database invariants', () => {
         driverAdapterError: { cause: { constraint: { index: 'Lead_organizationId_placeId_key' } } },
       },
     });
+  });
+
+  it('accepts a PAUSED campaign that remembers where to resume', async () => {
+    const campaign = await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'PAUSED', pausedFrom: 'SCORING' },
+    });
+
+    expect(campaign.pausedFrom).toBe('SCORING');
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'DISCOVERING', pausedFrom: null },
+    });
+  });
+
+  it.each([
+    ['PAUSED without pausedFrom', { status: 'PAUSED' }],
+    ['pausedFrom on an active campaign', { status: 'SCORING', pausedFrom: 'ENRICHING' }],
+    ['pausedFrom set to a final status', { status: 'PAUSED', pausedFrom: 'COMPLETED' }],
+  ] as const)('rejects a Campaign with %s', async (_case, data) => {
+    await expect(prisma.campaign.update({ where: { id: campaignId }, data })).rejects.toThrow(
+      'campaign_paused_from_only_when_paused',
+    );
   });
 });
 

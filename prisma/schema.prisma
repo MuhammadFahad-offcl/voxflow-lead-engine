@@ -181,17 +181,18 @@ model Campaign {
 
   city                String
   areas               String[]
-  status              CampaignStatus @default(DISCOVERING)
-  maxResultsPerSearch Int            @default(100) // FR-2, ADR-0010
-  searchCount         Int            @default(0)
-  foundCount          Int            @default(0)
-  duplicateCount      Int            @default(0)
-  filteredCount       Int            @default(0)
+  status              CampaignStatus  @default(DISCOVERING)
+  pausedFrom          CampaignStatus? // FR-3: status to return to on resume; set exactly while PAUSED
+  maxResultsPerSearch Int             @default(100) // FR-2, ADR-0010
+  searchCount         Int             @default(0)
+  foundCount          Int             @default(0)
+  duplicateCount      Int             @default(0)
+  filteredCount       Int             @default(0)
   approvalRunId       String? // HazelJS durable run awaiting approval (FR-19)
   approvalNote        String?
   approvedAt          DateTime?
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
 
   leads       Lead[]
   costRecords CostRecord[]
