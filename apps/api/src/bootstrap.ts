@@ -38,6 +38,8 @@ export function loadEnvOrExit(source: Readonly<Record<string, string | undefined
  * Registers the env and the root logger in DI, then creates the HazelJS app with every provider.
  *
  * Does not listen on a port and does not install signal handlers: the API's `listen` does both.
+ * Does not run `onModuleInit`, `onApplicationBootstrap` or the `module-destroy` shutdown step, and
+ * does not await async provider factories: in HazelJS 2.0.13 only `listen()` does those.
  * @param env - Parsed configuration from {@link loadEnvOrExit} (or a test's fixed values).
  * @returns The app; its container holds `ENV`, `LOGGER` and `PrismaProvider`.
  * @throws When a class provider's constructor throws.

@@ -36,6 +36,23 @@ describe('loadEnv', () => {
     expect(loadEnv({ ...minimal, ANTHROPIC_API_KEY: '' }).ANTHROPIC_API_KEY).toBeUndefined();
   });
 
+  it('gives a key with a default its default when the value is empty', () => {
+    expect(loadEnv({ ...minimal, API_PORT: '', LOG_LEVEL: '' })).toMatchObject({
+      API_PORT: 4000,
+      LOG_LEVEL: 'info',
+    });
+  });
+
+  it('names DATABASE_URL as missing when it is empty', () => {
+    expect(errorOf({ DATABASE_URL: '' }).variables).toEqual(['DATABASE_URL (missing)']);
+  });
+
+  it('rejects a LOG_LEVEL that would silence the HazelJS logger', () => {
+    for (const level of ['fatal', 'trace', 'silent']) {
+      expect(errorOf({ ...minimal, LOG_LEVEL: level }).variables).toEqual(['LOG_LEVEL (invalid)']);
+    }
+  });
+
   it('reads DEMO_MODE=false as false', () => {
     expect(loadEnv({ ...minimal, DEMO_MODE: 'false' }).DEMO_MODE).toBe(false);
   });

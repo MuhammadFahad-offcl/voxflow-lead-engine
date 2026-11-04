@@ -7,10 +7,6 @@
  */
 import { z } from 'zod';
 
-// .env.example leaves unused keys as `KEY=`, which arrives as an empty string; treat it as unset.
-const optional = <T extends z.ZodType>(schema: T) =>
-  z.preprocess((value) => (value === '' ? undefined : value), schema.optional());
-
 // Environment values are always strings, so ports have to be coerced.
 const port = (fallback: number) => z.coerce.number().int().min(1).max(65535).default(fallback);
 
@@ -20,7 +16,9 @@ const EnvShape = z.object({
     .default('true')
     .transform((value) => value === 'true'),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  LOG_LEVEL: z.enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent']).default('info'),
+  // Only levels HazelJS's winston logger also knows: it reads LOG_LEVEL too, and writes nothing,
+  // not even uncaught errors, for fatal, trace or silent (ADR-0014).
+  LOG_LEVEL: z.enum(['error', 'warn', 'info', 'debug']).default('info'),
   TZ_DISPLAY: z.string().min(1).default('Asia/Karachi'),
 
   DATABASE_URL: z.url(),
@@ -29,27 +27,30 @@ const EnvShape = z.object({
   API_PORT: port(4000),
   WEB_PORT: port(3000),
 
-  APIFY_TOKEN: optional(z.string()),
-  APIFY_ACTOR_ID: optional(z.string()),
-  PERPLEXITY_API_KEY: optional(z.string()),
+  APIFY_TOKEN: z.string().optional(),
+  APIFY_ACTOR_ID: z.string().optional(),
+  PERPLEXITY_API_KEY: z.string().optional(),
   PERPLEXITY_EMBEDDING_MODEL: z.string().min(1).default('pplx-embed-v1-0.6b'),
-  ANTHROPIC_API_KEY: optional(z.string()),
-  OPENAI_API_KEY: optional(z.string()),
+  ANTHROPIC_API_KEY: z.string().optional(),
+  OPENAI_API_KEY: z.string().optional(),
 
-  VAPI_API_KEY: optional(z.string()),
-  VAPI_PHONE_NUMBER_ID: optional(z.string()),
-  VAPI_ASSISTANT_ID: optional(z.string()),
-  VAPI_WEBHOOK_SECRET: optional(z.string()),
-  PUBLIC_HOOKS_BASE_URL: optional(z.url()),
+  VAPI_API_KEY: z.string().optional(),
+  VAPI_PHONE_NUMBER_ID: z.string().optional(),
+  VAPI_ASSISTANT_ID: z.string().optional(),
+  VAPI_WEBHOOK_SECRET: z.string().optional(),
+  PUBLIC_HOOKS_BASE_URL: z.url().optional(),
 
-  GOOGLE_CLIENT_ID: optional(z.string()),
-  GOOGLE_CLIENT_SECRET: optional(z.string()),
-  GOOGLE_REFRESH_TOKEN: optional(z.string()),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  GOOGLE_REFRESH_TOKEN: z.string().optional(),
   GOOGLE_CALENDAR_ID: z.string().min(1).default('primary'),
 
   FOUNDER_NAME: z.string().min(1).default('Fahad'),
-  FOUNDER_WHATSAPP: optional(z.string().regex(/^\+\d{10,15}$/, 'E.164, e.g. +923000000000')),
-  BACKUP_DIR: optional(z.string()),
+  FOUNDER_WHATSAPP: z
+    .string()
+    .regex(/^\+\d{10,15}$/, 'E.164, e.g. +923000000000')
+    .optional(),
+  BACKUP_DIR: z.string().optional(),
 });
 
 type EnvKey = keyof z.infer<typeof EnvShape>;
@@ -107,12 +108,17 @@ export class InvalidEnvError extends Error {
  * @throws InvalidEnvError naming every missing or invalid variable, never its value.
  */
 export function loadEnv(source: Readonly<Record<string, string | undefined>>): Env {
-  const result = EnvSchema.safeParse(source);
+  // .env.example leaves keys as `KEY=`, which arrives as an empty string: treat it as unset, so an
+  // optional key stays undefined and a key with a default takes it.
+  const cleaned = Object.fromEntries(
+    Object.entries(source).map(([name, value]) => [name, value === '' ? undefined : value]),
+  );
+  const result = EnvSchema.safeParse(cleaned);
   if (result.success) return result.data;
   // Only the name and a fixed word: Zod messages may quote the rejected input.
   const variables = result.error.issues.map((issue) => {
     const name = String(issue.path[0] ?? '(root)');
-    const state = source[name] === undefined || source[name] === '' ? 'missing' : 'invalid';
+    const state = cleaned[name] === undefined ? 'missing' : 'invalid';
     return `${name} (${state})`;
   });
   throw new InvalidEnvError([...new Set(variables)]);
