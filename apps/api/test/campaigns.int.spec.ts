@@ -1,7 +1,7 @@
 /**
  * Integration test of the campaigns API on a real server and its own migrated database.
  *
- * Serves: FR-1, FR-2; issue #8 acceptance criteria (create; reads follow in part 2b).
+ * Serves: FR-1, FR-2; issue #8 acceptance criteria.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
@@ -18,7 +18,7 @@ let app: HazelApp;
 let prisma: PrismaClient;
 let baseUrl: string;
 
-const call = async (method: 'POST', path: string, body?: unknown) => {
+const call = async (method: 'GET' | 'POST', path: string, body?: unknown) => {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers: { 'Content-Type': 'application/json' },
@@ -151,5 +151,38 @@ describe('POST /campaigns', () => {
     const { status } = await create({ nicheSlug: 'bakery', city: 'Lahore', areas: ['DHA'] });
 
     expect(status).toBe(404);
+  });
+});
+
+// Proves the read routes return the same summary the create returned, newest first.
+describe('GET /campaigns and /campaigns/:id', () => {
+  it('lists campaigns newest first', async () => {
+    const { body: newest } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Karachi',
+      areas: ['Clifton'],
+    });
+
+    const { status, body } = await call('GET', '/campaigns');
+
+    expect(status).toBe(200);
+    expect((body as unknown as { id: string }[])[0]?.id).toBe(newest['id']);
+  });
+
+  it('gets one campaign with its grid and cap', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA', 'Gulberg'],
+    });
+
+    const { status, body } = await call('GET', `/campaigns/${String(created['id'])}`);
+
+    expect(status).toBe(200);
+    expect(body).toEqual(created);
+  });
+
+  it('answers 404 for an unknown campaign', async () => {
+    expect((await call('GET', '/campaigns/no-such-campaign')).status).toBe(404);
   });
 });

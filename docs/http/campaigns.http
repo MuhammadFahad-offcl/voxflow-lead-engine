@@ -1,0 +1,42 @@
+# Example requests for the campaigns API (FR-1, FR-2), for the VS Code REST Client extension.
+# Start the API with `pnpm dev` and seed the database first (`pnpm db:seed`).
+# The API listens on 127.0.0.1 only (ADR-0003).
+
+@base = http://127.0.0.1:4000
+
+### Create a campaign: 4 dental search terms × 2 areas = 8 searches
+# @name created
+POST {{base}}/campaigns
+Content-Type: application/json
+
+{
+  "nicheSlug": "dental-clinic",
+  "city": "Lahore",
+  "areas": ["DHA", "Gulberg"]
+}
+
+### List campaigns, newest first
+GET {{base}}/campaigns
+
+### Get the campaign created above
+GET {{base}}/campaigns/{{created.response.body.id}}
+
+### 400: no areas, with the Zod message per field
+POST {{base}}/campaigns
+Content-Type: application/json
+
+{
+  "nicheSlug": "dental-clinic",
+  "city": "Lahore",
+  "areas": []
+}
+
+### 404: unknown niche
+POST {{base}}/campaigns
+Content-Type: application/json
+
+{
+  "nicheSlug": "bakery",
+  "city": "Lahore",
+  "areas": ["DHA"]
+}
