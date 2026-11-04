@@ -51,7 +51,7 @@
       },
       "no_online_booking": {
         "points": 8,
-        "rule": "no booking widget or booking link on the website or the Maps listing; no website at all counts as none on the website (evidence: no website listed)"
+        "rule": "both: (1) no website listed, or the website was read and has no booking widget or link (UNREADABLE does not count); and (2) the Maps listing has no booking link (Google Book/reserve, or a booking site such as oladoc or marham)"
       },
       "reviews_unreplied": {
         "points": 7,
