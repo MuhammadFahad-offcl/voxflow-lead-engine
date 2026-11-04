@@ -1,4 +1,4 @@
-# Example requests for the campaigns API (FR-1, FR-2), for the VS Code REST Client extension.
+# Example requests for the campaigns API (FR-1, FR-2, FR-3), for the VS Code REST Client extension.
 # Start the API with `pnpm dev` and seed the database first (`pnpm db:seed`).
 # The API listens on 127.0.0.1 only (ADR-0003).
 
@@ -20,6 +20,12 @@ GET {{base}}/campaigns
 
 ### Get the campaign created above
 GET {{base}}/campaigns/{{created.response.body.id}}
+
+### Pause it (only from an active status; 409 otherwise)
+POST {{base}}/campaigns/{{created.response.body.id}}/pause
+
+### Resume it in the status it was paused from (409 when it is not paused)
+POST {{base}}/campaigns/{{created.response.body.id}}/resume
 
 ### 400: no areas, with the Zod message per field
 POST {{base}}/campaigns

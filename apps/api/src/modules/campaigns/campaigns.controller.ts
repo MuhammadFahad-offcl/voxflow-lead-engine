@@ -1,7 +1,7 @@
 /**
  * HTTP routes for campaigns. Parses input with Zod, calls the service, nothing else.
  *
- * Serves: FR-1, FR-2; ADR-0003 (these routes bind to 127.0.0.1 with the rest of the API).
+ * Serves: FR-1, FR-2, FR-3; ADR-0003 (these routes bind to 127.0.0.1 with the rest of the API).
  * Used by: apps/api/src/modules/campaigns/campaigns.module.ts; docs/http/campaigns.http.
  */
 import { Body, Controller, Get, HttpCode, Param, Post, ValidationError } from '@hazeljs/core';
@@ -87,5 +87,29 @@ export class CampaignsController {
   @Get('/:id')
   get(@Param('id') id: string): Promise<CampaignSummary> {
     return this.campaigns.get(parseId(id));
+  }
+
+  /**
+   * Pauses an active campaign.
+   * @param id - Campaign id from the path.
+   * @returns 200 with the paused campaign.
+   * @throws ValidationError (400) for a bad id; NotFoundError (404); ConflictError (409) when it
+   * cannot be paused; HttpError (503) when the database is not seeded.
+   */
+  @Post('/:id/pause')
+  pause(@Param('id') id: string): Promise<CampaignSummary> {
+    return this.campaigns.pause(parseId(id));
+  }
+
+  /**
+   * Resumes a paused campaign where it stopped.
+   * @param id - Campaign id from the path.
+   * @returns 200 with the resumed campaign.
+   * @throws ValidationError (400) for a bad id; NotFoundError (404); ConflictError (409) when it
+   * is not paused; HttpError (503) when the database is not seeded.
+   */
+  @Post('/:id/resume')
+  resume(@Param('id') id: string): Promise<CampaignSummary> {
+    return this.campaigns.resume(parseId(id));
   }
 }

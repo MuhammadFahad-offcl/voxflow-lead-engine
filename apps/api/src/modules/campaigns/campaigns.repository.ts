@@ -1,12 +1,12 @@
 /**
  * Database access for campaigns: the only campaigns code that talks to Prisma.
  *
- * Serves: FR-1, FR-2; hazeljs-conventions (repositories in front of the database).
+ * Serves: FR-1, FR-2, FR-3; hazeljs-conventions (repositories in front of the database).
  * Used by: apps/api/src/modules/campaigns/campaigns.service.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { PrismaProvider } from '../../db/prisma.provider.js';
-import type { Prisma } from '../../generated/prisma/client.js';
+import type { CampaignStatus, Prisma } from '../../generated/prisma/client.js';
 
 // What every campaign read returns: the row plus the niche fields the summary needs.
 const WITH_NICHE = { nicheProfile: { select: { slug: true, searchTerms: true } } } as const;
@@ -21,6 +21,12 @@ interface NewCampaign {
   city: string;
   areas: string[];
   searchCount: number;
+}
+
+/** A campaign's status pair: `pausedFrom` is set exactly while `status` is PAUSED. */
+interface StatusPair {
+  status: CampaignStatus;
+  pausedFrom: CampaignStatus | null;
 }
 
 /** Reads and writes `Campaign` rows for the one v1 organization. */
@@ -96,5 +102,25 @@ export class CampaignsRepository {
    */
   find(organizationId: string, id: string): Promise<CampaignWithNiche | null> {
     return this.prisma.campaign.findFirst({ where: { id, organizationId }, include: WITH_NICHE });
+  }
+
+  /**
+   * Changes a campaign's status only if both its status and `pausedFrom` are still what the caller
+   * read.
+   *
+   * Does not check the state machine: the service did. Guarding on both fields makes a concurrent
+   * change lose cleanly: a resume that read "PAUSED from SCORING" cannot apply after the campaign
+   * was resumed, moved on and paused again from a later status.
+   * @param id - Campaign id.
+   * @param read - Status pair the caller read.
+   * @param data - Status pair to write.
+   * @returns True when the row was updated, false when it had already changed.
+   */
+  async updateStatusIf(id: string, read: StatusPair, data: StatusPair): Promise<boolean> {
+    const { count } = await this.prisma.campaign.updateMany({
+      where: { id, status: read.status, pausedFrom: read.pausedFrom },
+      data,
+    });
+    return count === 1;
   }
 }

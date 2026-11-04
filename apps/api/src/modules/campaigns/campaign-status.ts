@@ -2,7 +2,7 @@
  * FR-3's campaign state machine as one pure function.
  *
  * Serves: FR-3 (campaign status), hazeljs-conventions ("pure functions for rules").
- * Used by: the campaigns service (pause and resume, part 3 of #8).
+ * Used by: apps/api/src/modules/campaigns/campaigns.service.ts.
  */
 import type { CampaignStatus } from '../../generated/prisma/client.js';
 
