@@ -4,7 +4,7 @@
  *
  * Serves: FR-4 (niche profile), FR-8 (ideal-client rules), FR-14/FR-15 (signal weights and tiers),
  * FR-16 (catalog), PRD "Lead scoring model".
- * Used by: the seed (next part of #7).
+ * Used by: apps/api/src/db/seed.ts.
  */
 import { z } from 'zod';
 

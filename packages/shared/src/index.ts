@@ -2,7 +2,7 @@
  * Zod schemas and inferred types shared by the API and the dashboard.
  *
  * Serves: ADR-0001 (one set of Zod schemas), NFR-8 (issue #3, monorepo scaffold).
- * Used by: apps/web/app/page.tsx, apps/api/test/server.int.spec.ts.
+ * Used by: apps/web/app/page.tsx, apps/api/test/server.int.spec.ts, apps/api/src/db/seed.ts.
  */
 import { z } from 'zod';
 
@@ -17,3 +17,6 @@ export const HealthResponse = z.object({
 });
 /** Parsed `GET /health` body. Shares the schema's name so one import gives both. */
 export type HealthResponse = z.infer<typeof HealthResponse>;
+
+export { Booking, CallingHours, DEFAULT_SETTINGS, LlmModels, SpendCaps } from './settings.js';
+export { CatalogFile, NicheFile } from './niche.js';

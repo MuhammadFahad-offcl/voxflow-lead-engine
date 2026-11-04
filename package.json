@@ -17,6 +17,7 @@
     "test:cov": "node --env-file-if-exists=.env --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
+    "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
     "prepare": "husky"
   },
@@ -37,6 +38,7 @@
     "prettier": "3.9.10",
     "prisma": "7.10.1",
     "ts-jest": "29.4.15",
+    "tsx": "4.23.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"
   }

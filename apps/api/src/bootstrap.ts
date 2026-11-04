@@ -2,7 +2,7 @@
  * Startup steps shared by the API and the worker: validate env, build DI, close Prisma on shutdown.
  *
  * Serves: docs/architecture.md §2 and §12, ADR-0007, NFR-5, NFR-10.
- * Used by: apps/api/src/main.ts, apps/api/src/worker.ts, apps/api/src/server.ts.
+ * Used by: apps/api/src/main.ts, apps/api/src/worker.ts, apps/api/src/seed.ts, apps/api/src/server.ts.
  */
 import { Container, HazelApp } from '@hazeljs/core';
 import { AppModule } from './app.module.js';
