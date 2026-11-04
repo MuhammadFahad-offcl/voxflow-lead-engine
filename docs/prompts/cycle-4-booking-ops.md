@@ -3,6 +3,7 @@
 **Cycle goal:** during the call the AI agent offers two real free slots and books a Google Meet video call on your calendar; you send the confirmation with one click; the system runs reliably on your laptop (tunnel, backups, retention, funnel, alerts). Ship **v1.0.0 on 30 Nov**, live run in December.
 
 **[YOU] before you start this cycle**
+
 - Cycle 3 merged, `v0.3.0` tagged, HazelJS submitted.
 - Google Cloud project with the Calendar API enabled and an OAuth client (Desktop app) — Claude will guide you in C4-01.
 - Cloudflare account with the `voxflow.agency` domain on Cloudflare DNS (needed for C4-03).
@@ -14,6 +15,7 @@ Every prompt starts after **S-2** and ends with **S-5 → S-6**.
 ---
 
 ## C4-01 · feat: CalendarPort, slot cache, get-slots and book-slot tool routes
+
 Branch `feat/<#>-booking` · Trace FR-25, FR-26, NFR-3, ADR-0008
 
 ```text
@@ -48,6 +50,7 @@ Show the plan and wait.
 ---
 
 ## C4-02 · feat: Send confirmation button (prefilled WhatsApp)
+
 Branch `feat/<#>-send-confirmation` · Trace FR-27, US-12
 
 ```text
@@ -67,6 +70,7 @@ Acceptance: booked demo lead → button opens WhatsApp Web with the right text. 
 ---
 
 ## C4-03 · chore: Cloudflare Tunnel with 3-path ingress and tunnel health
+
 Branch `chore/<#>-tunnel` · Trace NFR-5, NFR-10, ADR-0003
 
 **[YOU]:** install `cloudflared` on Windows (`winget install Cloudflare.cloudflared`), log in, create the tunnel; Claude guides you.
@@ -95,6 +99,7 @@ a real test call to my phone books a slot end to end. Show the plan and wait.
 ---
 
 ## C4-04 · feat: nightly backup and retention loops, restore test
+
 Branch `feat/<#>-backup-retention` · Trace NFR-6, NFR-12
 
 ```text
@@ -115,6 +120,7 @@ Acceptance: a dump appears in BACKUP_DIR; restore steps work on a clean volume. 
 ---
 
 ## C4-05 · feat: weekly funnel and costs pages
+
 Branch `feat/<#>-funnel-costs` · Trace FR-31, FR-30 (costs), FR-33, US-15, G-goals
 
 ```text
@@ -136,6 +142,7 @@ Acceptance: funnel and cost numbers match a hand count on demo data in the PR de
 ---
 
 ## C4-06 · feat: daily summary and failure alerts
+
 Branch `feat/<#>-alerts` · Trace FR-34 (should), NFR-10
 
 ```text
@@ -155,6 +162,7 @@ Acceptance: in DEMO_MODE the summary appears in the log; with real config I rece
 ---
 
 ## C4-07 · release: full regression and v1.0.0
+
 Branch `chore/<#>-release-v1` · Trace NFR-1–NFR-13, PRD release plan
 
 ```text
@@ -172,4 +180,5 @@ Issue #<#>: v1.0 release. Trace: all NFRs, PRD "Release plan".
 ---
 
 ## Cycle 4 close
+
 Run **S-8** with `<N> = 4`. Tag `v1.0.0`. Live run starts 1 December.

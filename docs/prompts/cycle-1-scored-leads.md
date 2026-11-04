@@ -3,6 +3,7 @@
 **Cycle goal:** from the dashboard, create a "dental clinic, Lahore, DHA + Gulberg" campaign and get a lead table of enriched, scored leads — every point backed by evidence — exportable to CSV. Works fully in `DEMO_MODE=true` and with real Apify/Perplexity/Haiku.
 
 **[YOU] before you start this cycle**
+
 - Docker Desktop running; `docker compose up -d` works.
 - `copy .env.example .env` (keep `DEMO_MODE=true` until C1-07).
 - Apify account + API token (needed at C1-07). Perplexity API key (C1-10). Anthropic API key (C1-11). Put keys in `.env` yourself.
@@ -13,6 +14,7 @@ Every prompt below starts after **S-2** and ends with **S-5 → S-6**.
 ---
 
 ## C1-01 · chore: monorepo scaffold
+
 Branch `chore/<#>-monorepo-scaffold` · Trace NFR-8, ADR-0001
 
 ```text
@@ -51,6 +53,7 @@ Show the plan (≤ 5 bullets + list of files) and wait for "go".
 ---
 
 ## C1-02 · ci: GitHub Actions, commitlint, Husky
+
 Branch `chore/<#>-ci-pipeline` · Trace NFR-5, NFR-8
 
 ```text
@@ -77,6 +80,7 @@ Show the plan and wait.
 ---
 
 ## C1-03 · chore: Docker, Prisma 7, first migration
+
 Branch `chore/<#>-database` · Trace ADR-0002, docs/database.md
 
 ```text
@@ -112,6 +116,7 @@ Never run migrate reset or db push. Show the plan and wait.
 ---
 
 ## C1-04 · feat: env config, logger, DI binding for adapters, demo mode
+
 Branch `feat/<#>-config-di` · Trace ADR-0007, FR-36, NFR-5, NFR-10
 
 ```text
@@ -142,6 +147,7 @@ GET /ready shows the db check healthy; all gates green. Show the plan and wait.
 ---
 
 ## C1-05 · feat: seed organization, settings defaults, dental niche, catalog
+
 Branch `feat/<#>-seed` · Trace FR-4, FR-26, FR-33
 
 ```text
@@ -170,6 +176,7 @@ Acceptance: `pnpm db:seed` works on a fresh DB and in CI; gates green. Show the 
 ---
 
 ## C1-06 · feat: campaigns API
+
 Branch `feat/<#>-campaigns-api` · Trace FR-1, FR-2, FR-3
 
 ```text
@@ -193,6 +200,7 @@ Acceptance: creating "dental-clinic / Lahore / [DHA, Gulberg]" returns searches 
 ---
 
 ## C1-07 · spike: choose the Apify Google Maps actor
+
 Branch `chore/<#>-apify-actor-spike` · Trace FR-5, ADR-0010
 
 **[YOU] first:** create the Apify account, put `APIFY_TOKEN` in `.env`, keep ~$5 credit.
@@ -225,6 +233,7 @@ Deliverable: the comparison table in the PR description + ADR update + fixtures.
 ---
 
 ## C1-08 · feat: LeadSourcePort, discover step, normalization, dedupe, ideal-client filter
+
 Branch `feat/<#>-discover` · Trace FR-5, FR-6, FR-7, FR-8, FR-33
 
 ```text
@@ -259,6 +268,7 @@ token, one 1-area campaign works and its cost shows in CostRecord. Show the plan
 ---
 
 ## C1-09 · feat: WebReaderPort — fetch → Lightpanda → unreadable, and extraction
+
 Branch `feat/<#>-web-reader` · Trace FR-9, FR-10, ADR-0004
 
 ```text
@@ -294,6 +304,7 @@ Acceptance: all 6 fixture sites produce the expected fields and status. Show the
 ---
 
 ## C1-10 · feat: reviews storage and WebContextPort (Perplexity)
+
 Branch `feat/<#>-reviews-context` · Trace FR-11, FR-12
 
 **[YOU] first:** `PERPLEXITY_API_KEY` in `.env`.
@@ -319,6 +330,7 @@ Show the plan and wait.
 ---
 
 ## C1-11 · feat: LlmPort with cost recording and the $10 monthly cap; review labelling
+
 Branch `feat/<#>-llm-port` · Trace FR-13, FR-33, NFR-4, ADR-0006
 
 **[YOU] first:** `ANTHROPIC_API_KEY` in `.env`.
@@ -353,6 +365,7 @@ one real lead costs < $0.001. Show the plan and wait.
 ---
 
 ## C1-12 · feat: scoring rules, signals and tiers
+
 Branch `feat/<#>-scoring` · Trace FR-14, FR-15, NFR-9
 
 ```text
@@ -381,6 +394,7 @@ their top 3 evidence lines. Show the plan and wait.
 ---
 
 ## C1-13 · feat: lead AgentGraph (enrich → score), per-lead status, retry
+
 Branch `feat/<#>-lead-graph` · Trace FR-32, NFR-1, NFR-2, ADR-0001
 
 ```text
@@ -409,6 +423,7 @@ Show the plan and wait.
 ---
 
 ## C1-14 · feat: dashboard — campaigns, new campaign, lead table, CSV
+
 Branch `feat/<#>-dashboard-leads` · Trace FR-30 (part), FR-32, FR-33, US-14
 
 ```text
@@ -437,4 +452,5 @@ progress, filter to HOT, expand a lead to see evidence, export CSV. Page loads <
 ---
 
 ## Cycle 1 close
+
 Run **S-8** with `<N> = 1`. Record the demo: create campaign → lead table → evidence → CSV. Tag `v0.1.0`.

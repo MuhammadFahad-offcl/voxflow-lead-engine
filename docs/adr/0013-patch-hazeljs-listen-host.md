@@ -31,5 +31,12 @@ Option 1: `patches/@hazeljs__core@2.0.13.patch`, registered under `patchedDepend
 
 - The API listens on 127.0.0.1 only; `netstat` confirmed it during #3. Tests finish in about 2 s instead of 6 s.
 - The patch is tied to exactly 2.0.13. Upgrading HazelJS means re-creating the patch or dropping it; pnpm stops the install if it no longer applies.
-- The upstream issue covering both defects is drafted in the PR for #3; Fahad files it on `hazel-js/hazeljs`.
+- Both defects are filed upstream, one issue each (see References).
 - Revisit when a HazelJS release fixes both: remove the patch and mark this ADR superseded.
+
+## References
+
+- [hazel-js/hazeljs#35](https://github.com/hazel-js/hazeljs/issues/35) — `HazelApp.listen()` cannot bind to a specific host
+- [hazel-js/hazeljs#36](https://github.com/hazel-js/hazeljs/issues/36) — `HealthCheckManager.runChecks` leaves timeout timers running
+
+When HazelJS releases the fixes, remove `patches/@hazeljs__core@2.0.13.patch` and its `patchedDependencies` entry in `pnpm-workspace.yaml`.

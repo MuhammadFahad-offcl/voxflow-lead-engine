@@ -3,6 +3,7 @@
 **Cycle goal:** every warm or hot lead gets exactly one catalog service (with the evidence that justifies it) and a personalised Urdu call script; the founder reviews the campaign once and approves or rejects it. Pending approval survives a restart.
 
 **[YOU] before you start this cycle**
+
 - Cycle 1 merged and tagged `v0.1.0`.
 - Answer PRD **Q5** (which services you will really sell): edit `config/catalog/services.json` yourself or tell Claude in C2-01.
 - `OPENAI_API_KEY` in `.env` for C2-06 only.
@@ -13,6 +14,7 @@ Every prompt starts after **S-2** and ends with **S-5 → S-6**.
 ---
 
 ## C2-01 · feat: service catalog CRUD, EmbeddingPort, pgvector search
+
 Branch `feat/<#>-catalog` · Trace FR-16, ADR-0006
 
 ```text
@@ -41,6 +43,7 @@ Acceptance: `pnpm db:seed` gives all 10 services a vector; /catalog edits re-emb
 ---
 
 ## C2-02 · spike: `@hazeljs/rag` pgvector store vs our own repository
+
 Branch `chore/<#>-rag-spike` · Trace FR-16, ADR-0001 · time-box 2 h
 
 ```text
@@ -59,6 +62,7 @@ Issue #<#>: spike — HazelJS RAG vs own pgvector repository. Trace: FR-16. Time
 ---
 
 ## C2-03 · feat: solution agent
+
 Branch `feat/<#>-solution-agent` · Trace FR-17, US-5, ADR-0006
 
 ```text
@@ -87,6 +91,7 @@ recorded. Show the plan and wait.
 ---
 
 ## C2-04 · feat: script agent filling the niche template
+
 Branch `feat/<#>-script-agent` · Trace FR-18, NFR-7
 
 ```text
@@ -116,6 +121,7 @@ Show the plan and wait.
 ---
 
 ## C2-05 · test: eval set of 10 fictional clinics in CI
+
 Branch `chore/<#>-evals` · Trace NFR-9
 
 ```text
@@ -139,6 +145,7 @@ Acceptance: 10/10 pass in CI. Show the plan and wait.
 ---
 
 ## C2-06 · experiment: Haiku 5.5 vs gpt-6-luna for Urdu scripts
+
 Branch `docs/<#>-script-model-experiment` · Trace FR-18, ADR-0006
 
 ```text
@@ -159,6 +166,7 @@ option in the existing LLM adapter if missing (behind LlmPort; model chosen by S
 ---
 
 ## C2-07 · feat: approval agent with durable suspend, approve/reject API and screen
+
 Branch `feat/<#>-approval` · Trace FR-19, US-8, NFR-2, ADR-0011
 
 ```text
@@ -189,6 +197,7 @@ Show the plan and wait.
 ---
 
 ## C2-08 · feat: lead detail page
+
 Branch `feat/<#>-lead-detail` · Trace FR-30 (lead detail), FR-32, US-6
 
 ```text
@@ -209,4 +218,5 @@ Acceptance: a HOT demo lead page shows evidence → service → script in one vi
 ---
 
 ## Cycle 2 close
+
 Run **S-8** with `<N> = 2`. Demo: campaign → approval screen with sample scripts → approve → scheduled attempts. Tag `v0.2.0`.

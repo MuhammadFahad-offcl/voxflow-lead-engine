@@ -3,6 +3,7 @@
 **Cycle goal:** approved campaigns are called by the Urdu Vapi agent inside calling hours, every call is checked by Gatekeeper policies first, results (result, reason, English remarks) appear on the dashboard, attempt 2 and do-not-call work. Submit to HazelJS on **23 Nov**.
 
 **[YOU] before you start this cycle**
+
 - Cycle 2 merged and tagged `v0.2.0`.
 - Vapi account with credit; a phone number in Vapi that can call Pakistani mobiles (imported Twilio/Telnyx number or Vapi number — confirm international calling to +92 works and its per-minute price).
 - Answer PRD **Q1** (PTA telemarketing rules) before any call to a real business. Test calls go only to your own phones.
@@ -16,6 +17,7 @@ Every prompt starts after **S-2** and ends with **S-5 → S-6**.
 ---
 
 ## C3-01 · feat: settings API and page
+
 Branch `feat/<#>-settings` · Trace FR-20, FR-26, FR-33, NFR-6, ADR-0006
 
 ```text
@@ -36,6 +38,7 @@ Acceptance: change calling hours on the page → C2's scheduler uses them for ne
 ---
 
 ## C3-02 · feat: Gatekeeper policies and health
+
 Branch `feat/<#>-policies` · Trace FR-21, FR-23, FR-24, FR-22 (health), NFR-7, NFR-10
 
 ```text
@@ -65,6 +68,7 @@ Acceptance: a policy table test file reads like the architecture table. Show the
 ---
 
 ## C3-03 · feat: VoicePort (Vapi + simulated), caller agent, call dispatcher
+
 Branch `feat/<#>-calling` · Trace FR-22, FR-20, NFR-1, NFR-7
 
 ```text
@@ -97,6 +101,7 @@ Acceptance: in DEMO_MODE an approved campaign's attempts dial in calling hours o
 ---
 
 ## C3-04 · feat: Vapi webhook, outcome agent, attempt 2, do-not-call
+
 Branch `feat/<#>-outcomes` · Trace FR-28, FR-29, FR-23, FR-24, NFR-1, NFR-6, NFR-13
 
 ```text
@@ -126,6 +131,7 @@ Show the plan and wait.
 ---
 
 ## C3-05 · feat: reconciliation loop
+
 Branch `feat/<#>-reconciliation` · Trace FR-28, NFR-2, ADR-0009
 
 ```text
@@ -143,6 +149,7 @@ This is how real test calls get results until the tunnel exists. Show the plan a
 ---
 
 ## C3-06 · feat: calls-today page and run timeline view
+
 Branch `feat/<#>-calls-pages` · Trace FR-30, FR-35, NFR-10
 
 ```text
@@ -162,6 +169,7 @@ and results. Show the plan and wait.
 ---
 
 ## C3-07 · test: 10 real test calls to your own phones
+
 Branch `docs/<#>-voice-tests` · Trace risk "Urdu voice quality", NFR-7
 
 **[YOU]:** have 2–3 phones ready (yours, family). Never call a real business in this step.
@@ -183,6 +191,7 @@ Issue #<#>: real voice tests. Trace: PRD risks (Urdu voice quality), NFR-7.
 ---
 
 ## C3-08 · docs: README, demo video, fresh-clone test, tag, submit
+
 Branch `docs/<#>-submission` · Trace NFR-11, docs/hazeljs-submission.md
 
 ```text
@@ -204,4 +213,5 @@ https://hazeljs.ai/build#submit on 23 Nov.
 ---
 
 ## Cycle 3 close
+
 Run **S-8** with `<N> = 3`. Submit to HazelJS. Tag `v0.3.0`.

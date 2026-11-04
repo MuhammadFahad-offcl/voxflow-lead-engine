@@ -11,12 +11,27 @@
   "version": 1,
   "name": "Dental clinics",
   "searchTerms": ["dental clinic", "dentist", "dental surgeon", "orthodontist"],
-  "categoryKeywords": ["dental clinic", "dentist", "dental", "orthodontist", "oral surgeon", "endodontist"],
+  "categoryKeywords": [
+    "dental clinic",
+    "dentist",
+    "dental",
+    "orthodontist",
+    "oral surgeon",
+    "endodontist"
+  ],
   "idealClient": {
     "privateClinicOnly": true,
     "minRating": 4.0,
     "minReviewCount": 30,
-    "excludeNameKeywords": ["hospital", "teaching", "university", "college", "medical complex", "trust", "foundation"],
+    "excludeNameKeywords": [
+      "hospital",
+      "teaching",
+      "university",
+      "college",
+      "medical complex",
+      "trust",
+      "foundation"
+    ],
     "excludeChains": true,
     "chainRule": "same normalized name found at 3 or more places in one campaign"
   },
@@ -86,8 +101,26 @@
       }
     }
   },
-  "reviewLabels": ["PHONE_UNANSWERED", "BOOKING_OR_WAIT", "STAFF_OR_SERVICE", "PRICE", "POSITIVE", "OTHER"],
-  "premiumAreas": ["DHA", "Gulberg", "Model Town", "Johar Town", "Bahria Town", "Cantt", "Garden Town", "Faisal Town", "Valencia", "Wapda Town"],
+  "reviewLabels": [
+    "PHONE_UNANSWERED",
+    "BOOKING_OR_WAIT",
+    "STAFF_OR_SERVICE",
+    "PRICE",
+    "POSITIVE",
+    "OTHER"
+  ],
+  "premiumAreas": [
+    "DHA",
+    "Gulberg",
+    "Model Town",
+    "Johar Town",
+    "Bahria Town",
+    "Cantt",
+    "Garden Town",
+    "Faisal Town",
+    "Valencia",
+    "Wapda Town"
+  ],
   "defaultAreas": ["DHA", "Gulberg", "Model Town", "Johar Town", "Bahria Town"],
   "scriptTemplateFile": "dental-clinic.script.md"
 }

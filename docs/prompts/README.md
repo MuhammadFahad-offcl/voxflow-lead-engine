@@ -2,13 +2,13 @@
 
 These files hold one ready-to-paste prompt per backlog issue, cycle by cycle. They turn `docs/backlog.md` into instructions Claude Code can execute without guessing.
 
-| File | Cycle | Dates | Deliverable |
-|---|---|---|---|
-| [`00-every-session.md`](00-every-session.md) | all | — | Session start, plan review, fix, review, ship, cycle close |
-| [`cycle-1-scored-leads.md`](cycle-1-scored-leads.md) | 1 | 3–9 Nov | Lead table of enriched, scored leads with evidence + CSV |
-| [`cycle-2-solutions-scripts.md`](cycle-2-solutions-scripts.md) | 2 | 10–16 Nov | One service + Urdu script per warm/hot lead, campaign approval |
-| [`cycle-3-ai-calls.md`](cycle-3-ai-calls.md) | 3 | 17–23 Nov | Policy-gated Urdu AI calls with logged outcomes; HazelJS submission |
-| [`cycle-4-booking-ops.md`](cycle-4-booking-ops.md) | 4 | 24–30 Nov | Booking during the call, operations, v1.0 |
+| File                                                           | Cycle | Dates     | Deliverable                                                         |
+| -------------------------------------------------------------- | ----- | --------- | ------------------------------------------------------------------- |
+| [`00-every-session.md`](00-every-session.md)                   | all   | —         | Session start, plan review, fix, review, ship, cycle close          |
+| [`cycle-1-scored-leads.md`](cycle-1-scored-leads.md)           | 1     | 3–9 Nov   | Lead table of enriched, scored leads with evidence + CSV            |
+| [`cycle-2-solutions-scripts.md`](cycle-2-solutions-scripts.md) | 2     | 10–16 Nov | One service + Urdu script per warm/hot lead, campaign approval      |
+| [`cycle-3-ai-calls.md`](cycle-3-ai-calls.md)                   | 3     | 17–23 Nov | Policy-gated Urdu AI calls with logged outcomes; HazelJS submission |
+| [`cycle-4-booking-ops.md`](cycle-4-booking-ops.md)             | 4     | 24–30 Nov | Booking during the call, operations, v1.0                           |
 
 ## Can Claude Code write the files itself?
 

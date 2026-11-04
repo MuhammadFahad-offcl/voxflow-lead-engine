@@ -6,13 +6,13 @@
 
 ## How the project maps to the evaluation criteria
 
-| Criterion | Weight | Where it is shown |
-| --- | --- | --- |
-| Practical use of HazelJS | 30% | `AgentGraph` per lead; `@Agent`/`@Tool` agents; durable HITL campaign approval with SQL run store; Gatekeeper policies before every call; run timeline; `@hazeljs/testing` agent tests. README lists each with file links. |
-| Functionality and technical implementation | 25% | Demo mode runs one campaign end to end from a fresh clone, including a simulated call |
-| Creativity and innovation | 20% | Evidence-based scoring from public reviews; Urdu AI calls that book meetings live |
-| Code quality and documentation | 15% | Strict TypeScript, CI gates, ADRs, PRD, architecture doc, development log in `docs/retros/` |
-| Real-world impact | 10% | Built for and used by a real agency; honest metrics only — no claimed clients until they exist |
+| Criterion                                  | Weight | Where it is shown                                                                                                                                                                                                          |
+| ------------------------------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Practical use of HazelJS                   | 30%    | `AgentGraph` per lead; `@Agent`/`@Tool` agents; durable HITL campaign approval with SQL run store; Gatekeeper policies before every call; run timeline; `@hazeljs/testing` agent tests. README lists each with file links. |
+| Functionality and technical implementation | 25%    | Demo mode runs one campaign end to end from a fresh clone, including a simulated call                                                                                                                                      |
+| Creativity and innovation                  | 20%    | Evidence-based scoring from public reviews; Urdu AI calls that book meetings live                                                                                                                                          |
+| Code quality and documentation             | 15%    | Strict TypeScript, CI gates, ADRs, PRD, architecture doc, development log in `docs/retros/`                                                                                                                                |
+| Real-world impact                          | 10%    | Built for and used by a real agency; honest metrics only — no claimed clients until they exist                                                                                                                             |
 
 ## The email's tips, and how we cover them
 

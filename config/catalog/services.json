@@ -1,7 +1,9 @@
 {
   "meta": {
     "status": "draft",
-    "pendingQuestions": ["PRD Q5: confirm which services VoxFlow will actually sell and deliver in December"],
+    "pendingQuestions": [
+      "PRD Q5: confirm which services VoxFlow will actually sell and deliver in December"
+    ],
     "rule": "expectedResult never contains numbers or guarantees; the founder states figures on the meeting, not the AI caller",
     "fittingSignals": "keys must exist in config/niches/<niche>.json → signalWeights"
   },
