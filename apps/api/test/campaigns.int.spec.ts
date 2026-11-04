@@ -1,7 +1,7 @@
 /**
  * Integration test of the campaigns API on a real server and its own migrated database.
  *
- * Serves: FR-1, FR-2; issue #8 acceptance criteria.
+ * Serves: FR-1, FR-2, FR-3; issue #8 acceptance criteria.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
@@ -9,6 +9,7 @@ import type { HazelApp } from '@hazeljs/core';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { CampaignSummary } from '@voxflow/shared';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
+import { CampaignsRepository } from '../src/modules/campaigns/campaigns.repository.js';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { startServer } from '../src/server.js';
 import { createTestDatabase } from './test-database.js';
@@ -184,5 +185,89 @@ describe('GET /campaigns and /campaigns/:id', () => {
 
   it('answers 404 for an unknown campaign', async () => {
     expect((await call('GET', '/campaigns/no-such-campaign')).status).toBe(404);
+  });
+});
+
+// Proves pause remembers the status, resume returns to it, and illegal moves are 409 (FR-3).
+describe('POST /campaigns/:id/pause and /resume', () => {
+  it('pauses a SCORING campaign and resumes it in SCORING', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    await prisma.campaign.update({ where: { id }, data: { status: 'SCORING' } });
+
+    const paused = await call('POST', `/campaigns/${id}/pause`);
+    const stored = await prisma.campaign.findUniqueOrThrow({ where: { id } });
+    const resumed = await call('POST', `/campaigns/${id}/resume`);
+
+    expect(paused).toMatchObject({ status: 200, body: { status: 'PAUSED' } });
+    expect(stored.pausedFrom).toBe('SCORING');
+    expect(resumed).toMatchObject({ status: 200, body: { status: 'SCORING' } });
+    expect((await prisma.campaign.findUniqueOrThrow({ where: { id } })).pausedFrom).toBeNull();
+  });
+
+  it('answers 409 when pausing a campaign that is already paused', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    await call('POST', `/campaigns/${id}/pause`);
+
+    expect((await call('POST', `/campaigns/${id}/pause`)).status).toBe(409);
+  });
+
+  it('answers 409 when resuming a campaign that is not paused', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+
+    expect((await call('POST', `/campaigns/${String(created['id'])}/resume`)).status).toBe(409);
+  });
+
+  it('answers 409 when pausing a completed campaign', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    await prisma.campaign.update({ where: { id }, data: { status: 'COMPLETED' } });
+
+    expect((await call('POST', `/campaigns/${id}/pause`)).status).toBe(409);
+  });
+
+  it('refuses to resume from a pause that is not the one it read', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    await prisma.campaign.update({
+      where: { id },
+      data: { status: 'PAUSED', pausedFrom: 'SCORING' },
+    });
+    const repository = app.getContainer().resolve(CampaignsRepository);
+
+    // Meanwhile another request resumed it, it moved on, and it was paused again from a later stage.
+    await prisma.campaign.update({ where: { id }, data: { pausedFrom: 'SCRIPTING' } });
+    const applied = await repository.updateStatusIf(
+      id,
+      { status: 'PAUSED', pausedFrom: 'SCORING' },
+      { status: 'SCORING', pausedFrom: null },
+    );
+
+    expect(applied).toBe(false);
+    expect(await prisma.campaign.findUniqueOrThrow({ where: { id } })).toMatchObject({
+      status: 'PAUSED',
+      pausedFrom: 'SCRIPTING',
+    });
   });
 });

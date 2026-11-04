@@ -1,11 +1,12 @@
 /**
- * Campaign use cases: create with its search grid, list and get.
+ * Campaign use cases: create with its search grid, list, get, pause and resume.
  *
- * Serves: FR-1 (create), FR-2 (grid size, cap, duplicate rate).
+ * Serves: FR-1 (create), FR-2 (grid size, cap, duplicate rate), FR-3 (status changes).
  * Used by: apps/api/src/modules/campaigns/campaigns.controller.ts.
  */
-import { HttpError, Injectable, NotFoundError } from '@hazeljs/core';
+import { ConflictError, HttpError, Injectable, NotFoundError } from '@hazeljs/core';
 import type { CampaignSummary, CreateCampaignInput } from '@voxflow/shared';
+import { canTransition } from './campaign-status.js';
 import { CampaignsRepository, type CampaignWithNiche } from './campaigns.repository.js';
 
 /**
@@ -97,6 +98,51 @@ export class CampaignsService {
    */
   async get(id: string): Promise<CampaignSummary> {
     return toSummary(await this.find(id));
+  }
+
+  /**
+   * Pauses an active campaign and remembers its status for resume.
+   * @param id - Campaign id.
+   * @returns The paused campaign.
+   * @throws NotFoundError when it does not exist; ConflictError when it is not active (already
+   * paused, completed or failed) or changed while this ran; HttpError (503) when the database is
+   * not seeded.
+   */
+  async pause(id: string): Promise<CampaignSummary> {
+    const campaign = await this.find(id);
+    if (!canTransition(campaign.status, 'PAUSED')) {
+      throw new ConflictError(`A ${campaign.status} campaign cannot be paused`);
+    }
+    await this.changeStatus(campaign, { status: 'PAUSED', pausedFrom: campaign.status });
+    return this.get(id);
+  }
+
+  /**
+   * Resumes a paused campaign in the status it was paused from.
+   * @param id - Campaign id.
+   * @returns The resumed campaign.
+   * @throws NotFoundError when it does not exist; ConflictError when it is not paused or changed
+   * while this ran; HttpError (503) when the database is not seeded.
+   */
+  async resume(id: string): Promise<CampaignSummary> {
+    const campaign = await this.find(id);
+    // The database CHECK guarantees pausedFrom is set exactly while the status is PAUSED.
+    const target = campaign.pausedFrom;
+    if (campaign.status !== 'PAUSED' || target === null || !canTransition('PAUSED', target)) {
+      throw new ConflictError(`A ${campaign.status} campaign cannot be resumed`);
+    }
+    await this.changeStatus(campaign, { status: target, pausedFrom: null });
+    return this.get(id);
+  }
+
+  private async changeStatus(
+    campaign: CampaignWithNiche,
+    data: Parameters<CampaignsRepository['updateStatusIf']>[2],
+  ): Promise<void> {
+    const read = { status: campaign.status, pausedFrom: campaign.pausedFrom };
+    if (!(await this.repository.updateStatusIf(campaign.id, read, data))) {
+      throw new ConflictError('The campaign changed meanwhile; reload and try again');
+    }
   }
 
   private async find(id: string): Promise<CampaignWithNiche> {
