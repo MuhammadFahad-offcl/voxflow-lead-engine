@@ -2,7 +2,7 @@
 # tests with coverage and the gitleaks secret scan.
 #
 # Serves: NFR-5, NFR-8.
-# Used by: GitHub Actions; branch protection on main requires the job id `ci` as a status check.
+# Used by: GitHub Actions. The job id `ci` is the status check name for branch protection on main.
 name: CI
 
 on:

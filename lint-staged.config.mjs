@@ -6,7 +6,8 @@
  */
 export default {
   // The two globs must not overlap: lint-staged runs them at the same time.
+  // ESLint first: its autofixes can break formatting, and Prettier then has the last word.
   // --no-warn-ignored: a staged file on ESLint's ignore list would otherwise fail --max-warnings 0.
-  '*.{ts,tsx,js,mjs,cjs}': ['prettier --write', 'eslint --fix --max-warnings 0 --no-warn-ignored'],
+  '*.{ts,tsx,js,mjs,cjs}': ['eslint --fix --max-warnings 0 --no-warn-ignored', 'prettier --write'],
   '*.{json,md,yml,yaml,css}': 'prettier --write',
 };

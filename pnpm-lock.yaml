@@ -169,6 +169,9 @@ importers:
 
   .:
     devDependencies:
+      '@commitlint/cli':
+        specifier: 21.2.4
+        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3)
       '@commitlint/config-conventional':
         specifier: 21.2.4
         version: 21.2.4
@@ -181,9 +184,6 @@ importers:
       '@types/node':
         specifier: 26.6.6
         version: 26.6.6
-      commitlint:
-        specifier: 21.2.4
-        version: 21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3)
       eslint:
         specifier: 10.14.0
         version: 10.14.0(jiti@2.7.0)(supports-color@8.1.1)
@@ -1867,11 +1867,6 @@ packages:
   comment-parser@1.4.9:
     resolution: {integrity: sha512-+2AvZKjJaNq9GQljm3tr0utwrig5BL+jgJGvz5rDpGKNIp+ojcRXWUwBbh/sGIi1QCprR6PsKFakub+w1v+4hQ==}
     engines: {node: '>= 12.0.0'}
-
-  commitlint@21.2.4:
-    resolution: {integrity: sha512-+zC+f2PKKecA7q3YiL1xBqxInqmJ4EVrdroOA7nDNDLvQnkrEh8fEx4TX3KKyq8ltLNrc+RBp6iFil/uxyFXOQ==}
-    engines: {node: '>=22.12.0'}
-    hasBin: true
 
   conventional-changelog-angular@9.4.0:
     resolution: {integrity: sha512-HdxRxuS8bBXVIuo4V82gvSwAXT0vYQUizrjs/izmPg5JdDstr8v8I5hduGL3iQbG+o310dUDxC4+LetuS5hu9w==}
@@ -4763,15 +4758,6 @@ snapshots:
   comment-parser@1.4.1: {}
 
   comment-parser@1.4.9: {}
-
-  commitlint@21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3):
-    dependencies:
-      '@commitlint/cli': 21.2.4(conventional-commits-parser@7.1.4)(typescript@6.0.3)
-      '@commitlint/types': 21.2.3
-    transitivePeerDependencies:
-      - conventional-commits-filter
-      - conventional-commits-parser
-      - typescript
 
   conventional-changelog-angular@9.4.0:
     dependencies:
