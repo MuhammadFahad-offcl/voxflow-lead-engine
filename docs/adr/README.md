@@ -20,4 +20,4 @@ Write a new one with `/adr <title>` in Claude Code, or copy [`template.md`](./te
 | [0012](./0012-pin-typescript-6.md)                  | Pin TypeScript 6.0.3 until the lint and test tools support 7             | Accepted                 |
 | [0013](./0013-patch-hazeljs-listen-host.md)         | Patch @hazeljs/core: bind to 127.0.0.1 and clear health-check timers     | Accepted                 |
 | [0014](./0014-pino-logger-env-before-di.md)         | pino for structured logs; validate the environment before HazelJS starts | Accepted                 |
-| [0015](./0015-apify-hybrid-two-pass.md)             | Apify: Compass for places, Scraperlink for reviews, in two passes        | Proposed                 |
+| [0015](./0015-apify-hybrid-two-pass.md)             | Apify: Compass for places, Scraperlink for reviews, in two passes        | Accepted                 |
