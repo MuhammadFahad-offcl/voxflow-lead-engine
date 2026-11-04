@@ -1,0 +1,5 @@
+# Rejects a commit whose message is not a Conventional Commit.
+#
+# Serves: NFR-8.
+# Used by: git, through the core.hooksPath that `pnpm install` sets (the `prepare` script).
+pnpm exec commitlint --edit "$1"

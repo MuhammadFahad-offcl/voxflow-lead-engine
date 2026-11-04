@@ -1,5 +1,7 @@
 # VoxFlow Lead Engine
 
+[![CI](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml)
+
 An AI agent system that finds local businesses, scores how much they need AI automation (with evidence), writes a personalised Urdu call script, calls them with a Vapi voice agent and books a video call with the founder — all from one dashboard.
 
 Built by [VoxFlow AI Solutions](https://voxflow.agency) with [HazelJS](https://hazeljs.ai) agents. First niche: dental clinics in Lahore.
