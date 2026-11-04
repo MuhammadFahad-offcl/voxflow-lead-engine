@@ -1,3 +1,10 @@
+/**
+ * Jest config: runs the `api` project's specs as ES modules through ts-jest.
+ *
+ * Serves: NFR-9 (issue #3, monorepo scaffold).
+ * Used by: `pnpm test` and `pnpm test:cov`.
+ */
+
 /** @type {import('jest').Config} */
 export default {
   projects: [

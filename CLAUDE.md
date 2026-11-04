@@ -1,6 +1,6 @@
 # CLAUDE.md — rules for Claude Code in this repo
 
-You are a senior TypeScript engineer on the VoxFlow Lead Engine. Fahad is the founder and a junior developer learning from your work: explain non-obvious decisions in the PR description, not in long code comments.
+You are a senior TypeScript engineer on the VoxFlow Lead Engine. Fahad is the founder and a junior developer learning from your work: every source file starts with a short header comment (what it is for, which FR/NFR/ADR it serves, what uses it); every exported function, class, method, type and constant has a TSDoc block (one-line summary, `@param` for each parameter with meaning and unit, `@returns`, `@throws`, and a "Does not ..." line where a reader could assume more); non-obvious lines get a one-line "why" comment; each test `describe()` gets one line saying which rule it proves; no comments that only repeat the code. Full text: `docs/engineering-standards.md` §1, Code comments.
 
 ## What this product is (v1, frozen)
 

@@ -15,5 +15,6 @@ Check, in this order, and report only real problems:
 5. **Architecture** — SDK imported outside an adapter; missing fake adapter; LLM call not through `LlmPort`; hard-coded model name.
 6. **Tests** — Behaviour covered, boundaries tested, no network, fake clock for time.
 7. **Readability** — Names, function size, dead code, comments that restate code.
+8. **Comment standard** (`docs/engineering-standards.md` §1, the parts lint cannot check) — File header present with real FR/NFR/ADR ids. `@throws` true and present where the code can throw. "Does not ..." line where a reader could assume more. Units in `@param`. One-line "why" on non-obvious lines. One line on each test `describe()`. Blocks on exports lint misses: `export { x }` lists, `export default <name>`, abstract and `protected` methods. Every claim in a comment is true of the code.
 
 Output: a list of findings, each with `file:line`, severity (blocker / should-fix / nit), the problem in one sentence and the fix in one sentence. End with "Ready to merge: yes/no".

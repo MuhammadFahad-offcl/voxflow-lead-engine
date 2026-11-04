@@ -1,13 +1,22 @@
+/**
+ * Integration test of the real API server on a random local port.
+ *
+ * Serves: ADR-0003, ADR-0013, and the test asked for in prompt C1-01 item 5
+ * (docs/prompts/cycle-1-scored-leads.md): bound address, GET /health, GET /ready shape.
+ * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
+ */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { HazelApp } from '@hazeljs/core';
 import { HealthResponse } from '@voxflow/shared';
 import { startServer } from '../src/server.js';
 
+// Proves 127.0.0.1-only binding (ADR-0003, ADR-0013) and the probes in docs/architecture.md §13.
 describe('API server', () => {
   let app: HazelApp;
   let baseUrl: string;
 
   beforeAll(async () => {
+    // Port 0 lets the OS pick a free port, so the test never clashes with a running API.
     app = await startServer('127.0.0.1', 0);
     const address = app.getServer()?.address();
     if (address === null || address === undefined || typeof address === 'string') {
