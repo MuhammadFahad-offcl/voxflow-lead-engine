@@ -1,3 +1,9 @@
+/**
+ * ESLint flat config for the whole repo, including the code comment rules.
+ *
+ * Serves: NFR-8 (issue #3, monorepo scaffold), docs/engineering-standards.md §1.
+ * Used by: `pnpm lint`.
+ */
 import js from '@eslint/js';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import jsdoc from 'eslint-plugin-jsdoc';
@@ -60,7 +66,8 @@ export default defineConfig(
             MethodDefinition: true,
           },
           contexts: [
-            // A default-exported function, class or name is checked at its declaration.
+            // A default export by name is checked at its declaration for functions, classes and
+            // type aliases only; constants, interfaces and enums exported that way are not.
             'ExportDefaultDeclaration[declaration.type!=/^(ClassDeclaration|FunctionDeclaration|Identifier)$/]',
             'TSDeclareFunction',
             'TSEnumDeclaration',

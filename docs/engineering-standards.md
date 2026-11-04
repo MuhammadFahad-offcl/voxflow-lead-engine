@@ -26,7 +26,7 @@ These rules apply to every line of code, whether written by a person or by Claud
 - **Tests.** Each test `describe()` gets one line saying which rule it proves.
 - **No noise.** No comments that only repeat the code.
 
-A header looks like this, with a blank line after it when the next line is an export, so it is not read as that export's TSDoc block:
+A header looks like this:
 
 ```ts
 /**
@@ -37,7 +37,9 @@ A header looks like this, with a blank line after it when the next line is an ex
  */
 ```
 
-`eslint-plugin-jsdoc` checks TypeScript files: a block with a summary on exported declarations, and for each signature that every `@param` matches and is described, that `@returns` is present and described when a value is returned, and that tags carry no types. Review checks the rest: file headers, `@throws`, "Does not ..." lines, "why" comments, `describe()` lines, public class fields, abstract methods, and constants, interfaces and enums exported through an `export { x }` list.
+Lint note: a header directly above an export counts as that export's block, so `jsdoc/require-jsdoc` passes for the export silently. A blank line between them makes lint report it.
+
+`eslint-plugin-jsdoc` checks TypeScript files: a block with a summary on exported declarations, and for each signature that every `@param` matches and is described, that `@returns` is present and described when a value is returned, and that tags carry no types. Review checks the rest: file headers, `@throws`, "Does not ..." lines, "why" comments, `describe()` lines, abstract methods, `protected` methods of exported classes, and constants, interfaces and enums exported through an `export { x }` list or as `export default <name>`.
 
 ## 2. Git and GitHub
 

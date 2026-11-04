@@ -1,7 +1,7 @@
 /**
  * Dashboard home page: shows whether the API is reachable.
  *
- * Serves: ADR-0001, NFR-8 (issue #3: proves web, API and the shared schema work together).
+ * Serves: FR-30, ADR-0001 (issue #3: proves web, API and the shared schema work together).
  * Used by: Next.js App Router, which serves this file at `/`.
  */
 import { HealthResponse } from '@voxflow/shared';

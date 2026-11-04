@@ -1,7 +1,7 @@
 /**
  * Entry point of the API process: reads the bind address from the environment, starts the server.
  *
- * Serves: ADR-0003 (127.0.0.1 by default), NFR-8 (issue #3, monorepo scaffold).
+ * Serves: ADR-0003, ADR-0013 (127.0.0.1 by default), NFR-8 (issue #3, monorepo scaffold).
  * Used by: the `dev:start` script in apps/api/package.json, which runs the compiled dist/main.js.
  */
 import { z } from 'zod';

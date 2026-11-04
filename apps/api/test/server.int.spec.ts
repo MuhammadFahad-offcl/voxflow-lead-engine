@@ -1,7 +1,8 @@
 /**
  * Integration test of the real API server on a random local port.
  *
- * Serves: ADR-0003, ADR-0013 (issue #3 acceptance: bound address, GET /health, GET /ready shape).
+ * Serves: ADR-0003, ADR-0013, and the test asked for in prompt C1-01 item 5
+ * (docs/prompts/cycle-1-scored-leads.md): bound address, GET /health, GET /ready shape.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
@@ -9,7 +10,7 @@ import type { HazelApp } from '@hazeljs/core';
 import { HealthResponse } from '@voxflow/shared';
 import { startServer } from '../src/server.js';
 
-// Proves ADR-0003 and ADR-0013: the API binds to 127.0.0.1 only and its built-in probes answer.
+// Proves 127.0.0.1-only binding (ADR-0003, ADR-0013) and the probes in docs/architecture.md §13.
 describe('API server', () => {
   let app: HazelApp;
   let baseUrl: string;

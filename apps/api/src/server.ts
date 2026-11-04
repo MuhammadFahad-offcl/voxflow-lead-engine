@@ -11,11 +11,15 @@ import { AppModule } from './app.module.js';
  * Starts the API server and resolves once it is listening.
  *
  * Does not reject when the port is taken: HazelJS 2.0.13 has no `error` listener on its server, so
- * EADDRINUSE arrives as an uncaught exception and this promise never settles.
+ * EADDRINUSE is an uncaught exception that ends the process.
+ * Does not stop on a throwing `onModuleInit` or synchronous provider factory: HazelJS swallows the
+ * error and the server still starts.
+ * Does not reject when an async provider factory rejects and no class provider depends on it: the
+ * server binds, then HazelJS shuts it down on the unhandled rejection.
  * @param host - IP address to bind to. Pass 127.0.0.1 so only this laptop can reach the API.
  * @param port - TCP port number. 0 lets the operating system pick a free port.
  * @returns The running app, so the caller can read its address and close it.
- * @throws When a HazelJS module init hook fails.
+ * @throws When a class provider's constructor throws, or an async factory one depends on rejects.
  */
 export async function startServer(host: string, port: number): Promise<HazelApp> {
   const app = await HazelApp.create(AppModule);

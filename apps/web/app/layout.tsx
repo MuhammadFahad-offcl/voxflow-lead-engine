@@ -1,7 +1,7 @@
 /**
  * Root layout of the dashboard: the document shell around every page.
  *
- * Serves: ADR-0001, NFR-8 (issue #3, monorepo scaffold). The FR-30 pages will render inside it.
+ * Serves: FR-30 (its pages render inside this shell), ADR-0001 (issue #3, monorepo scaffold).
  * Used by: Next.js App Router, which wraps every page in apps/web/app with this file.
  */
 import type { Metadata } from 'next';
