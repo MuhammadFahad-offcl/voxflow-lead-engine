@@ -7,7 +7,9 @@
     "build": "tsc --build",
     "dev": "tsc --build && pnpm run \"/^dev:/\"",
     "dev:compile": "tsc --build --watch --preserveWatchOutput",
-    "dev:start": "node --env-file-if-exists=../../.env --enable-source-maps --watch dist/main.js"
+    "dev:start": "node --env-file-if-exists=../../.env --enable-source-maps --watch dist/main.js",
+    "dev:worker": "node --env-file-if-exists=../../.env --enable-source-maps --watch dist/worker.js",
+    "worker": "node --env-file-if-exists=../../.env --enable-source-maps dist/worker.js"
   },
   "dependencies": {
     "@hazeljs/agent": "2.0.13",

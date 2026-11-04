@@ -3,7 +3,7 @@
  *
  * Serves: ADR-0002 (issue #5, database setup), docs/architecture.md §12 (URL from the parsed env).
  * Used by: apps/api/src/app.module.ts, apps/api/src/bootstrap.ts, apps/api/src/server.ts,
- * apps/api/test/db.int.spec.ts.
+ * apps/api/src/db/db-health.ts, apps/api/test/db.int.spec.ts.
  */
 import { Inject, Injectable } from '@hazeljs/core';
 import { PrismaPg } from '@prisma/adapter-pg';

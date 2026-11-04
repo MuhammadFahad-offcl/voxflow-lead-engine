@@ -3,7 +3,7 @@
  *
  * Serves: docs/architecture.md §12, ADR-0007 (DEMO_MODE), NFR-5 (no secret values in errors), FR-36.
  * Used by: apps/api/src/bootstrap.ts, apps/api/src/db/prisma.provider.ts, apps/api/src/server.ts,
- * apps/api/test/test-env.ts.
+ * apps/api/src/adapters/bind.ts, apps/api/test/test-env.ts.
  */
 import { z } from 'zod';
 

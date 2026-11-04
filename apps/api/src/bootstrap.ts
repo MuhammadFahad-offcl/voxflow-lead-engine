@@ -1,8 +1,8 @@
 /**
- * Startup steps for each entry point: validate env, build DI, close Prisma on shutdown.
+ * Startup steps shared by the API and the worker: validate env, build DI, close Prisma on shutdown.
  *
  * Serves: docs/architecture.md §2 and §12, ADR-0007, NFR-5, NFR-10.
- * Used by: apps/api/src/main.ts, apps/api/src/server.ts.
+ * Used by: apps/api/src/main.ts, apps/api/src/worker.ts, apps/api/src/server.ts.
  */
 import { Container, HazelApp } from '@hazeljs/core';
 import { AppModule } from './app.module.js';
@@ -37,7 +37,8 @@ export function loadEnvOrExit(source: Readonly<Record<string, string | undefined
 /**
  * Registers the env and the root logger in DI, then creates the HazelJS app with every provider.
  *
- * Does not listen on a port and does not install signal handlers: the API's `listen` does both.
+ * Does not listen on a port and does not install signal handlers: the API's `listen` does both;
+ * the worker installs signal handlers itself.
  * @param env - Parsed configuration from {@link loadEnvOrExit} (or a test's fixed values).
  * @returns The app; its container holds `ENV`, `LOGGER` and `PrismaProvider`.
  * @throws When a class provider's constructor throws.
