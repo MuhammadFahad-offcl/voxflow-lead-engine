@@ -1,5 +1,5 @@
 /**
- * Database access for discovery: claims, pauses and the Apify spend so far.
+ * Database access for discovery: claims, the per-search cost records, and storing places.
  *
  * Serves: FR-3, FR-5, FR-7, FR-8, FR-33; hazeljs-conventions (repositories, atomic worker claims).
  * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/scheduler/campaign-runner.ts.
@@ -25,6 +25,12 @@ export type DiscoveryCampaign = Prisma.CampaignGetPayload<{ include: typeof FOR_
 
 /** A search's cost record: `units` stays null until the search is stored. */
 export type SearchRecord = Pick<CostRecord, 'id' | 'note' | 'units'>;
+
+/** One place that failed the ideal-client filter. */
+interface Rejection {
+  leadId: string;
+  reason: string;
+}
 
 /** Reads and writes what discovery needs. */
 @Injectable()
@@ -116,5 +122,114 @@ export class DiscoveryRepository {
       _sum: { amountUsd: true },
     });
     return sum.amountUsd ?? new Prisma.Decimal(0);
+  }
+
+  /**
+   * Saves a started run. The amount is its limit until the true charge is known, so a crashed
+   * run still counts against the daily cap.
+   * @param data - Owner, campaign, limit in US dollars, and the search note.
+   * @param data.organizationId - `Organization.id`.
+   * @param data.campaignId - `Campaign.id`.
+   * @param data.amountUsd - The run's charge limit.
+   * @param data.note - From `searchNote`.
+   * @returns The new record's id.
+   */
+  async reserveSearch(data: {
+    organizationId: string;
+    campaignId: string;
+    amountUsd: Prisma.Decimal;
+    note: string;
+  }): Promise<string> {
+    const { id } = await this.prisma.costRecord.create({
+      data: { ...data, service: 'APIFY' },
+      select: { id: true },
+    });
+    return id;
+  }
+
+  /**
+   * Stores one finished search in a single transaction: its leads, its counts and its true charge.
+   *
+   * Setting `units` is what marks the search done. It comes first and only a null matches, so a
+   * second runner that collected the same run waits on the row, matches nothing and adds nothing.
+   * Does not touch places already stored: `skipDuplicates` leaves them as they are (FR-7).
+   * @param search - The search and what it returned.
+   * @param search.recordId - Its `CostRecord.id`.
+   * @param search.campaignId - `Campaign.id`.
+   * @param search.rows - One lead row per result, repeats included.
+   * @param search.costUsd - True charge in US dollars; null keeps the reserved amount.
+   * @returns How many results were new and how many were duplicates; null when already stored.
+   */
+  storeSearch(search: {
+    recordId: string;
+    campaignId: string;
+    rows: Prisma.LeadCreateManyInput[];
+    costUsd: Prisma.Decimal | null;
+  }): Promise<{ created: number; duplicates: number } | null> {
+    const { recordId, campaignId, rows, costUsd } = search;
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.costRecord.updateMany({
+        where: { id: recordId, units: null },
+        data: { units: rows.length, ...(costUsd === null ? {} : { amountUsd: costUsd }) },
+      });
+      if (count === 0) return null;
+      const created = await tx.lead.createManyAndReturn({
+        data: rows,
+        skipDuplicates: true,
+        select: { id: true },
+      });
+      const duplicates = rows.length - created.length;
+      await tx.campaign.update({
+        where: { id: campaignId },
+        data: { foundCount: { increment: rows.length }, duplicateCount: { increment: duplicates } },
+      });
+      return { created: created.length, duplicates };
+    });
+  }
+
+  /**
+   * Lists the places a campaign stored, with what the filter needs.
+   * @param campaignId - Campaign id.
+   * @returns Every lead this campaign found first.
+   */
+  campaignPlaces(
+    campaignId: string,
+  ): Promise<{ id: string; name: string; status: string; rawPlace: Prisma.JsonValue }[]> {
+    return this.prisma.lead.findMany({
+      where: { campaignId },
+      select: { id: true, name: true, status: true, rawPlace: true },
+    });
+  }
+
+  /**
+   * Applies the filter's verdicts and moves the campaign on, all or nothing.
+   *
+   * The claim is checked first, so a lost claim changes no lead, and the row stays locked until
+   * this commits. One update per distinct reason, not per lead: 8,000 single updates ran past
+   * Prisma's 5-second transaction limit.
+   * `filteredCount` is counted from the rows, not added to, so repeating this cannot inflate it.
+   * @param claim - The claim held.
+   * @param rejections - The places to mark FILTERED_OUT.
+   * @returns True when the campaign moved to ENRICHING; false when the claim was lost.
+   */
+  finishDiscovery(claim: Claim, rejections: readonly Rejection[]): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.campaign.updateMany({
+        where: { id: claim.id, status: 'DISCOVERING', discoveryClaimedAt: claim.claimedAt },
+        data: { status: 'ENRICHING', discoveryClaimedAt: null },
+      });
+      if (count === 0) return false;
+      for (const [reason, group] of Map.groupBy(rejections, (rejection) => rejection.reason)) {
+        await tx.lead.updateMany({
+          where: { id: { in: group.map((rejection) => rejection.leadId) } },
+          data: { status: 'FILTERED_OUT', filterReason: reason },
+        });
+      }
+      const filteredCount = await tx.lead.count({
+        where: { campaignId: claim.id, status: 'FILTERED_OUT' },
+      });
+      await tx.campaign.update({ where: { id: claim.id }, data: { filteredCount } });
+      return true;
+    });
   }
 }
