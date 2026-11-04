@@ -1,5 +1,5 @@
-# The checks every pull request and every push to main must pass: install, typecheck, lint, Knip,
-# tests with coverage and the gitleaks secret scan.
+# The checks every pull request and every push to main must pass: install, Prettier, the PR title
+# (pull requests only), typecheck, lint, Knip, tests with coverage and the gitleaks secret scan.
 #
 # Serves: NFR-5, NFR-8.
 # Used by: GitHub Actions. The job id `ci` is the status check name for branch protection on main.
@@ -7,6 +7,8 @@ name: CI
 
 on:
   pull_request:
+    # `edited` so that fixing a PR title re-runs the title check.
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [main]
 
@@ -59,6 +61,14 @@ jobs:
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
+      # Cheapest checks first. lint-staged formats on commit, but `--no-verify` skips it.
+      - run: pnpm exec prettier --check .
+      # The squash commit on main takes the PR title, which the commit-msg hook never sees.
+      - if: github.event_name == 'pull_request'
+        env:
+          # Through env, not ${{ }} in the script: a title must never run as shell code.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
       # The client is git-ignored; typecheck, Knip and the tests all import it.
       - run: pnpm db:generate
       - run: pnpm typecheck
