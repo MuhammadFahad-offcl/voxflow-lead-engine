@@ -30,6 +30,6 @@ describe('testEnv', () => {
     expect(env.DEMO_MODE).toBe(true);
     expect(env.ANTHROPIC_API_KEY).toBeUndefined();
     expect(env.VAPI_API_KEY).toBeUndefined();
-    expect(env.LOG_LEVEL).toBe('silent');
+    expect(env.LOG_LEVEL).toBe('error');
   });
 });

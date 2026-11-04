@@ -2,7 +2,9 @@
  * The one place that chooses a real or a fake adapter for a port.
  *
  * Serves: ADR-0007 (DEMO_MODE binds every fake; business code never checks it), FR-36, NFR-9.
- * Used by: the adapters module, once the first port exists (#10 adds LeadSourcePort).
+ * Used by: `createApp` in apps/api/src/bootstrap.ts, before `HazelApp.create`, once the first port
+ * exists (#10 adds LeadSourcePort). HazelJS builds module providers inside `create`, so binding
+ * has to happen first; apps/api/src/adapters/bind.spec.ts.
  */
 import type { Container, InjectionToken, Type } from '@hazeljs/core';
 import type { Env } from '../config/env.js';

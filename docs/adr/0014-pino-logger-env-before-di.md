@@ -32,6 +32,7 @@ The environment is parsed with Zod by `loadEnvOrExit` in each entry point (`main
 ## Consequences
 
 - Our lines are JSON; HazelJS's own startup and shutdown lines are still coloured text from winston on the same output. Accepted for v1; revisit if HazelJS lets us replace its logger.
+- HazelJS's logger reads the same `LOG_LEVEL`, and with `fatal`, `trace` or `silent` it writes nothing at all, its uncaught-error and shutdown lines included. The env schema therefore accepts only the levels both loggers share: `error`, `warn`, `info`, `debug`.
 - HazelJS's logger still calls `dotenv.config()` when it is imported. Tests therefore never read configuration from `process.env`: they build their `Env` with `apps/api/test/test-env.ts` (demo mode, no service keys).
 - A bad `.env` stops the API and the worker with exit code 1 and a list of names, verified by running both.
 - Revisit if HazelJS ships a pluggable logger or stops swallowing startup errors.

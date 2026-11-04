@@ -24,8 +24,8 @@ export const LOGGER = 'Logger';
  * Does not mask anything by itself: pass phone numbers through `maskPhone` and never pass secrets,
  * transcripts or review authors.
  * @param level - Lowest level written, from `LOG_LEVEL`; `silent` writes nothing.
- * @param destination - Where lines go. Defaults to standard output, written synchronously so a line
- * logged just before `process.exit` is not lost.
+ * @param destination - Where lines go. Defaults to standard output: buffered, and flushed
+ * synchronously when the process exits, so a line logged just before `process.exit` is not lost.
  * @returns A logger that writes `{"level":"info","time":"<ISO UTC>",...,"msg":"..."}` lines.
  */
 export function createLogger(level: LevelWithSilent, destination?: DestinationStream): Logger {

@@ -49,18 +49,18 @@ To use real services, set `DEMO_MODE=false` and fill the keys in `.env` (see `.e
 
 ## Scripts
 
-| Command                       | What it does                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------- |
-| `pnpm dev`                    | API (http://127.0.0.1:4000), worker, dashboard (localhost:3000), with reload. |
-| `pnpm build`                  | compile `packages/shared` and `apps/api`, production build of `apps/web`      |
-| `pnpm typecheck`              | TypeScript build mode across all packages, tests included                     |
-| `pnpm lint`                   | ESLint (typescript-eslint strict + stylistic, sonarjs)                        |
-| `pnpm format`                 | Prettier, rewrites files in place                                             |
-| `pnpm knip`                   | unused files, exports and dependencies                                        |
-| `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running           |
-| `pnpm db:migrate`             | apply migrations in development (`prisma migrate dev`)                        |
-| `pnpm db:generate`            | write the Prisma client to `apps/api/src/generated/` (git-ignored)            |
-| `pnpm db:studio`              | browse the database in Prisma Studio                                          |
+| Command                       | What it does                                                              |
+| ----------------------------- | ------------------------------------------------------------------------- |
+| `pnpm dev`                    | API (http://127.0.0.1:4000), worker and dashboard (http://localhost:3000) |
+| `pnpm build`                  | compile `packages/shared` and `apps/api`, production build of `apps/web`  |
+| `pnpm typecheck`              | TypeScript build mode across all packages, tests included                 |
+| `pnpm lint`                   | ESLint (typescript-eslint strict + stylistic, sonarjs)                    |
+| `pnpm format`                 | Prettier, rewrites files in place                                         |
+| `pnpm knip`                   | unused files, exports and dependencies                                    |
+| `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running       |
+| `pnpm db:migrate`             | apply migrations in development (`prisma migrate dev`)                    |
+| `pnpm db:generate`            | write the Prisma client to `apps/api/src/generated/` (git-ignored)        |
+| `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 
 ## Project docs
 

@@ -39,6 +39,9 @@ export function loadEnvOrExit(source: Readonly<Record<string, string | undefined
  *
  * Does not listen on a port and does not install signal handlers: the API's `listen` does both;
  * the worker installs signal handlers itself.
+ * Does not run `onModuleInit`, `onApplicationBootstrap` or the `module-destroy` shutdown step, and
+ * does not await async provider factories: in HazelJS 2.0.13 only `listen()` does those, so the
+ * worker gets none of them.
  * @param env - Parsed configuration from {@link loadEnvOrExit} (or a test's fixed values).
  * @returns The app; its container holds `ENV`, `LOGGER` and `PrismaProvider`.
  * @throws When a class provider's constructor throws.
