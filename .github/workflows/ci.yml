@@ -62,6 +62,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
 
+      # Its postinstall also writes the git-ignored Prisma client that typecheck, Knip and the
+      # tests import, so a broken postinstall fails the very next steps.
       - run: pnpm install --frozen-lockfile
       # Cheapest checks first. lint-staged formats on commit, but `--no-verify` skips it.
       - run: pnpm exec prettier --check .
@@ -71,8 +73,6 @@ jobs:
           # Through env, not ${{ }} in the script: a title must never run as shell code.
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: printf '%s\n' "$PR_TITLE" | pnpm exec commitlint
-      # The client is git-ignored; typecheck, Knip and the tests all import it.
-      - run: pnpm db:generate
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm knip

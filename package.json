@@ -16,9 +16,10 @@
     "test": "node --env-file-if-exists=.env --experimental-vm-modules node_modules/jest/bin/jest.js",
     "test:cov": "node --env-file-if-exists=.env --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
+    "db:migrate": "prisma migrate dev && prisma generate",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "postinstall": "prisma generate",
     "prepare": "husky"
   },
   "devDependencies": {

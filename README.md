@@ -38,8 +38,8 @@ git clone https://github.com/MuhammadFahad-offcl/voxflow-lead-engine.git
 cd voxflow-lead-engine
 cp .env.example .env          # DEMO_MODE=true is the default; set your own POSTGRES_PASSWORD
 docker compose up -d          # Postgres + pgvector, Lightpanda
-pnpm install
-pnpm db:migrate && pnpm db:generate && pnpm db:seed
+pnpm install                  # the first install also generates the Prisma client
+pnpm db:migrate && pnpm db:seed
 pnpm dev                      # dashboard http://localhost:3000, API http://127.0.0.1:4000, worker
 ```
 
@@ -78,10 +78,12 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm format`                 | Prettier, rewrites files in place                                         |
 | `pnpm knip`                   | unused files, exports and dependencies                                    |
 | `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running       |
-| `pnpm db:migrate`             | apply migrations in development (`prisma migrate dev`)                    |
+| `pnpm db:migrate`             | apply migrations, then regenerate the Prisma client (`prisma generate`)   |
 | `pnpm db:seed`                | seed the organization, settings, dental niche and catalog; re-run is safe |
-| `pnpm db:generate`            | write the Prisma client to `apps/api/src/generated/` (git-ignored)        |
+| `pnpm db:generate`            | write the client to `apps/api/src/generated/`; `db:migrate` also runs it  |
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
+
+After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` updates the dependencies and, when it installs anything, regenerates the Prisma client; when nothing changed, pnpm skips it. `pnpm db:migrate` applies new migrations and always regenerates the client, because Prisma 7 does not do that on its own. So the pair always leaves the client in step with the schema.
 
 ## Project docs
 

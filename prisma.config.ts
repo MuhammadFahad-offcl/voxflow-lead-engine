@@ -7,10 +7,23 @@
 import 'dotenv/config';
 import { defineConfig, env } from 'prisma/config';
 
+// Prisma's env() throws when the variable is unset, which would stop every command, generate
+// included. Undefined lets the config load; commands that connect then report the missing URL.
+const databaseUrl = (): string | undefined => {
+  try {
+    return env('DATABASE_URL');
+  } catch {
+    return undefined;
+  }
+};
+
 /**
  * Tells the Prisma CLI where the schema and migrations live and which database to use.
  *
  * Does not open a connection or run migrations: only Prisma CLI commands do that.
+ * Does not require DATABASE_URL to load: `prisma generate` (run on every `pnpm install`) needs no
+ * database, so a fresh clone installs before `.env` exists. Commands that connect still fail
+ * without it, and the seed names the missing variable.
  */
 export default defineConfig({
   schema: 'prisma/schema.prisma',
@@ -21,6 +34,6 @@ export default defineConfig({
     seed: 'tsx --tsconfig apps/api/tsconfig.json apps/api/src/seed.ts',
   },
   datasource: {
-    url: env('DATABASE_URL'),
+    url: databaseUrl(),
   },
 });
