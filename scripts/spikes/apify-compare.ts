@@ -16,6 +16,19 @@ import process from 'node:process';
 
 const SEARCH = 'dental clinic';
 const LOCATION = 'DHA, Lahore, Pakistan';
+// GeoJSON order is [longitude, latitude]; the ring ends where it starts.
+const DHA_POLYGON = {
+  type: 'Polygon',
+  coordinates: [
+    [
+      [74.37, 31.43],
+      [74.47, 31.43],
+      [74.47, 31.51],
+      [74.37, 31.51],
+      [74.37, 31.43],
+    ],
+  ],
+};
 const PLACES = 20;
 const REVIEWS = 30;
 // Pass 2 fetches reviews for this many survivors per actor: enough to measure, cheap enough to repeat.
@@ -349,7 +362,7 @@ const summarize = (pass1: Pass1[], pass2: Pass2[], spent: number): string => {
   const lines: string[] = [
     `# Apify spike summary (#9)`,
     ``,
-    `Search: "${SEARCH}" in "${LOCATION}", ${String(PLACES)} places; pass 2: ${String(REVIEWS)} newest reviews for up to ${String(PASS2_PLACES)} survivors. Tier: ${process.env['APIFY_PLAN_TIER'] ?? 'FREE'}. Total spent: ${usd(spent)}.`,
+    `Search: "${SEARCH}" in "${LOCATION}" (Scraperlink: that text; Compass: a polygon around DHA phases 1-6), ${String(PLACES)} places; pass 2: ${String(REVIEWS)} newest reviews for up to ${String(PASS2_PLACES)} survivors. Tier: ${process.env['APIFY_PLAN_TIER'] ?? 'FREE'}. Total spent: ${usd(spent)}.`,
     ``,
     `## Pass 1: places only`,
     ``,
@@ -503,7 +516,10 @@ const pass1Inputs: [string, string, Json][] = [
     ACTORS.compass,
     {
       searchStringsArray: [SEARCH],
-      locationQuery: LOCATION,
+      // Compass geocodes free text with OpenStreetMap, which reads "DHA, Lahore, Pakistan" as one
+      // small residential patch, and the first run found 0 places. This polygon covers DHA phases
+      // 1-6, from the bounding boxes OpenStreetMap returns for DHA and its phases.
+      customGeolocation: DHA_POLYGON,
       maxCrawledPlacesPerSearch: PLACES,
       language: 'en',
       // Detail pages carry the booking links; reviews, images and contacts stay off in pass 1.
