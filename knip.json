@@ -1,7 +1,9 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
   "workspaces": {
-    ".": {},
+    ".": {
+      "ignore": ["scripts/spikes/**"]
+    },
     "apps/api": {
       "entry": ["src/main.ts", "src/worker.ts"],
       "project": ["src/**/*.ts", "test/**/*.ts"],
