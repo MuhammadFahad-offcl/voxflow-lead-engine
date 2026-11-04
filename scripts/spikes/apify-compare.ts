@@ -154,8 +154,15 @@ const realRunner = (token: string): RunActor => {
       ...init,
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     });
-    if (!response.ok)
-      throw new Error(`Apify ${path.split('?')[0] ?? ''}: HTTP ${String(response.status)}`);
+    if (!response.ok) {
+      // Apify explains a refusal in { error: { type, message } }; it never echoes the token.
+      const body = (await response.json().catch(() => ({}))) as { error?: Json };
+      const reason = [body.error?.['type'], body.error?.['message']].filter(Boolean).join(': ');
+      const suffix = reason === '' ? '' : ' (' + reason + ')';
+      throw new Error(
+        `Apify ${path.split('?')[0] ?? ''}: HTTP ${String(response.status)}${suffix}`,
+      );
+    }
     return (await response.json()) as Json;
   };
   return async (actorId, input) => {
@@ -399,6 +406,12 @@ const summarize = (pass1: Pass1[], pass2: Pass2[], spent: number): string => {
 
 // ── Main ───────────────────────────────────────────────────────────────────────────────────────
 const dryRun = process.argv.includes('--dry-run');
+const flag = (name: string): string | undefined =>
+  process.argv.find((arg) => arg.startsWith(`--${name}=`))?.slice(name.length + 3);
+// --only=compass reruns just one actor's pass 1 and the pass-2 options on its survivors.
+const only = flag('only');
+// --already-spent=0.19 counts an earlier run against the same $0.90 total, so the spike stays under $1.
+const alreadySpent = Number(flag('already-spent') ?? 0);
 // Trimmed, because a stray space or line ending copied into .env makes Apify answer 401.
 const token = process.env['APIFY_TOKEN']?.trim();
 if (!dryRun && (token === undefined || token === '')) {
@@ -427,7 +440,7 @@ const outDir = join(
 );
 await mkdir(outDir, { recursive: true });
 
-let spent = 0;
+let spent = alreadySpent;
 const run = async (name: string, actorId: string, input: Json): Promise<RunResult> => {
   if (spent + RUN_LIMIT_USD > SPEND_LIMIT_USD)
     throw new Error(
@@ -476,7 +489,10 @@ const pass1Inputs: [string, string, Json][] = [
     },
   ],
 ];
-for (const [label, actorId, input] of pass1Inputs) {
+// Pass 2 follows: an actor skipped here has no survivors, so its pass-2 options are skipped too.
+for (const [label, actorId, input] of pass1Inputs.filter(
+  ([l]) => only === undefined || l === only,
+)) {
   try {
     const result = await run(`pass1-${label}`, actorId, input);
     const places = result.items.map(toPlace).filter((p) => p.placeId !== '');
