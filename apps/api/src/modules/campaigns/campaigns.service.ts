@@ -1,0 +1,88 @@
+/**
+ * Campaign use cases: create a campaign with its search grid (list and get follow in part 2b of #8).
+ *
+ * Serves: FR-1 (create), FR-2 (grid size, cap, duplicate rate).
+ * Used by: apps/api/src/modules/campaigns/campaigns.controller.ts.
+ */
+import { HttpError, Injectable, NotFoundError } from '@hazeljs/core';
+import type { CampaignSummary, CreateCampaignInput } from '@voxflow/shared';
+import { CampaignsRepository, type CampaignWithNiche } from './campaigns.repository.js';
+
+/**
+ * Share of discovery results that were duplicates (FR-2), rounded to 2 decimals.
+ *
+ * Does not return money, so a rounded number is fine here.
+ * @param foundCount - Every result discovery received, duplicates included.
+ * @param duplicateCount - Results that matched a business already found.
+ * @returns A rate from 0 to 1, or null when nothing has been found yet.
+ */
+export function duplicateRate(foundCount: number, duplicateCount: number): number | null {
+  if (foundCount === 0) return null;
+  return Math.round((duplicateCount / foundCount) * 100) / 100;
+}
+
+/**
+ * Builds the API view of a campaign.
+ * @param campaign - Row with its niche.
+ * @returns The summary, with the grid split into its factors and the duplicate rate.
+ */
+function toSummary(campaign: CampaignWithNiche): CampaignSummary {
+  return {
+    id: campaign.id,
+    nicheSlug: campaign.nicheProfile.slug,
+    city: campaign.city,
+    areas: campaign.areas,
+    status: campaign.status,
+    grid: {
+      terms: campaign.nicheProfile.searchTerms.length,
+      areas: campaign.areas.length,
+      searches: campaign.searchCount,
+    },
+    maxResultsPerSearch: campaign.maxResultsPerSearch,
+    foundCount: campaign.foundCount,
+    duplicateCount: campaign.duplicateCount,
+    duplicateRate: duplicateRate(campaign.foundCount, campaign.duplicateCount),
+    filteredCount: campaign.filteredCount,
+    createdAt: campaign.createdAt.toISOString(),
+  };
+}
+
+/** Campaign use cases for the one v1 organization. */
+@Injectable()
+export class CampaignsService {
+  /**
+   * Wires the service to its repository.
+   * @param repository - Campaign database access.
+   */
+  constructor(private readonly repository: CampaignsRepository) {}
+
+  /**
+   * Creates a campaign from the newest version of a niche, in DISCOVERING.
+   *
+   * Does not start discovery: the worker's campaign runner picks DISCOVERING campaigns up (#10, #15).
+   * @param input - Validated body of `POST /campaigns`.
+   * @returns The new campaign; `grid.searches` is search terms × areas.
+   * @throws NotFoundError when no niche has that slug; HttpError (503) when the database is not
+   * seeded.
+   */
+  async create(input: CreateCampaignInput): Promise<CampaignSummary> {
+    const organizationId = await this.organizationId();
+    const niche = await this.repository.findLatestNiche(organizationId, input.nicheSlug);
+    if (niche === null) throw new NotFoundError(`Niche "${input.nicheSlug}" not found`);
+    const campaign = await this.repository.create({
+      organizationId,
+      nicheProfileId: niche.id,
+      city: input.city,
+      areas: input.areas,
+      searchCount: niche.searchTerms.length * input.areas.length,
+    });
+    return toSummary(campaign);
+  }
+
+  private async organizationId(): Promise<string> {
+    const id = await this.repository.findOrganizationId();
+    // 503: the API works, but this database has not been set up yet.
+    if (id === null) throw new HttpError(503, 'No organization found: run pnpm db:seed');
+    return id;
+  }
+}
