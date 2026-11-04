@@ -28,7 +28,7 @@ erDiagram
 
 ## Lifecycles
 
-**Campaign:** `DISCOVERING → ENRICHING → SCORING → SCRIPTING → AWAITING_APPROVAL → CALLING → COMPLETED`. Any stage can go to `PAUSED` (operator) or `FAILED`.
+**Campaign:** `DISCOVERING → ENRICHING → SCORING → SCRIPTING → AWAITING_APPROVAL → CALLING → COMPLETED`. Any active stage (not `COMPLETED`) can go to `PAUSED` (operator) or `FAILED`; `PAUSED` can also go to `FAILED`. Resume returns to the stage stored in `pausedFrom`. `COMPLETED` and `FAILED` are final.
 
 **Lead:** `DISCOVERED → ENRICHED → SCORED → READY_TO_CALL → IN_CALLING → BOOKED | CLOSED`.
 Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidence-backed problem), `NEEDS_REVIEW` (solution invalid twice), `FAILED` (see `failedStep`, `error`). Cold leads stay at `SCORED`.
@@ -47,6 +47,7 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 | One meeting per call, one calendar event per meeting | `callAttemptId @unique`, `calendarEventId @unique`                                                      |
 | A blocked number stays blocked                       | `@@unique([organizationId, phone])` on `DoNotCall`; checked by the do-not-call policy before every dial |
 | Niche settings of old campaigns stay explainable     | `NicheProfile` rows are versioned (`@@unique([organizationId, slug, version])`) and never edited        |
+| A paused campaign knows where to resume              | `CHECK`: `pausedFrom` set exactly while `PAUSED`, never to `PAUSED`, `COMPLETED` or `FAILED`            |
 
 ## Conventions
 
