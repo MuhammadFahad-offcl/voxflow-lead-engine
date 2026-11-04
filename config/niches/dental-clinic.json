@@ -43,19 +43,19 @@
     "PAIN": {
       "phone_unanswered_reviews": {
         "points": 15,
-        "rule": "at least 1 review (last 12 months) labelled PHONE_UNANSWERED by the review-labelling task"
+        "rule": "at least 2 of the last 30 reviews (the 30 most recent by publishedAt) labelled PHONE_UNANSWERED by the review-labelling task"
       },
       "booking_wait_reviews": {
         "points": 10,
-        "rule": "at least 1 review (last 12 months) labelled BOOKING_OR_WAIT"
+        "rule": "at least 2 of the last 30 reviews (the 30 most recent by publishedAt) labelled BOOKING_OR_WAIT"
       },
       "no_online_booking": {
         "points": 8,
-        "rule": "website read and no booking widget or booking link found; or no website"
+        "rule": "no booking widget or booking link on the website or the Maps listing; no website at all counts as none on the website (evidence: no website listed)"
       },
       "reviews_unreplied": {
         "points": 7,
-        "rule": "more than half of the stored reviews have no owner reply"
+        "rule": "more than half of the last 30 reviews (the 30 most recent by publishedAt) have no owner reply"
       }
     },
     "FIT": {

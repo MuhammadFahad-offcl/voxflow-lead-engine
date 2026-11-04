@@ -383,7 +383,8 @@ Read first: docs/prd.md "Lead scoring model" (authoritative), config/niches/dent
    Evidence examples: quoted review sentence (≤ 200 chars) with reviewId, the booking-widget check result,
    "Maps category: Dental clinic", the wa.me URL.
 2. Tests: for every signal a "gets points" and a "no evidence → no points" case; boundaries 44/45, 69/70;
-   maximum possible score = 100; reviews older than 12 months ignored for review signals (fixed clock).
+   maximum possible score = 100; only the 30 most recent reviews count; 1 matching review gives 0 points,
+   2 give full points.
 3. pipeline/score.step.ts: build LeadFacts from the DB, run scoreLead, replace the lead's Signal rows in one
    transaction, store score, scoreBreakdown, tier, status SCORED.
 
