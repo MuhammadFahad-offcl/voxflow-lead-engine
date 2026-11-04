@@ -7,6 +7,9 @@ saveExact: true
 # Prebuilt binaries ship as optional dependencies; never compile from source.
 allowBuilds:
   '@parcel/watcher': false
+  # The Prisma CLI fetches its schema engine on first use, so no install script has to run.
+  '@prisma/engines': false
+  prisma: false
 
 patchedDependencies:
   '@hazeljs/core@2.0.13': patches/@hazeljs__core@2.0.13.patch

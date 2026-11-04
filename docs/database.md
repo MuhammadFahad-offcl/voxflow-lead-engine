@@ -69,6 +69,16 @@ The daily retention loop clears `CallAttempt.transcript` and `recordingUrl` afte
 
 Create it with `pnpm prisma migrate dev --create-only --name init`, add the three lines by hand, then `pnpm prisma migrate dev`. Prisma 7 does not run `generate` for you: run `pnpm prisma generate` after.
 
+Prisma has no HNSW index type, so `Service` also declares `@@index([embedding], map: "service_embedding_hnsw")`. The name is what matters: without that line Prisma reads the hand-made index as drift, `migrate dev` asks for a new migration, and that migration drops the index. The real index is still the HNSW one from the migration; an integration test checks it.
+
+## Run tables
+
+The `agent_*` tables at the end of the schema are the HazelJS Agent OS stores, copied from `@hazeljs/agent`'s `prisma-schema.example.prisma`. The only edit is `AgentStep[]?` to `AgentStep[]`, because Prisma rejects optional lists. They follow HazelJS's naming, not the conventions above.
+
+## Test database
+
+Integration tests run against `voxflow_test`, on the server in `DATABASE_URL`. `apps/api/test/test-database.ts` drops and recreates it, then runs `prisma migrate deploy`, so development data is never touched.
+
 ## Changing the schema
 
 Follow the `db-change` skill (`.claude/skills/db-change/SKILL.md`): PRD or ADR first, one migration per PR, never edit a migration that is on `main`.

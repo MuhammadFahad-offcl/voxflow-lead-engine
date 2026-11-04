@@ -13,8 +13,11 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "knip": "knip",
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "test:cov": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "test": "node --env-file-if-exists=.env --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:cov": "node --env-file-if-exists=.env --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:studio": "prisma studio",
     "prepare": "husky"
   },
   "devDependencies": {
@@ -23,6 +26,7 @@
     "@eslint/js": "10.0.1",
     "@jest/globals": "30.5.2",
     "@types/node": "26.6.6",
+    "dotenv": "18.0.9",
     "eslint": "10.14.0",
     "eslint-plugin-jsdoc": "65.4.2",
     "eslint-plugin-sonarjs": "4.2.2",
@@ -31,6 +35,7 @@
     "knip": "6.44.1",
     "lint-staged": "17.6.0",
     "prettier": "3.9.10",
+    "prisma": "7.10.1",
     "ts-jest": "29.4.15",
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1"

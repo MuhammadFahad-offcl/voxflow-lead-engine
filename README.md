@@ -39,7 +39,7 @@ cd voxflow-lead-engine
 cp .env.example .env          # DEMO_MODE=true is the default
 docker compose up -d          # Postgres + pgvector, Lightpanda
 pnpm install
-pnpm db:migrate && pnpm db:seed
+pnpm db:migrate && pnpm db:generate && pnpm db:seed
 pnpm dev                      # dashboard http://localhost:3000, API http://127.0.0.1:4000
 ```
 
@@ -57,7 +57,10 @@ To use real services, set `DEMO_MODE=false` and fill the keys in `.env` (see `.e
 | `pnpm lint`                   | ESLint (typescript-eslint strict + stylistic, sonarjs)                        |
 | `pnpm format`                 | Prettier, rewrites files in place                                             |
 | `pnpm knip`                   | unused files, exports and dependencies                                        |
-| `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report                                  |
+| `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running           |
+| `pnpm db:migrate`             | apply migrations in development (`prisma migrate dev`)                        |
+| `pnpm db:generate`            | write the Prisma client to `apps/api/src/generated/` (git-ignored)            |
+| `pnpm db:studio`              | browse the database in Prisma Studio                                          |
 
 ## Project docs
 

@@ -26,8 +26,8 @@ export default defineConfig(
     '**/.next/',
     '**/coverage/',
     'apps/web/next-env.d.ts',
-    // Linted once Prisma is installed in #5.
-    'prisma.config.ts',
+    // Written by `prisma generate`, git-ignored.
+    'apps/api/src/generated/',
   ]),
   js.configs.recommended,
   tseslint.configs.strictTypeChecked,
@@ -36,7 +36,11 @@ export default defineConfig(
   {
     languageOptions: {
       parserOptions: {
-        projectService: true,
+        projectService: {
+          // At the repo root, outside every package's tsconfig.
+          allowDefaultProject: ['prisma.config.ts'],
+          defaultProject: 'tsconfig.base.json',
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
