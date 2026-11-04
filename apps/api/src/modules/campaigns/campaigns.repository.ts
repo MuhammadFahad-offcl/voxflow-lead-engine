@@ -21,6 +21,8 @@ interface NewCampaign {
   city: string;
   areas: string[];
   searchCount: number;
+  /** Left out to take the database default (FR-2). */
+  maxResultsPerSearch?: number;
 }
 
 /** A campaign's status pair: `pausedFrom` is set exactly while `status` is PAUSED. */
@@ -113,10 +115,14 @@ export class CampaignsRepository {
    * was resumed, moved on and paused again from a later status.
    * @param id - Campaign id.
    * @param read - Status pair the caller read.
-   * @param data - Status pair to write.
+   * @param data - Status pair to write, plus a cleared `pauseReason` on resume.
    * @returns True when the row was updated, false when it had already changed.
    */
-  async updateStatusIf(id: string, read: StatusPair, data: StatusPair): Promise<boolean> {
+  async updateStatusIf(
+    id: string,
+    read: StatusPair,
+    data: StatusPair & { pauseReason?: null },
+  ): Promise<boolean> {
     const { count } = await this.prisma.campaign.updateMany({
       where: { id, status: read.status, pausedFrom: read.pausedFrom },
       data,

@@ -183,6 +183,8 @@ model Campaign {
   areas               String[]
   status              CampaignStatus  @default(DISCOVERING)
   pausedFrom          CampaignStatus? // FR-3: status to return to on resume; set exactly while PAUSED
+  pauseReason         String? // FR-33: why the system paused it; null for an operator pause
+  discoveryClaimedAt  DateTime? // expiring lease of the campaign runner (#10); null when unclaimed
   maxResultsPerSearch Int             @default(100) // FR-2, ADR-0010
   searchCount         Int             @default(0)
   foundCount          Int             @default(0)

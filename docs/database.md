@@ -58,6 +58,11 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 - JSON columns (`Settings.*`, `NicheProfile.idealClient`, `signalWeights`, `Lead.scoreBreakdown`, `businessContext`) are validated with Zod schemas from `packages/shared` on every write.
 - Deleting a lead cascades to its reviews, signals, solution, script, attempts and meetings. Cost records keep the money history (`SetNull`).
 
+## Campaign discovery fields
+
+- `Campaign.discoveryClaimedAt` is the campaign runner's expiring lease (#10). The runner claims a `DISCOVERING` campaign by setting it, renews it before each search and clears it when it stops. A claim older than the lease counts as abandoned, so a crashed worker's campaign is picked up again.
+- `Campaign.pauseReason` says why the system paused a campaign, for example a spend cap (FR-33). It is null for an operator pause, and resume clears it.
+
 ## Retention (NFR-6)
 
 The daily retention loop clears `CallAttempt.transcript` and `recordingUrl` after `Settings.retentionDays` (default 90). The result, reason code and remarks stay.

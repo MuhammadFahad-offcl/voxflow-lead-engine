@@ -20,6 +20,9 @@ const CampaignStatus = z.enum([
 ]);
 
 const MAX_AREAS = 20;
+// ADR-0010's cap: nothing may ask Apify for more per search, only for less.
+const MAX_RESULTS_PER_SEARCH = 100;
+const CAP_MESSAGE = `maxResultsPerSearch must be a whole number from 1 to ${String(MAX_RESULTS_PER_SEARCH)}`;
 // Areas become Apify search queries; nothing real is this long.
 const MAX_TEXT = 100;
 
@@ -43,6 +46,13 @@ export const CreateCampaignInput = z.strictObject({
       (areas) => new Set(areas.map((area) => area.toLowerCase())).size === areas.length,
       'each area may appear only once',
     ),
+  // Lower it for a cheap test run; left out, the database default of 100 applies (FR-2).
+  maxResultsPerSearch: z
+    .number({ error: CAP_MESSAGE })
+    .int(CAP_MESSAGE)
+    .min(1, CAP_MESSAGE)
+    .max(MAX_RESULTS_PER_SEARCH, CAP_MESSAGE)
+    .optional(),
 });
 /** Parsed `POST /campaigns` body. Shares the schema's name so one import gives both. */
 export type CreateCampaignInput = z.infer<typeof CreateCampaignInput>;
@@ -54,6 +64,8 @@ export const CampaignSummary = z.object({
   city: z.string(),
   areas: z.array(z.string()),
   status: CampaignStatus,
+  // FR-33: why the system paused it, e.g. a spend cap; null for an operator pause or when not paused.
+  pauseReason: z.string().nullable(),
   // FR-2: one search per niche search term per area, each capped at maxResultsPerSearch.
   grid: z.object({
     terms: z.number().int().positive(),
