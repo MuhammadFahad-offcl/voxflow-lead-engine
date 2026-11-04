@@ -1,6 +1,6 @@
 # 0010. Cap Apify results per search; actor chosen in Cycle 1
 
-- **Status:** Accepted (actor choice pending, due Cycle 1)
+- **Status:** Accepted; actor choice superseded by [0015](./0015-apify-hybrid-two-pass.md)
 - **Date:** 2026-11-03
 - **Deciders:** Muhammad Fahad
 - **PRD links:** FR-2, FR-5, FR-7
