@@ -4,7 +4,8 @@
  *
  * Serves: FR-5 (discovery), FR-8 (filter fields), FR-10/FR-14 (phone, website, booking links),
  * FR-11 (the 30 newest reviews), ADR-0015 (hybrid two-pass design), CLAUDE.md (validate Apify items).
- * Used by: apps/api/src/adapters/lead-source/apify-items.spec.ts; the Apify adapter in #10.
+ * Used by: apps/api/src/adapters/lead-source/apify-items.spec.ts,
+ * apps/api/src/pipeline/ideal-client-filter.ts; the Apify adapter in #10.
  */
 import { z } from 'zod';
 
@@ -45,6 +46,8 @@ export const CompassPlaceItem = z.object({
   tableReservationLinks: z.array(z.unknown()),
   openingHours: z.array(z.object({ day: z.string(), hours: z.string() })),
 });
+/** Parsed Compass place. Shares the schema's name so one import gives both. */
+export type CompassPlaceItem = z.infer<typeof CompassPlaceItem>;
 
 /**
  * One review from scraperlink/google-maps-scraper.

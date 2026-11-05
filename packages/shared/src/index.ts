@@ -20,5 +20,5 @@ export const HealthResponse = z.object({
 export type HealthResponse = z.infer<typeof HealthResponse>;
 
 export { Booking, CallingHours, DEFAULT_SETTINGS, LlmModels, SpendCaps } from './settings.js';
-export { CatalogFile, NicheFile } from './niche.js';
+export { CatalogFile, IdealClient, NicheFile } from './niche.js';
 export { CampaignSummary, CreateCampaignInput } from './campaign.js';

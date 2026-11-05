@@ -48,6 +48,18 @@ const SignalWeights = z
     'signal points must add up to 100, so a score is out of 100',
   );
 
+/** A niche's ideal-client rules (FR-8), as `NicheProfile.idealClient` stores them. */
+export const IdealClient = z.object({
+  privateClinicOnly: z.boolean(),
+  minRating: z.number().min(0).max(5),
+  minReviewCount: z.number().int().nonnegative(),
+  excludeNameKeywords: z.array(z.string().min(1)),
+  excludeChains: z.boolean(),
+  chainRule: z.string().min(1),
+});
+/** Parsed ideal-client rules. Shares the schema's name so one import gives both. */
+export type IdealClient = z.infer<typeof IdealClient>;
+
 /** A niche profile file. `meta` (draft status, open questions) is allowed and not stored. */
 export const NicheFile = z
   .object({
@@ -57,14 +69,7 @@ export const NicheFile = z
     name: z.string().min(1),
     searchTerms: z.array(z.string().min(1)).min(1),
     categoryKeywords: z.array(z.string().min(1)).min(1),
-    idealClient: z.object({
-      privateClinicOnly: z.boolean(),
-      minRating: z.number().min(0).max(5),
-      minReviewCount: z.number().int().nonnegative(),
-      excludeNameKeywords: z.array(z.string().min(1)),
-      excludeChains: z.boolean(),
-      chainRule: z.string().min(1),
-    }),
+    idealClient: IdealClient,
     tiers: z
       .object({ hot: z.number().int().max(100), warm: z.number().int().min(0) })
       .refine((tiers) => tiers.warm < tiers.hot, 'warm must be below hot'),
