@@ -11,7 +11,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { errorFields, type Logger } from '../logging/logger.js';
 import type { LeadSourcePort, PlaceSearch } from '../ports/lead-source.port.js';
 import { findAreaPolygon, missingAreas, type AreaPolygons } from './area-polygons.js';
-import { countChainNames, idealClientFilter } from './ideal-client-filter.js';
+import { countChainNames, idealClientFilter, isOpen } from './ideal-client-filter.js';
 import type { PaidStartGate } from './paid-start-gate.js';
 import {
   buildGrid,
@@ -205,6 +205,7 @@ const collectAndStore = async (
     recordId: search.recordId,
     campaignId,
     rows: collected.items.map((item) => toLeadRow(item, owner)),
+    openPlaceIds: collected.items.filter(isOpen).map((item) => item.placeId),
     costUsd: collected.costUsd,
     ...(reason === null ? {} : { pause: { claim, reason } }),
   });

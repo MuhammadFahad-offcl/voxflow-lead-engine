@@ -337,7 +337,7 @@ describe('storeSearch', () => {
       costUsd: new Prisma.Decimal('0.018'),
     });
 
-    expect(stored).toEqual({ created: 2, duplicates: 1, paused: false });
+    expect(stored).toEqual({ created: 2, reopened: 0, duplicates: 1, paused: false });
     expect(await campaign(campaignId)).toMatchObject({ foundCount: 3, duplicateCount: 1 });
     const record = await prisma.costRecord.findUniqueOrThrow({ where: { id: recordId } });
     expect(record.units).toBe(3);
@@ -406,9 +406,72 @@ describe('storeSearch', () => {
       costUsd: null,
     });
 
-    expect(stored).toEqual({ created: 0, duplicates: 1, paused: false });
+    expect(stored).toEqual({ created: 0, reopened: 0, duplicates: 1, paused: false });
     const lead = await prisma.lead.findFirstOrThrow({ where: { placeId: 'a' } });
     expect(lead.campaignId).toBe(firstId);
+  });
+
+  it('takes a reopened place with its fresh data, counted once when listed twice', async () => {
+    const { id: firstId } = await newClaim();
+    await prisma.lead.create({
+      data: {
+        ...row(firstId, 'a'),
+        status: 'FILTERED_OUT',
+        filterReason: 'temporarily closed',
+        rating: '4.1',
+      },
+    });
+    const { id: campaignId } = await newClaim();
+    const fresh = {
+      ...row(campaignId, 'a'),
+      rating: '4.8',
+      rawPlace: { temporarilyClosed: false },
+    };
+
+    const stored = await repository.storeSearch({
+      recordId: await reserve(campaignId),
+      campaignId,
+      rows: [fresh, fresh],
+      openPlaceIds: ['a', 'a'],
+      costUsd: null,
+    });
+
+    expect(stored).toEqual({ created: 0, reopened: 1, duplicates: 1, paused: false });
+    const lead = await prisma.lead.findFirstOrThrow({ where: { placeId: 'a' } });
+    expect(lead).toMatchObject({
+      campaignId,
+      status: 'DISCOVERED',
+      filterReason: null,
+      rawPlace: { temporarilyClosed: false },
+    });
+    expect(lead.rating?.toFixed(1)).toBe('4.8');
+    expect(await campaign(campaignId)).toMatchObject({ foundCount: 2, duplicateCount: 1 });
+  });
+
+  it.each([
+    ['another reason', 'rating 3.6 is below the minimum 4', ['a']],
+    ['a listing not shown open', 'temporarily closed', []],
+  ])('leaves a stored place alone for %s', async (_case, filterReason, openPlaceIds) => {
+    const { id: firstId } = await newClaim();
+    await prisma.lead.create({
+      data: { ...row(firstId, 'a'), status: 'FILTERED_OUT', filterReason },
+    });
+    const { id: campaignId } = await newClaim();
+
+    const stored = await repository.storeSearch({
+      recordId: await reserve(campaignId),
+      campaignId,
+      rows: [row(campaignId, 'a')],
+      openPlaceIds,
+      costUsd: null,
+    });
+
+    expect(stored).toMatchObject({ reopened: 0, duplicates: 1 });
+    expect(await prisma.lead.findFirstOrThrow({ where: { placeId: 'a' } })).toMatchObject({
+      campaignId: firstId,
+      status: 'FILTERED_OUT',
+      filterReason,
+    });
   });
 
   it('adds nothing when the same search is stored twice', async () => {

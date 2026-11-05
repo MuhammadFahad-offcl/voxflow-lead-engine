@@ -13,6 +13,7 @@ import { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
 import {
   countChainNames,
   idealClientFilter,
+  isOpen,
   normalizeName,
   type FilterablePlace,
 } from './ideal-client-filter.js';
@@ -71,6 +72,19 @@ describe('idealClientFilter: closed places', () => {
 
     expect([permanentlyClosed, temporarilyClosed]).toEqual([false, false]);
     expect(CompassPlaceItem.safeParse(noStatus).success).toBe(true);
+  });
+});
+
+// Proves what counts as open when a later search looks at a stored closed place again.
+describe('isOpen', () => {
+  it.each([
+    [{}, true],
+    [{ temporarilyClosed: false, permanentlyClosed: false }, true],
+    [{ temporarilyClosed: null }, true],
+    [{ temporarilyClosed: true }, false],
+    [{ permanentlyClosed: true }, false],
+  ])('reads %j as %s', (flags, open) => {
+    expect(isOpen(flags)).toBe(open);
   });
 });
 

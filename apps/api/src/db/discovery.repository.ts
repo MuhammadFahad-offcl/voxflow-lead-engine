@@ -6,6 +6,7 @@
  */
 import { Injectable } from '@hazeljs/core';
 import { Prisma, type CostRecord } from '../generated/prisma/client.js';
+import { TEMPORARILY_CLOSED_REASON } from '../pipeline/ideal-client-filter.js';
 import { wouldPassCap } from '../pipeline/spend-cap.js';
 import { PrismaProvider } from './prisma.provider.js';
 
@@ -64,6 +65,35 @@ const setSearchState = (
   client.$executeRaw`UPDATE "CostRecord"
     SET note = jsonb_set(note::jsonb, '{state}', to_jsonb(${state}::text))::text
     WHERE id = ${recordId}`;
+
+// Gives open places filtered out as temporarily closed back to the pipeline, under this campaign:
+// the campaign that first found one may be long finished, and nothing would ever enrich it there.
+const reopenPlaces = async (
+  tx: Prisma.TransactionClient,
+  campaignId: string,
+  openRows: readonly Prisma.LeadCreateManyInput[],
+): Promise<number> => {
+  const [first] = openRows;
+  if (first === undefined) return 0;
+  const { organizationId } = first;
+  const closed = await tx.lead.findMany({
+    where: {
+      organizationId,
+      placeId: { in: openRows.map((row) => row.placeId) },
+      status: 'FILTERED_OUT',
+      filterReason: TEMPORARILY_CLOSED_REASON,
+    },
+    select: { id: true, placeId: true },
+  });
+  const fresh = new Map(openRows.map((row) => [row.placeId, row]));
+  for (const { id, placeId } of closed) {
+    await tx.lead.update({
+      where: { id },
+      data: { ...fresh.get(placeId), campaignId, status: 'DISCOVERED', filterReason: null },
+    });
+  }
+  return closed.length;
+};
 
 /** Reads and writes what discovery needs. */
 @Injectable()
@@ -290,26 +320,36 @@ export class DiscoveryRepository {
    * between the two would lose the only word that it went wrong.
    * Setting `units` is what marks the search done. It comes first and only a null matches, so a
    * second runner that collected the same run waits on the row, matches nothing and adds nothing.
-   * Does not touch places already stored: `skipDuplicates` leaves them as they are (FR-7).
+   * Does not touch places already stored (FR-7), with one exception: a place filtered out as
+   * temporarily closed that this search shows open moves to this campaign with its fresh data, back
+   * in DISCOVERED, so the filter judges it again at the end of the pass. It counts as new here, not
+   * as a duplicate; the campaign that first found it keeps its counts.
    * @param search - The search and what it returned.
    * @param search.recordId - Its `CostRecord.id`.
    * @param search.campaignId - `Campaign.id`.
    * @param search.rows - One lead row per result, repeats included.
+   * @param search.openPlaceIds - The results whose listing shows them open, from `isOpen`.
    * @param search.costUsd - True charge in US dollars; null keeps the reserved amount.
    * @param search.pause - Given when the run went wrong: what to pause on.
    * @param search.pause.claim - The claim held.
    * @param search.pause.reason - Shown on the dashboard.
-   * @returns How many results were new, how many were duplicates and whether the campaign paused;
+   * @returns How many results were new, reopened or duplicates, and whether the campaign paused;
    * null when already stored.
    */
   storeSearch(search: {
     recordId: string;
     campaignId: string;
     rows: Prisma.LeadCreateManyInput[];
+    openPlaceIds?: readonly string[];
     costUsd: Prisma.Decimal | null;
     pause?: { claim: Claim; reason: string };
-  }): Promise<{ created: number; duplicates: number; paused: boolean } | null> {
-    const { recordId, campaignId, rows, costUsd, pause } = search;
+  }): Promise<{
+    created: number;
+    reopened: number;
+    duplicates: number;
+    paused: boolean;
+  } | null> {
+    const { recordId, campaignId, rows, openPlaceIds = [], costUsd, pause } = search;
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.costRecord.updateMany({
         where: { id: recordId, units: null },
@@ -319,26 +359,31 @@ export class DiscoveryRepository {
       const created = await tx.lead.createManyAndReturn({
         data: rows,
         skipDuplicates: true,
-        select: { id: true },
+        select: { placeId: true },
       });
-      const duplicates = rows.length - created.length;
+      const createdIds = new Set(created.map(({ placeId }) => placeId));
+      const open = new Set(openPlaceIds);
+      const repeats = rows.filter(({ placeId }) => open.has(placeId) && !createdIds.has(placeId));
+      const reopened = await reopenPlaces(tx, campaignId, repeats);
+      const duplicates = rows.length - created.length - reopened;
       await tx.campaign.update({
         where: { id: campaignId },
         data: { foundCount: { increment: rows.length }, duplicateCount: { increment: duplicates } },
       });
-      if (pause === undefined) return { created: created.length, duplicates, paused: false };
+      const counts = { created: created.length, reopened, duplicates };
+      if (pause === undefined) return { ...counts, paused: false };
       const { count: paused } = await tx.campaign.updateMany({
         where: heldBy(pause.claim),
         data: pausedBecause(pause.reason),
       });
-      return { created: created.length, duplicates, paused: paused === 1 };
+      return { ...counts, paused: paused === 1 };
     });
   }
 
   /**
    * Lists the places a campaign stored, with what the filter needs.
    * @param campaignId - Campaign id.
-   * @returns Every lead this campaign found first.
+   * @returns Every lead this campaign found first or reopened.
    */
   campaignPlaces(
     campaignId: string,
