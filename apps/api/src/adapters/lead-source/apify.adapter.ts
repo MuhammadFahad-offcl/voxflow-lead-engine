@@ -19,9 +19,11 @@ import {
   runChargeLimitUsd,
 } from './compass-input.js';
 
-// Apify stops the run here. 100 places take about 3 minutes (31 s per 20 in the #9 spike), and the
-// discover lease (15 minutes) must outlast this and the wait below.
+// Apify stops the run here. 100 places take about 3 minutes (31 s per 20 in the #9 spike).
 const RUN_TIMEOUT_SECS = 600;
+// The longest one start request may take. The client's default is 360 s, and that plus collect's
+// 660 s wait is 1,020 s, past the 15-minute lease; this leaves 210 s to read and store the results.
+const START_TIMEOUT_SECS = 30;
 // The client backs off between attempts and retries network errors, 429 and 5xx.
 const READ_RETRIES = 3;
 const FINISHED = new Set<string>(['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']);
@@ -34,6 +36,8 @@ export class ApifyLeadSourceAdapter implements LeadSourcePort {
   protected readonly baseUrl: string = 'https://api.apify.com';
   /** How long {@link collect} waits, in seconds: the run's limit plus a minute for its shutdown. */
   protected readonly waitSecs: number = RUN_TIMEOUT_SECS + 60;
+  /** How long {@link start} waits for Apify's answer, in seconds. */
+  protected readonly startTimeoutSecs: number = START_TIMEOUT_SECS;
   private readonly token: string;
 
   /**
@@ -58,12 +62,16 @@ export class ApifyLeadSourceAdapter implements LeadSourcePort {
    *
    * The client retries every request up to 8 times by default, POST included, so an unlucky start
    * could otherwise create 9 paid runs. This call uses a client with `maxRetries: 0`.
+   * Does not know whether a timed-out request created a run: it rejects like any failed start, so
+   * the step keeps the reservation, retries nothing and asks the founder to check.
    * @inheritDoc
    */
   async start(search: PlaceSearch): Promise<string> {
     assertChargeLimit(search.chargeLimitUsd);
-    const run = await this.client(0).actor(COMPASS_ACTOR_ID).start(buildCompassInput(search), {
+    const client = this.client(0, this.startTimeoutSecs);
+    const run = await client.actor(COMPASS_ACTOR_ID).start(buildCompassInput(search), {
       maxTotalChargeUsd: search.chargeLimitUsd.toNumber(),
+      // How long Apify lets the run go on, not how long this request may take.
       timeout: RUN_TIMEOUT_SECS,
     });
     return run.id;
@@ -89,7 +97,13 @@ export class ApifyLeadSourceAdapter implements LeadSourcePort {
     };
   }
 
-  private client(maxRetries: number): ApifyClient {
-    return new ApifyClient({ token: this.token, baseUrl: this.baseUrl, maxRetries });
+  private client(maxRetries: number, timeoutSecs?: number): ApifyClient {
+    const { token, baseUrl } = this;
+    return new ApifyClient({
+      token,
+      baseUrl,
+      maxRetries,
+      ...(timeoutSecs === undefined ? {} : { timeoutSecs }),
+    });
   }
 }

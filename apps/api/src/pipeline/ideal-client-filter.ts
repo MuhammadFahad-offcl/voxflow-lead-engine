@@ -23,7 +23,10 @@ export type FilterablePlace = Pick<
   | 'temporarilyClosed'
 >;
 
-/** The `Lead.filterReason` of a temporarily closed place: the one reason a later search can undo. */
+/**
+ * The `Lead.filterReason` of a temporarily closed place: the one reason a later search can undo.
+ * Stored rows match this exact text: rewording it leaves them filtered out for good.
+ */
 export const TEMPORARILY_CLOSED_REASON = 'temporarily closed';
 
 /** The filter's verdict; `reason` is what `Lead.filterReason` stores and the dashboard shows. */

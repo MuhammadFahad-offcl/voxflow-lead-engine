@@ -5,6 +5,8 @@
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { DiscoveryRepository, type Claim } from '../src/db/discovery.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { Prisma } from '../src/generated/prisma/client.js';
@@ -53,15 +55,28 @@ const later = new Date('2026-11-05T07:05:00.000Z');
 const dayStart = new Date('2026-11-04T19:00:00.000Z');
 const reservedNote = searchNote({ term: 'fictional term', area: 'DHA', runId: null });
 
-const reserveUnder = (claim: Claim, capUsd: string) =>
-  repository.reserveWithinCap(claim, {
+const reserveUnder = async (claim: Claim, capUsd: string) => {
+  const spendCaps = { ...DEFAULT_SETTINGS.spendCaps, apifyDailyUsd: capUsd };
+  await prisma.settings.update({ where: { organizationId }, data: { spendCaps } });
+  return repository.reserveWithinCap(claim, {
     organizationId,
     amountUsd: new Prisma.Decimal('0.61'),
-    capUsd: new Prisma.Decimal(capUsd),
     dayStart,
     at: later,
     note: reservedNote,
   });
+};
+
+// Counts this database's sessions stuck on a lock; other specs use other databases.
+const waitForLockWaiters = async (wanted: number): Promise<void> => {
+  const count = async (): Promise<number> => {
+    const [found] = await prisma.$queryRaw<{ waiting: number }[]>`SELECT count(*)::int AS waiting
+      FROM pg_stat_activity
+      WHERE datname = current_database() AND wait_event_type = 'Lock'`;
+    return found?.waiting ?? 0;
+  };
+  while ((await count()) < wanted) await sleep(10);
+};
 
 const recordNote = async (id: string) => {
   const record = await prisma.costRecord.findUniqueOrThrow({ where: { id } });
@@ -73,6 +88,7 @@ beforeAll(async () => {
   prisma = new PrismaProvider(testEnv({ DATABASE_URL: url }));
   repository = new DiscoveryRepository(prisma);
   ({ id: organizationId } = await prisma.organization.create({ data: { name: 'Fictional Org' } }));
+  await prisma.settings.create({ data: { organizationId, ...DEFAULT_SETTINGS } });
   ({ id: nicheProfileId } = await prisma.nicheProfile.create({
     data: {
       organizationId,
@@ -214,6 +230,7 @@ describe('reserveWithinCap', () => {
 
     expect(refused).toMatchObject({ outcome: 'OVER_CAP' });
     expect(refused.outcome === 'OVER_CAP' && refused.spent.toFixed(2)).toBe('0.61');
+    expect(refused.outcome === 'OVER_CAP' && refused.capUsd.toFixed(2)).toBe('1.21');
     expect(await prisma.costRecord.count()).toBe(1);
   });
 
@@ -474,6 +491,49 @@ describe('storeSearch', () => {
       status: 'FILTERED_OUT',
       filterReason,
     });
+  });
+
+  it('gives a reopened place to one campaign when two reopen it at once', async () => {
+    const { id: firstId } = await newClaim();
+    const { id: leadId } = await prisma.lead.create({
+      data: { ...row(firstId, 'a'), status: 'FILTERED_OUT', filterReason: 'temporarily closed' },
+    });
+    const store = async ({ id: campaignId }: Claim) =>
+      repository.storeSearch({
+        recordId: await reserve(campaignId),
+        campaignId,
+        rows: [row(campaignId, 'a')],
+        openPlaceIds: ['a'],
+        costUsd: null,
+      });
+    const [second, third] = [await newClaim(), await newClaim()];
+    let release = (): void => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    // Holds the row, so both stores read the place as closed before either can move it.
+    const blocker = prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Lead" WHERE id = ${leadId} FOR UPDATE`;
+      await held;
+    });
+    await sleep(100);
+    const stores = Promise.all([store(second), store(third)]);
+
+    await waitForLockWaiters(2);
+    release();
+    await blocker;
+    const results = await stores;
+
+    expect(results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ reopened: 1, duplicates: 0 }),
+        expect.objectContaining({ reopened: 0, duplicates: 1 }),
+      ]),
+    );
+    const counts = await Promise.all([campaign(second.id), campaign(third.id)]);
+    expect(counts.map(({ duplicateCount }) => duplicateCount).sort((a, b) => a - b)).toEqual([
+      0, 1,
+    ]);
   });
 
   it('adds nothing when the same search is stored twice', async () => {

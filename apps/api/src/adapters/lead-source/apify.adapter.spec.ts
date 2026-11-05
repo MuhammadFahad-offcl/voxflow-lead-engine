@@ -62,6 +62,7 @@ const json =
 const dropConnection: Reply = (response) => {
   response.socket?.destroy();
 };
+const noAnswer: Reply = () => undefined;
 
 let server: Server;
 let stubUrl = '';
@@ -85,6 +86,14 @@ const route = (request: IncomingMessage, response: ServerResponse, body: string)
 class StubbedAdapter extends ApifyLeadSourceAdapter {
   protected override readonly baseUrl = stubUrl;
   protected override readonly waitSecs = 1;
+  protected override readonly startTimeoutSecs = 1;
+}
+
+// Reads the protected limits as shipped, with nothing overridden.
+class LimitsOfTheRealAdapter extends ApifyLeadSourceAdapter {
+  limits(): { startTimeoutSecs: number; waitSecs: number } {
+    return { startTimeoutSecs: this.startTimeoutSecs, waitSecs: this.waitSecs };
+  }
 }
 
 const warn = jest.fn();
@@ -171,6 +180,25 @@ describe('ApifyLeadSourceAdapter.start failures', () => {
     await expect(adapter().start(search)).rejects.toThrow();
 
     expect(starts()).toBe(1);
+  });
+
+  it('gives up on a start that gets no answer, sending one request, within its limit', async () => {
+    replies.start = [noAnswer];
+    const startedAt = Date.now();
+
+    await expect(adapter().start(search)).rejects.toThrow();
+
+    expect(Date.now() - startedAt).toBeLessThan(3000);
+    expect(starts()).toBe(1);
+  });
+
+  it('keeps its limit short enough for one search to fit the 15-minute lease', () => {
+    const { startTimeoutSecs, waitSecs } = new LimitsOfTheRealAdapter(
+      { APIFY_TOKEN: 'fictional-token' } as Env,
+      logger,
+    ).limits();
+
+    expect(startTimeoutSecs + waitSecs).toBeLessThan(15 * 60);
   });
 });
 
