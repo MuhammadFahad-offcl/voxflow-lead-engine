@@ -15,7 +15,14 @@ interface GridSearch {
   area: string;
 }
 
-const SearchNote = z.object({ term: z.string(), area: z.string(), runId: z.string() });
+const SearchNote = z.object({
+  term: z.string(),
+  area: z.string(),
+  // Null from the reservation until Apify accepts the start: a crash in between leaves this trace.
+  runId: z.string().nullable(),
+  // OPEN: in use. CHECK_APIFY: paused so the founder can look for its run. ABANDONED: he resumed.
+  state: z.enum(['OPEN', 'CHECK_APIFY', 'ABANDONED']).default('OPEN'),
+});
 /** What a search's `CostRecord.note` holds. */
 type SearchNote = z.infer<typeof SearchNote>;
 
@@ -47,10 +54,10 @@ export function searchKey(search: GridSearch): string {
 
 /**
  * Writes the note of a search's `CostRecord`, which is what lets a restart find its paid run.
- * @param note - Term, area and Apify run id.
+ * @param note - Term, area, Apify run id (null before the start) and, when not OPEN, its state.
  * @returns The text for `CostRecord.note`.
  */
-export function searchNote(note: SearchNote): string {
+export function searchNote(note: z.input<typeof SearchNote>): string {
   return JSON.stringify(note);
 }
 
@@ -59,7 +66,7 @@ export function searchNote(note: SearchNote): string {
  *
  * Does not throw: other APIFY cost records, such as review runs in #12, hold other notes.
  * @param note - The stored note.
- * @returns Term, area and run id, or null when the record is not a discovery search.
+ * @returns Term, area, run id and state, or null when the record is not a discovery search.
  */
 export function readSearchNote(note: string | null): SearchNote | null {
   if (note === null) return null;

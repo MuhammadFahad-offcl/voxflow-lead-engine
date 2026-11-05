@@ -8,6 +8,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/glo
 import { DiscoveryRepository, type Claim } from '../src/db/discovery.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { Prisma } from '../src/generated/prisma/client.js';
+import { readSearchNote, searchNote } from '../src/pipeline/search-plan.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 
@@ -48,6 +49,23 @@ const row = (campaignId: string, placeId: string): Prisma.LeadCreateManyInput =>
 
 const campaign = (id: string) => prisma.campaign.findUniqueOrThrow({ where: { id } });
 const later = new Date('2026-11-05T07:05:00.000Z');
+const dayStart = new Date('2026-11-04T19:00:00.000Z');
+const reservedNote = searchNote({ term: 'fictional term', area: 'DHA', runId: null });
+
+const reserveUnder = (claim: Claim, capUsd: string) =>
+  repository.reserveWithinCap(claim, {
+    organizationId,
+    amountUsd: new Prisma.Decimal('0.61'),
+    capUsd: new Prisma.Decimal(capUsd),
+    dayStart,
+    at: later,
+    note: reservedNote,
+  });
+
+const recordNote = async (id: string) => {
+  const record = await prisma.costRecord.findUniqueOrThrow({ where: { id } });
+  return { amountUsd: record.amountUsd.toFixed(2), note: readSearchNote(record.note) };
+};
 
 beforeAll(async () => {
   const url = await createTestDatabase('voxflow_discovery_repository_test');
@@ -170,6 +188,139 @@ describe('apifySpentSince', () => {
     const spent = await repository.apifySpentSince(organizationId, later);
 
     expect(spent.isZero()).toBe(true);
+  });
+});
+
+// Proves the cap check and the reservation are one step, so no two runners can both fit (FR-33).
+describe('reserveWithinCap', () => {
+  it('saves the limit against the campaign, with no run id yet', async () => {
+    const claim = await newClaim();
+
+    const reserved = await reserveUnder(claim, '2.00');
+
+    if (reserved.outcome !== 'RESERVED') throw new Error('Expected a reservation');
+    expect(await recordNote(reserved.recordId)).toMatchObject({
+      amountUsd: '0.61',
+      note: { runId: null, state: 'OPEN' },
+    });
+  });
+
+  it('allows landing exactly on the cap and refuses a cent past it', async () => {
+    const claim = await newClaim();
+
+    await expect(reserveUnder(claim, '0.61')).resolves.toMatchObject({ outcome: 'RESERVED' });
+    const refused = await reserveUnder(claim, '1.21');
+
+    expect(refused).toMatchObject({ outcome: 'OVER_CAP' });
+    expect(refused.outcome === 'OVER_CAP' && refused.spent.toFixed(2)).toBe('0.61');
+    expect(await prisma.costRecord.count()).toBe(1);
+  });
+
+  it('does not count a record from before the day began', async () => {
+    const claim = await newClaim();
+    await prisma.costRecord.create({
+      data: {
+        organizationId,
+        service: 'APIFY',
+        amountUsd: '5.00',
+        at: new Date(dayStart.getTime() - 1),
+      },
+    });
+
+    await expect(reserveUnder(claim, '0.61')).resolves.toMatchObject({ outcome: 'RESERVED' });
+  });
+
+  it('reserves nothing for a runner whose lease another took over', async () => {
+    const claim = await newClaim();
+    await repository.renewClaim(claim, later);
+
+    await expect(reserveUnder(claim, '2.00')).resolves.toEqual({ outcome: 'CLAIM_LOST' });
+    expect(await prisma.costRecord.count()).toBe(0);
+  });
+
+  it.each([1, 2, 3, 4, 5])('lets only one of 4 campaigns fit a tight cap (round %d)', async () => {
+    const claims = await Promise.all([newClaim(), newClaim(), newClaim(), newClaim()]);
+
+    const results = await Promise.all(claims.map((claim) => reserveUnder(claim, '0.61')));
+
+    expect(results.filter(({ outcome }) => outcome === 'RESERVED')).toHaveLength(1);
+    expect(results.filter(({ outcome }) => outcome === 'OVER_CAP')).toHaveLength(3);
+    await prisma.costRecord.deleteMany();
+  });
+});
+
+// Proves a reservation's note can change from two sides without either write being lost.
+describe('saveRunId, pauseForCheck and abandonSearch', () => {
+  const reservation = async (claim: Claim): Promise<string> => {
+    const reserved = await reserveUnder(claim, '2.00');
+    if (reserved.outcome !== 'RESERVED') throw new Error('Expected a reservation');
+    return reserved.recordId;
+  };
+
+  it('saves the run id and leaves the rest of the note alone', async () => {
+    const recordId = await reservation(await newClaim());
+
+    await repository.saveRunId(recordId, 'fictional-run');
+
+    expect((await recordNote(recordId)).note).toEqual({
+      term: 'fictional term',
+      area: 'DHA',
+      runId: 'fictional-run',
+      state: 'OPEN',
+    });
+  });
+
+  it('pauses and marks the record in one step', async () => {
+    const claim = await newClaim();
+    const recordId = await reservation(claim);
+
+    await expect(repository.pauseForCheck(claim, recordId, 'Fictional reason')).resolves.toBe(true);
+
+    expect(await campaign(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pauseReason: 'Fictional reason',
+      discoveryClaimedAt: null,
+    });
+    expect((await recordNote(recordId)).note).toMatchObject({ runId: null, state: 'CHECK_APIFY' });
+  });
+
+  it('changes nothing for a stale runner', async () => {
+    const claim = await newClaim();
+    const recordId = await reservation(claim);
+    await repository.renewClaim(claim, later);
+
+    await expect(repository.pauseForCheck(claim, recordId, 'Fictional reason')).resolves.toBe(
+      false,
+    );
+
+    expect((await campaign(claim.id)).status).toBe('DISCOVERING');
+    expect((await recordNote(recordId)).note).toMatchObject({ state: 'OPEN' });
+  });
+
+  it('keeps a run id saved after the pause, so resume can collect that run', async () => {
+    const claim = await newClaim();
+    const recordId = await reservation(claim);
+    await repository.pauseForCheck(claim, recordId, 'Fictional reason');
+
+    await repository.saveRunId(recordId, 'fictional-run');
+
+    expect((await recordNote(recordId)).note).toMatchObject({
+      runId: 'fictional-run',
+      state: 'CHECK_APIFY',
+    });
+  });
+
+  it('abandons a record without giving its reservation back', async () => {
+    const recordId = await reservation(await newClaim());
+
+    await repository.abandonSearch(recordId);
+
+    expect(await recordNote(recordId)).toMatchObject({
+      amountUsd: '0.61',
+      note: { state: 'ABANDONED' },
+    });
+    const spent = await repository.apifySpentSince(organizationId, dayStart);
+    expect(spent.toFixed(2)).toBe('0.61');
   });
 });
 

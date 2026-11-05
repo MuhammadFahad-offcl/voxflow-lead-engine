@@ -51,8 +51,14 @@ describe('buildGrid', () => {
 describe('searchNote and readSearchNote', () => {
   const search = { term: 'dental clinic', area: 'DHA', runId: 'run-1' };
 
-  it('reads back what it wrote', () => {
-    expect(readSearchNote(searchNote(search))).toEqual(search);
+  it('reads back what it wrote, as OPEN unless it says otherwise', () => {
+    expect(readSearchNote(searchNote(search))).toEqual({ ...search, state: 'OPEN' });
+  });
+
+  it('reads back a reservation with no run id yet', () => {
+    const reserved = { ...search, runId: null, state: 'CHECK_APIFY' as const };
+
+    expect(readSearchNote(searchNote(reserved))).toEqual(reserved);
   });
 
   it('keeps term and area readable in the stored text', () => {
