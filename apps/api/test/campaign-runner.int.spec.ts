@@ -17,13 +17,18 @@ import type { Prisma } from '../src/generated/prisma/client.js';
 import { createLogger, type Logger } from '../src/logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from '../src/pipeline/area-polygons.js';
 import type { DiscoverDeps } from '../src/pipeline/discover.step.js';
-import { searchNote } from '../src/pipeline/search-plan.js';
+import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
+import { readSearchNote, searchNote } from '../src/pipeline/search-plan.js';
 import {
   LEAD_SOURCE,
   type LeadSourcePort,
   type PlaceSearch,
 } from '../src/ports/lead-source.port.js';
-import { runCampaignRunnerOnce, startCampaignRunner } from '../src/scheduler/campaign-runner.js';
+import {
+  registerRunnerShutdown,
+  runCampaignRunnerOnce,
+  startCampaignRunner,
+} from '../src/scheduler/campaign-runner.js';
 import { startServer } from '../src/server.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
@@ -86,6 +91,7 @@ beforeAll(async () => {
     polygons: loadAreaPolygons(AREAS_DIR),
     logger: createLogger('error'),
     now: () => new Date(),
+    startGate: new PaidStartGate(),
   };
 }, 120_000);
 
@@ -312,11 +318,83 @@ describe('startCampaignRunner', () => {
       repository: { claimNext } as unknown as DiscoveryRepository,
     };
 
-    const stop = startCampaignRunner(failing, 1);
+    const stop = startCampaignRunner({ ...failing, startGate: new PaidStartGate() }, 1);
     await sleep(50);
-    stop();
+    await stop(0);
 
     expect(error).toHaveBeenCalledTimes(1);
     expect(claimNext.mock.calls.length).toBeGreaterThan(1);
+  });
+});
+
+// Proves a stop signal lets the paid start finish and its run id reach the database (NFR-2).
+describe('campaign runner shutdown', () => {
+  // A start that ends when the test says so, so these tests do not depend on the machine's speed.
+  const heldStart = (release: Promise<null>): LeadSourcePort => ({
+    ...deps.leadSource,
+    start: async (search) => {
+      starts.push(search);
+      await release;
+      return app.getContainer().resolve<LeadSourcePort>(LEAD_SOURCE).start(search);
+    },
+  });
+  const started = async (): Promise<void> => {
+    while (starts.length === 0) await sleep(5);
+  };
+  // A stopped pass gives its claim up last, so the next test starts on a quiet database.
+  const passEnded = async (id: string): Promise<void> => {
+    while ((await row(id)).discoveryClaimedAt !== null) await sleep(5);
+  };
+
+  it('waits for the run id to be saved, and starts nothing after it', async () => {
+    const id = await createCampaign();
+    const { promise, resolve: release } = Promise.withResolvers<null>();
+    const runner = { ...deps, leadSource: heldStart(promise), startGate: new PaidStartGate() };
+
+    const stop = startCampaignRunner(runner, 1);
+    await started();
+    const stopped = stop(30_000);
+    release(null);
+    await expect(stopped).resolves.toBe(true);
+    const [record] = await prisma.costRecord.findMany({ where: { campaignId: id } });
+
+    expect(readSearchNote(record?.note ?? null)?.runId).not.toBeNull();
+    await passEnded(id);
+    expect(starts).toHaveLength(1);
+  });
+
+  it('gives up after the wait, leaving a record the next pass pauses on', async () => {
+    const id = await createCampaign();
+    const { promise, resolve: release } = Promise.withResolvers<null>();
+    const runner = { ...deps, leadSource: heldStart(promise), startGate: new PaidStartGate() };
+
+    const stop = startCampaignRunner(runner, 1);
+    await started();
+
+    await expect(stop(10)).resolves.toBe(false);
+    const [record] = await prisma.costRecord.findMany({ where: { campaignId: id } });
+    expect(readSearchNote(record?.note ?? null)?.runId).toBeNull();
+    release(null);
+    await passEnded(id);
+  });
+
+  it('registers a handler that stops the runner and warns when the wait ran out', async () => {
+    const handlers: (() => Promise<void>)[] = [];
+    const warn = jest.fn();
+    const stop = jest.fn<(waitMs: number) => Promise<boolean>>().mockResolvedValue(false);
+
+    registerRunnerShutdown(
+      {
+        registerShutdownHandler: ({ handler }) => {
+          handlers.push(handler);
+        },
+      },
+      stop,
+      { warn },
+    );
+    await handlers[0]?.();
+
+    expect(stop).toHaveBeenCalledWith(10_000);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 });

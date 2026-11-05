@@ -16,6 +16,7 @@ import { Prisma } from '../src/generated/prisma/client.js';
 import { createLogger } from '../src/logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from '../src/pipeline/area-polygons.js';
 import { discoverCampaign, type DiscoverDeps } from '../src/pipeline/discover.step.js';
+import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 import { readSearchNote, searchNote } from '../src/pipeline/search-plan.js';
 import { karachiDayStart } from '../src/pipeline/spend-cap.js';
 import type { CollectedRun, LeadSourcePort, PlaceSearch } from '../src/ports/lead-source.port.js';
@@ -70,6 +71,7 @@ const deps = (leadSource: LeadSourcePort, repo = repository): DiscoverDeps => ({
   polygons,
   logger,
   now: () => NOW,
+  startGate: new PaidStartGate(),
 });
 
 const newCampaign = async (areas: string[] = ['DHA']): Promise<Claim> => {
@@ -792,6 +794,21 @@ describe('discoverCampaign: stopping and carrying on', () => {
 
     expect(leadSource.starts).toHaveLength(0);
     expect(await costs(claim.id)).toHaveLength(0);
+  });
+
+  it('reserves nothing and releases its claim once shutdown has begun', async () => {
+    const startGate = new PaidStartGate();
+    await startGate.close(0);
+    const leadSource = new SpyLeadSource();
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign({ ...deps(leadSource), startGate }, claim)).resolves.toBe(
+      'STOPPED',
+    );
+
+    expect(leadSource.starts).toHaveLength(0);
+    expect(await costs(claim.id)).toHaveLength(0);
+    expect((await campaignRow(claim.id)).discoveryClaimedAt).toBeNull();
   });
 
   it('changes nothing when run again after every search is stored', async () => {
