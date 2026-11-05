@@ -11,8 +11,9 @@ import { createApp, loadEnvOrExit, registerPrismaShutdown } from './bootstrap.js
 import { DiscoveryRepository } from './db/discovery.repository.js';
 import { LOGGER, type Logger } from './logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from './pipeline/area-polygons.js';
+import { PaidStartGate } from './pipeline/paid-start-gate.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
-import { startCampaignRunner } from './scheduler/campaign-runner.js';
+import { registerRunnerShutdown, startCampaignRunner } from './scheduler/campaign-runner.js';
 
 const env = loadEnvOrExit(process.env);
 // Before createApp: HazelJS swallows startup errors, and a bad area file must stop the worker here.
@@ -21,17 +22,20 @@ const app = await createApp(env);
 const container = app.getContainer();
 const logger = container.resolve<Logger>(LOGGER);
 
-registerPrismaShutdown(app);
-// The API gets these from listen(); on SIGINT/SIGTERM they run the handlers above, then exit 0.
-app.getShutdownManager().setupSignalHandlers();
-
 // Its timer also keeps the process alive; shutdown always ends with process.exit.
-startCampaignRunner({
+const stopRunner = startCampaignRunner({
   repository: container.resolve(DiscoveryRepository),
   leadSource: container.resolve<LeadSourcePort>(LEAD_SOURCE),
   polygons,
   logger,
   now: () => new Date(),
+  startGate: new PaidStartGate(),
 });
+
+// In this order: the runner may still need the database to save a run id.
+registerRunnerShutdown(app, stopRunner, logger);
+registerPrismaShutdown(app);
+// The API gets these from listen(); on SIGINT/SIGTERM they run the handlers above, then exit 0.
+app.getShutdownManager().setupSignalHandlers();
 
 logger.info('worker started');

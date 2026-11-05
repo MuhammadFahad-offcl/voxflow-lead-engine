@@ -12,6 +12,7 @@ import { errorFields, type Logger } from '../logging/logger.js';
 import type { LeadSourcePort, PlaceSearch } from '../ports/lead-source.port.js';
 import { findAreaPolygon, missingAreas, type AreaPolygons } from './area-polygons.js';
 import { countChainNames, idealClientFilter } from './ideal-client-filter.js';
+import type { PaidStartGate } from './paid-start-gate.js';
 import {
   buildGrid,
   readSearchNote,
@@ -30,6 +31,8 @@ export interface DiscoverDeps {
   logger: Logger;
   /** The clock, so tests can fix the day the cap counts. */
   now: () => Date;
+  /** Lets shutdown wait for a paid start and its saved run id. */
+  startGate: PaidStartGate;
 }
 
 /** How a discover pass ended. */
@@ -53,12 +56,13 @@ interface StartedRun {
 
 /**
  * Why a search could not go on. `uncertainRecordId` names a record whose run may exist; PAUSED means
- * storing the search already paused the campaign.
+ * storing the search already paused the campaign; STOP means this runner lost its claim or the
+ * worker is shutting down.
  */
 type SearchStop =
   | { kind: 'PAUSE'; reason: string; uncertainRecordId?: string }
   | { kind: 'PAUSED' }
-  | { kind: 'CLAIM_LOST' };
+  | { kind: 'STOP' };
 
 /** One grid cell with everything needed to run it. */
 type GridCell = Pick<PlaceSearch, 'term' | 'area' | 'polygon'>;
@@ -91,7 +95,7 @@ const readKnownSearches = async (
 };
 
 // The reservation is committed before the request goes out, and no transaction spans the request.
-const startPaidRun = async (
+const reserveAndStart = async (
   deps: DiscoverDeps,
   campaign: DiscoveryCampaign,
   claim: Claim,
@@ -112,7 +116,7 @@ const startPaidRun = async (
     at: now,
     note: searchNote({ term, area, runId: null }),
   });
-  if (reservation.outcome === 'CLAIM_LOST') return { kind: 'CLAIM_LOST' };
+  if (reservation.outcome === 'CLAIM_LOST') return { kind: 'STOP' };
   if (reservation.outcome === 'OVER_CAP') {
     return { kind: 'PAUSE', reason: capPauseReason(reservation.spent, chargeLimitUsd, capUsd) };
   }
@@ -143,6 +147,16 @@ const startPaidRun = async (
     };
   }
   return { recordId, runId };
+};
+
+const startPaidRun = async (
+  deps: DiscoverDeps,
+  campaign: DiscoveryCampaign,
+  claim: Claim,
+  cell: GridCell,
+): Promise<SearchStop | StartedRun> => {
+  const result = await deps.startGate.run(() => reserveAndStart(deps, campaign, claim, cell));
+  return result === 'CLOSED' ? { kind: 'STOP' } : result;
 };
 
 // Decides what a known search needs next; only the founder's resume can lead to a new paid run.
@@ -199,7 +213,7 @@ const collectAndStore = async (
   deps.logger.info({ campaignId, term, area, status, skippedCount, stored }, 'search stored');
   if (reason === null) return null;
   deps.logger.warn({ campaignId, reason }, 'campaign paused');
-  return { kind: stored?.paused === true ? 'PAUSED' : 'CLAIM_LOST' };
+  return { kind: stored?.paused === true ? 'PAUSED' : 'STOP' };
 };
 
 // Picks a search up from wherever it got to; returns why it stopped, or null once it is stored.
@@ -284,7 +298,7 @@ const runGrid = async (deps: DiscoverDeps, held: { claim: Claim }): Promise<Disc
     const cell = cellOf(polygons, city, term, area);
     const stopped = await runSearch(deps, campaign, renewed, cell, known);
     if (stopped?.kind === 'PAUSED') return 'PAUSED';
-    if (stopped?.kind === 'CLAIM_LOST') return stopPass(deps, renewed);
+    if (stopped?.kind === 'STOP') return stopPass(deps, renewed);
     if (stopped !== null) {
       return pausePass(deps, renewed, stopped.reason, stopped.uncertainRecordId);
     }
@@ -313,8 +327,9 @@ const runGrid = async (deps: DiscoverDeps, held: { claim: Claim }): Promise<Disc
  * the error is not retried after every lease (NFR-1).
  * @param deps - Its dependencies.
  * @param claimed - The claim on the campaign, from the runner.
- * @returns ENRICHING when done; PAUSED when it paused the campaign; STOPPED when the claim was
- * lost, because an operator paused the campaign or another runner took it over.
+ * @returns ENRICHING when done; PAUSED when it paused the campaign; STOPPED when the worker is
+ * shutting down or the claim was lost, because an operator paused the campaign or another runner
+ * took it over.
  * @throws Prisma errors, only when the database refuses even the pause.
  */
 export async function discoverCampaign(
