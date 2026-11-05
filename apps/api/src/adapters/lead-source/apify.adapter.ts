@@ -24,7 +24,8 @@ import {
 const RUN_TIMEOUT_SECS = 600;
 // The client backs off between attempts and retries network errors, 429 and 5xx.
 const READ_RETRIES = 3;
-const FINISHED = new Set(['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']);
+const FINISHED = new Set<string>(['SUCCEEDED', 'FAILED', 'TIMED-OUT', 'ABORTED']);
+const isFinished = (status: string): status is CollectedRun['status'] => FINISHED.has(status);
 
 /** Runs Compass on Apify. */
 @Injectable()
@@ -72,14 +73,20 @@ export class ApifyLeadSourceAdapter implements LeadSourcePort {
   async collect(runId: string): Promise<CollectedRun> {
     const client = this.client(READ_RETRIES);
     const run = await client.run(runId).waitForFinish({ waitSecs: this.waitSecs });
-    if (!FINISHED.has(run.status)) {
+    if (!isFinished(run.status)) {
       throw new Error(`Apify run ${runId} is still ${run.status} after the wait`);
     }
     if (run.status !== 'SUCCEEDED') {
       this.logger.warn({ runId, status: run.status }, 'Apify run did not succeed; keeping results');
     }
     const { items } = await client.dataset(run.defaultDatasetId).listItems();
-    return { items: parsePlaceItems(items, this.logger), costUsd: chargeOfRun(run) };
+    const places = parsePlaceItems(items, this.logger);
+    return {
+      items: places,
+      costUsd: chargeOfRun(run),
+      status: run.status,
+      skippedCount: items.length - places.length,
+    };
   }
 
   private client(maxRetries: number): ApifyClient {

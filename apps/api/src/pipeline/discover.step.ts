@@ -12,7 +12,14 @@ import { errorFields, type Logger } from '../logging/logger.js';
 import type { LeadSourcePort, PlaceSearch } from '../ports/lead-source.port.js';
 import { findAreaPolygon, missingAreas, type AreaPolygons } from './area-polygons.js';
 import { countChainNames, idealClientFilter } from './ideal-client-filter.js';
-import { buildGrid, readSearchNote, searchKey, searchNote, toLeadRow } from './search-plan.js';
+import {
+  buildGrid,
+  readSearchNote,
+  runProblem,
+  searchKey,
+  searchNote,
+  toLeadRow,
+} from './search-plan.js';
 import { capPauseReason, karachiDayStart } from './spend-cap.js';
 
 /** What the step needs from outside. */
@@ -44,9 +51,14 @@ interface StartedRun {
   runId: string;
 }
 
-/** Why a search could not go on. `uncertainRecordId` names a record whose run may exist. */
+/**
+ * Why a search could not go on. `uncertainRecordId` names a record whose run may exist; PAUSED means
+ * storing the search already paused the campaign.
+ */
 type SearchStop =
-  { kind: 'PAUSE'; reason: string; uncertainRecordId?: string } | { kind: 'CLAIM_LOST' };
+  | { kind: 'PAUSE'; reason: string; uncertainRecordId?: string }
+  | { kind: 'PAUSED' }
+  | { kind: 'CLAIM_LOST' };
 
 /** One grid cell with everything needed to run it. */
 type GridCell = Pick<PlaceSearch, 'term' | 'area' | 'polygon'>;
@@ -154,6 +166,7 @@ const continueSearch = async (
 const collectAndStore = async (
   deps: DiscoverDeps,
   campaign: DiscoveryCampaign,
+  claim: Claim,
   cell: GridCell,
   search: StartedRun,
 ): Promise<SearchStop | null> => {
@@ -169,14 +182,20 @@ const collectAndStore = async (
   }
   const { organizationId, id: campaignId, city } = campaign;
   const owner = { organizationId, campaignId, area: cell.area, city };
+  const reason = runProblem(collected, cell);
   const stored = await deps.repository.storeSearch({
     recordId: search.recordId,
     campaignId,
     rows: collected.items.map((item) => toLeadRow(item, owner)),
     costUsd: collected.costUsd,
+    ...(reason === null ? {} : { pause: { claim, reason } }),
   });
-  deps.logger.info({ campaignId, term: cell.term, area: cell.area, stored }, 'search stored');
-  return null;
+  const { term, area } = cell;
+  const { status, skippedCount } = collected;
+  deps.logger.info({ campaignId, term, area, status, skippedCount, stored }, 'search stored');
+  if (reason === null) return null;
+  deps.logger.warn({ campaignId, reason }, 'campaign paused');
+  return { kind: stored?.paused === true ? 'PAUSED' : 'CLAIM_LOST' };
 };
 
 // Picks a search up from wherever it got to; returns why it stopped, or null once it is stored.
@@ -192,7 +211,7 @@ const runSearch = async (
       ? await startPaidRun(deps, campaign, claim, cell)
       : await continueSearch(deps, campaign, claim, cell, known);
   if ('kind' in search) return search;
-  return collectAndStore(deps, campaign, cell, search);
+  return collectAndStore(deps, campaign, claim, cell, search);
 };
 
 const cellOf = (polygons: AreaPolygons, city: string, term: string, area: string): GridCell => {
@@ -233,8 +252,9 @@ const filterAndFinish = async (
  * search under a new reservation.
  * Does not know whether the founder really checked: resuming without checking can pay for one extra
  * run, capped by that run's limit and counted in the day's total.
- * Does not stop for one bad item, nor retry a failed start: it pauses with a reason, and resuming
- * is the founder's decision.
+ * Does not stop for one bad item, nor retry a failed start or a run that went wrong: what such a
+ * run returned is stored and the campaign pauses with a reason. Resuming moves on to the next
+ * search; paying for that search again is the founder's decision.
  * @param deps - Its dependencies.
  * @param claimed - The claim on the campaign, from the runner.
  * @returns ENRICHING when done; PAUSED when it paused the campaign; STOPPED when the claim was
@@ -280,6 +300,7 @@ export async function discoverCampaign(
     claim = renewed;
     const cell = cellOf(polygons, city, term, area);
     const stopped = await runSearch(deps, campaign, claim, cell, known);
+    if (stopped?.kind === 'PAUSED') return 'PAUSED';
     if (stopped?.kind === 'CLAIM_LOST') return stop(claim);
     if (stopped !== null) return pause(stopped.reason, claim, stopped.uncertainRecordId);
   }

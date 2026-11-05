@@ -9,7 +9,14 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
 import { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
-import { buildGrid, readSearchNote, searchKey, searchNote, toLeadRow } from './search-plan.js';
+import {
+  buildGrid,
+  readSearchNote,
+  runProblem,
+  searchKey,
+  searchNote,
+  toLeadRow,
+} from './search-plan.js';
 
 const fixture = z
   .array(CompassPlaceItem)
@@ -72,6 +79,36 @@ describe('searchNote and readSearchNote', () => {
 
   it('gives one key per term and area, without mixing them up', () => {
     expect(searchKey({ term: 'a b', area: 'c' })).not.toBe(searchKey({ term: 'a', area: 'b c' }));
+  });
+});
+
+// Proves a paid search that went wrong always asks for the founder, and a good one never does.
+describe('runProblem', () => {
+  const search = { term: 'dentist', area: 'DHA' };
+  const good = { items: [place(0)], status: 'SUCCEEDED' as const, skippedCount: 0 };
+
+  it('finds nothing wrong with a successful run, even one with some invalid items', () => {
+    expect(runProblem(good, search)).toBeNull();
+    expect(runProblem({ ...good, skippedCount: 2 }, search)).toBeNull();
+  });
+
+  it.each(['FAILED', 'TIMED-OUT', 'ABORTED'] as const)('names a run that %s', (status) => {
+    const reason = runProblem({ ...good, status }, search);
+
+    expect(reason).toContain(`ended as ${status}`);
+    expect(reason).toContain('Valid places stored: 1');
+    expect(reason).toContain('Nothing re-runs by itself');
+  });
+
+  it('blames the fields when every item was invalid', () => {
+    const reason = runProblem({ ...good, items: [], skippedCount: 7 }, search);
+
+    expect(reason).toContain('All 7 items');
+    expect(reason).toContain("Compass's fields may have changed");
+  });
+
+  it('says so when a successful run found nothing', () => {
+    expect(runProblem({ ...good, items: [] }, search)).toContain('found no places');
   });
 });
 

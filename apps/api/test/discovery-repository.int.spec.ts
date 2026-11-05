@@ -337,11 +337,46 @@ describe('storeSearch', () => {
       costUsd: new Prisma.Decimal('0.018'),
     });
 
-    expect(stored).toEqual({ created: 2, duplicates: 1 });
+    expect(stored).toEqual({ created: 2, duplicates: 1, paused: false });
     expect(await campaign(campaignId)).toMatchObject({ foundCount: 3, duplicateCount: 1 });
     const record = await prisma.costRecord.findUniqueOrThrow({ where: { id: recordId } });
     expect(record.units).toBe(3);
     expect(record.amountUsd.toFixed(3)).toBe('0.018');
+  });
+
+  it('stores the rows and pauses together when the run went wrong', async () => {
+    const claim = await newClaim();
+    const search = {
+      recordId: await reserve(claim.id),
+      campaignId: claim.id,
+      rows: [row(claim.id, 'a')],
+      costUsd: null,
+      pause: { claim, reason: 'Fictional reason' },
+    };
+
+    await expect(repository.storeSearch(search)).resolves.toMatchObject({ paused: true });
+
+    expect(await campaign(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pauseReason: 'Fictional reason',
+      foundCount: 1,
+    });
+  });
+
+  it('still stores what a paid run returned for a runner that lost its claim', async () => {
+    const claim = await newClaim();
+    await repository.renewClaim(claim, later);
+    const search = {
+      recordId: await reserve(claim.id),
+      campaignId: claim.id,
+      rows: [row(claim.id, 'a')],
+      costUsd: null,
+      pause: { claim, reason: 'Fictional reason' },
+    };
+
+    await expect(repository.storeSearch(search)).resolves.toMatchObject({ paused: false });
+
+    expect(await campaign(claim.id)).toMatchObject({ status: 'DISCOVERING', foundCount: 1 });
   });
 
   it('keeps the reserved amount when the true charge is unknown', async () => {
@@ -371,7 +406,7 @@ describe('storeSearch', () => {
       costUsd: null,
     });
 
-    expect(stored).toEqual({ created: 0, duplicates: 1 });
+    expect(stored).toEqual({ created: 0, duplicates: 1, paused: false });
     const lead = await prisma.lead.findFirstOrThrow({ where: { placeId: 'a' } });
     expect(lead.campaignId).toBe(firstId);
   });

@@ -15,9 +15,10 @@ import { parsePlaceItems } from './apify-items.js';
 import { assertChargeLimit, runChargeLimitUsd } from './compass-input.js';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, '../../../../../fixtures/places');
-// One search term owns the fixtures. Serving them to all 4 of the niche's terms would count every
-// place 4 times, and the fixture campaign must end with 12 found, 1 duplicate.
-const FIXTURE_TERM = 'dental clinic';
+// The niche's terms share the fixtures, each row going to one term. Serving all of them to every
+// term would count each place 4 times, and the fixture campaign must end with 12 found, 1 duplicate;
+// serving them to one term would leave 3 searches empty, and an empty search pauses a campaign.
+const FIXTURE_TERMS = ['dental clinic', 'dentist', 'dental surgeon', 'orthodontist'];
 // Fictional, so demo campaigns show cost figures of the right size.
 const PLACE_CHARGE_USD = new Prisma.Decimal('0.006');
 
@@ -51,13 +52,17 @@ export class FakeLeadSourceAdapter implements LeadSourcePort {
   collect(runId: string): Promise<CollectedRun> {
     const { term, area, maxResults } = FakeRun.parse(JSON.parse(runId));
     const wanted = area.toLowerCase();
-    const items =
-      term === FIXTURE_TERM
-        ? this.fixtures()
-            .filter((item) => item.neighborhood?.toLowerCase().includes(wanted))
-            .slice(0, maxResults)
-        : [];
-    return Promise.resolve({ items, costUsd: PLACE_CHARGE_USD.times(items.length) });
+    const share = FIXTURE_TERMS.indexOf(term);
+    const items = this.fixtures()
+      .filter((item) => item.neighborhood?.toLowerCase().includes(wanted))
+      .filter((_item, index) => index % FIXTURE_TERMS.length === share)
+      .slice(0, maxResults);
+    return Promise.resolve({
+      items,
+      costUsd: PLACE_CHARGE_USD.times(items.length),
+      status: 'SUCCEEDED',
+      skippedCount: 0,
+    });
   }
 
   private fixtures(): ReturnType<typeof parsePlaceItems> {

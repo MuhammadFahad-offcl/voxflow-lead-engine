@@ -37,30 +37,39 @@ const collect = async (overrides: Partial<PlaceSearch> = {}) =>
 
 // Proves the fake behaves like the port promises, so demo mode exercises the real flow.
 describe('FakeLeadSourceAdapter', () => {
-  it('serves the 12 fixture rows for "dental clinic" in DHA, with a Decimal charge', async () => {
-    const { items, costUsd } = await collect();
+  it('serves a share of the fixture rows in DHA, as a successful run with a Decimal charge', async () => {
+    const { items, costUsd, status, skippedCount } = await collect();
 
-    expect(items).toHaveLength(12);
-    expect(costUsd?.toFixed(3)).toBe('0.072');
+    expect(items).toHaveLength(3);
+    expect(costUsd?.toFixed(3)).toBe('0.018');
+    expect({ status, skippedCount }).toEqual({ status: 'SUCCEEDED', skippedCount: 0 });
   });
 
   it('matches the area in any case', async () => {
-    expect((await collect({ area: 'dha' })).items).toHaveLength(12);
+    expect((await collect({ area: 'dha' })).items).toHaveLength(3);
   });
 
   it('serves nothing for an area the fixtures do not cover', async () => {
     expect((await collect({ area: 'Bahria Town' })).items).toHaveLength(0);
   });
 
-  it('serves nothing for the other search terms, so places are not counted 4 times', async () => {
-    const { items, costUsd } = await collect({ term: 'dentist' });
+  it('splits the 12 rows across the 4 terms, so no place is served twice by the split', async () => {
+    const terms = ['dental clinic', 'dentist', 'dental surgeon', 'orthodontist'];
+
+    const runs = await Promise.all(terms.map((term) => collect({ term })));
+
+    expect(runs.map(({ items }) => items.length)).toEqual([3, 3, 3, 3]);
+  });
+
+  it('serves nothing for a term the fixtures do not cover', async () => {
+    const { items, costUsd } = await collect({ term: 'fictional term' });
 
     expect(items).toHaveLength(0);
     expect(costUsd?.isZero()).toBe(true);
   });
 
   it('honours the cap per search', async () => {
-    expect((await collect({ maxResults: 5 })).items).toHaveLength(5);
+    expect((await collect({ maxResults: 2 })).items).toHaveLength(2);
   });
 
   it('refuses a charge limit below $0.50, like the real adapter', async () => {

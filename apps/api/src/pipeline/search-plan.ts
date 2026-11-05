@@ -7,6 +7,7 @@
 import { z } from 'zod';
 import type { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
 import type { Prisma } from '../generated/prisma/client.js';
+import type { CollectedRun } from '../ports/lead-source.port.js';
 import { normalizePhone, normalizeUrl } from './normalize.js';
 
 /** One cell of the grid, before it has a run. */
@@ -75,6 +76,33 @@ export function readSearchNote(note: string | null): SearchNote | null {
   } catch {
     return null;
   }
+}
+
+// A paid search that went wrong is stored as done, so resuming must not imply a retry.
+const MOVES_ON = 'Nothing re-runs by itself: resuming moves on to the next search.';
+
+/**
+ * Says what is wrong with a collected run, for the pause that follows it.
+ *
+ * Does not judge a run that lost only some items: those were logged, and the rest are good.
+ * @param run - How the run ended.
+ * @param search - Its term and area.
+ * @returns The text for `Campaign.pauseReason`, or null when the run needs no pause.
+ */
+export function runProblem(
+  run: Pick<CollectedRun, 'items' | 'status' | 'skippedCount'>,
+  search: GridSearch,
+): string | null {
+  const name = `"${search.term}" in ${search.area}`;
+  const found = String(run.items.length);
+  if (run.status !== 'SUCCEEDED') {
+    return `The Apify run for ${name} ended as ${run.status}. Valid places stored: ${found}. ${MOVES_ON}`;
+  }
+  if (run.items.length > 0) return null;
+  if (run.skippedCount > 0) {
+    return `All ${String(run.skippedCount)} items of the Apify run for ${name} were invalid, so Compass's fields may have changed. Check that before resuming. ${MOVES_ON}`;
+  }
+  return `The Apify run for ${name} succeeded but found no places. Check the area's polygon. ${MOVES_ON}`;
 }
 
 /**
