@@ -30,7 +30,6 @@ const EnvShape = z.object({
   WEB_PORT: port(3000),
 
   APIFY_TOKEN: z.string().optional(),
-  APIFY_ACTOR_ID: z.string().optional(),
   PERPLEXITY_API_KEY: z.string().optional(),
   PERPLEXITY_EMBEDDING_MODEL: z.string().min(1).default('pplx-embed-v1-0.6b'),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -73,9 +72,9 @@ const requireInLiveMode =
     }
   };
 
-// List the keys a real adapter needs in the issue that adds it, e.g. ['APIFY_TOKEN', 'APIFY_ACTOR_ID']
-// in #10. Empty for now: no real adapter exists. With DEMO_MODE=true the fakes never read them.
-const EnvSchema = EnvShape.superRefine(requireInLiveMode([]));
+// List the keys a real adapter needs in the issue that adds it. With DEMO_MODE=true the fakes never
+// read them.
+const EnvSchema = EnvShape.superRefine(requireInLiveMode(['APIFY_TOKEN']));
 
 /** Validated configuration of this process. Read it from DI with the {@link ENV} token. */
 export type Env = z.infer<typeof EnvSchema>;

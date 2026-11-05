@@ -54,7 +54,15 @@ describe('loadEnv', () => {
   });
 
   it('reads DEMO_MODE=false as false', () => {
-    expect(loadEnv({ ...minimal, DEMO_MODE: 'false' }).DEMO_MODE).toBe(false);
+    const live = { ...minimal, DEMO_MODE: 'false', APIFY_TOKEN: 'fictional-token' };
+
+    expect(loadEnv(live).DEMO_MODE).toBe(false);
+  });
+
+  it('names APIFY_TOKEN as missing when DEMO_MODE=false', () => {
+    expect(errorOf({ ...minimal, DEMO_MODE: 'false' }).variables).toEqual([
+      'APIFY_TOKEN (missing)',
+    ]);
   });
 
   it('names DATABASE_URL as missing when it is absent', () => {

@@ -2,11 +2,14 @@
  * Pure rules of a Compass run: the charge limit, the actor input and the charge of a finished run.
  *
  * Serves: FR-5, FR-33, ADR-0010 (cap per search), ADR-0015 (input, minimum limit, measured prices).
- * Used by: apps/api/src/adapters/lead-source/fake.adapter.ts, compass-input.spec.ts.
+ * Used by: apps/api/src/adapters/lead-source/apify.adapter.ts, fake.adapter.ts, compass-input.spec.ts.
  */
 import { z } from 'zod';
 import { Prisma } from '../../generated/prisma/client.js';
 import type { PlaceSearch } from '../../ports/lead-source.port.js';
+
+/** The pass-1 actor of ADR-0015. Fixed, not configured: the prices below are this actor's. */
+export const COMPASS_ACTOR_ID = 'compass~crawler-google-places';
 
 // Free-plan prices checked in the Apify Store on 2026-11-04 (ADR-0015): $0.004 a place plus $0.002
 // for the detail page that carries booking links, and one start event.

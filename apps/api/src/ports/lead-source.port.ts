@@ -8,6 +8,9 @@ import type { AreaPolygon } from '@voxflow/shared';
 import type { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
 import type { Prisma } from '../generated/prisma/client.js';
 
+/** DI token of {@link LeadSourcePort}. */
+export const LEAD_SOURCE = 'LeadSourcePort';
+
 /** One cell of the search grid (FR-2). */
 export interface PlaceSearch {
   term: string;
