@@ -72,10 +72,22 @@ const keywordForms = (keyword: string): string[] => {
   return [singular, /(?:s|x|z|ch|sh)$/.test(singular) ? `${singular}es` : `${singular}s`];
 };
 
+// Before one of these a keyword is an address: real clinics sit on "College Road".
+const ROAD_WORDS = new Set(['road', 'rd', 'street', 'avenue']);
+
+// `padded` has a space at each end, so `word` can match the first and last words too.
+const hasWordOffRoad = (padded: string, word: string): boolean => {
+  for (let at = padded.indexOf(word); at !== -1; at = padded.indexOf(word, at + 1)) {
+    const [nextWord = ''] = padded.slice(at + word.length).split(' ', 1);
+    if (!ROAD_WORDS.has(nextWord)) return true;
+  }
+  return false;
+};
+
 // Whole words only: `includes` alone would drop "Trusted Smiles" for the keyword "trust".
 const containsKeyword = (text: string, keyword: string): boolean => {
   const padded = ` ${normalizeName(text)} `;
-  return keywordForms(keyword).some((form) => padded.includes(` ${form} `));
+  return keywordForms(keyword).some((form) => hasWordOffRoad(padded, ` ${form} `));
 };
 
 // Only a flag that is true counts: a place with no status stays in.
@@ -102,6 +114,7 @@ export function isOpen(
  * Does not look at advertised places, only at the rules FR-8 names.
  * Does not match a keyword inside a longer word, and expects keywords written in the singular: the
  * plural is worked out here, not the other way round.
+ * Does not count a keyword followed by road, rd, street or avenue: "Hospital Road" is an address.
  * "Private" has no field of its own: a place counts as private when none of its Maps categories
  * holds one of the niche's excluded words.
  * @param place - The place's filter fields.
