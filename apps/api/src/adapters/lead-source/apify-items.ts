@@ -28,7 +28,13 @@ export const CompassPlaceItem = z.object({
   categories: z.array(z.string()),
   // Null for a place with no ratings yet; the ideal-client filter treats it as below the minimum.
   totalScore: z.number().min(0).max(5).nullable(),
-  reviewsCount: z.number().int().nonnegative(),
+  // Real items send null for a new listing; as 0 the place stays and the filter records why it failed.
+  reviewsCount: z
+    .number()
+    .int()
+    .nonnegative()
+    .nullable()
+    .transform((count) => count ?? 0),
   address: z.string().nullable(),
   neighborhood: z.string().nullable().optional(),
   city: z.string().nullable(),

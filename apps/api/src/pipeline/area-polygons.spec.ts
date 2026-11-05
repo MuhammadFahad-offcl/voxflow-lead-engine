@@ -46,6 +46,7 @@ describe('config/areas', () => {
   it.each([
     ['Model Town', 92],
     ['Bahria Town', 180],
+    ['Johar Town', 160],
   ])('holds the OpenStreetMap ring of %s, inside Lahore', (area, points) => {
     const ring = findAreaPolygon(polygons, 'Lahore', area)?.coordinates[0] ?? [];
 

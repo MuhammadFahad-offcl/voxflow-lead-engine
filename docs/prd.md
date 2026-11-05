@@ -7,7 +7,7 @@ Nov 3, 2026 · Muhammad Fahad
 | Field               | Value                                                                                                                                              |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Product             | VoxFlow Lead Engine                                                                                                                                |
-| Document version    | 0.4 (FR-8 clarified: closed places and keyword forms)                                                                                              |
+| Document version    | 0.4 (FR-7 and FR-8 clarified: closed places and keyword forms)                                                                                     |
 | Status              | Draft, awaiting owner review                                                                                                                       |
 | Owner               | Muhammad Fahad, Founder, VoxFlow AI Solutions                                                                                                      |
 | Technical reviewer  | Claude                                                                                                                                             |

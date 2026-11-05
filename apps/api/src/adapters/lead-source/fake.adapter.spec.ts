@@ -61,6 +61,14 @@ describe('FakeLeadSourceAdapter', () => {
     expect(runs.map(({ items }) => items.length)).toEqual([3, 3, 3, 3]);
   });
 
+  it('gives each term one of the 4 Gulberg rows, so no Gulberg search comes back empty', async () => {
+    const terms = ['dental clinic', 'dentist', 'dental surgeon', 'orthodontist'];
+
+    const runs = await Promise.all(terms.map((term) => collect({ term, area: 'Gulberg' })));
+
+    expect(runs.map(({ items }) => items.length)).toEqual([1, 1, 1, 1]);
+  });
+
   it('serves nothing for a term the fixtures do not cover', async () => {
     const { items, costUsd } = await collect({ term: 'fictional term' });
 

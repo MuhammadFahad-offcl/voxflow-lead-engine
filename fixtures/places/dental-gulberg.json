@@ -1,0 +1,145 @@
+[
+  {
+    "placeId": "fictional-place-g01",
+    "title": "Fictional Liberty Dental Studio",
+    "categoryName": "Dental clinic",
+    "categories": ["Dental clinic", "Dentist"],
+    "totalScore": 4.7,
+    "reviewsCount": 180,
+    "address": "1 Fictional Boulevard, Gulberg III, Lahore, Pakistan",
+    "neighborhood": "Gulberg III",
+    "city": "Lahore",
+    "countryCode": "PK",
+    "location": {
+      "lat": 31.511,
+      "lng": 74.343
+    },
+    "phone": "0300 0000021",
+    "phoneUnformatted": "+923000000021",
+    "url": "https://maps.example.com/place/fictional-place-g01",
+    "permanentlyClosed": false,
+    "temporarilyClosed": false,
+    "isAdvertisement": false,
+    "bookingLinks": [],
+    "reserveTableUrl": null,
+    "tableReservationLinks": [],
+    "openingHours": [
+      {
+        "day": "Monday",
+        "hours": "10 AM to 8 PM"
+      },
+      {
+        "day": "Friday",
+        "hours": "3 to 9 PM"
+      }
+    ],
+    "website": "https://g01.example.com"
+  },
+  {
+    "placeId": "fictional-place-g02",
+    "title": "Fictional Main Boulevard Dentist",
+    "categoryName": "Dentist",
+    "categories": ["Dentist"],
+    "totalScore": 4.3,
+    "reviewsCount": 64,
+    "address": "2 Fictional Boulevard, Gulberg II, Lahore, Pakistan",
+    "neighborhood": "Gulberg II",
+    "city": "Lahore",
+    "countryCode": "PK",
+    "location": {
+      "lat": 31.522,
+      "lng": 74.348
+    },
+    "phone": "0300 0000022",
+    "phoneUnformatted": "+923000000022",
+    "url": "https://maps.example.com/place/fictional-place-g02",
+    "permanentlyClosed": false,
+    "temporarilyClosed": false,
+    "isAdvertisement": false,
+    "bookingLinks": [],
+    "reserveTableUrl": null,
+    "tableReservationLinks": [],
+    "openingHours": [
+      {
+        "day": "Monday",
+        "hours": "10 AM to 8 PM"
+      },
+      {
+        "day": "Friday",
+        "hours": "3 to 9 PM"
+      }
+    ]
+  },
+  {
+    "placeId": "fictional-place-g03",
+    "title": "Fictional Crescent Dental Surgery",
+    "categoryName": "Dental clinic",
+    "categories": ["Dental clinic"],
+    "totalScore": 4.5,
+    "reviewsCount": 112,
+    "address": "3 Fictional Boulevard, Gulberg III, Lahore, Pakistan",
+    "neighborhood": "Gulberg III",
+    "city": "Lahore",
+    "countryCode": "PK",
+    "location": {
+      "lat": 31.505,
+      "lng": 74.338
+    },
+    "phone": "0300 0000023",
+    "phoneUnformatted": "+923000000023",
+    "url": "https://maps.example.com/place/fictional-place-g03",
+    "permanentlyClosed": false,
+    "temporarilyClosed": false,
+    "isAdvertisement": false,
+    "bookingLinks": [],
+    "reserveTableUrl": null,
+    "tableReservationLinks": [],
+    "openingHours": [
+      {
+        "day": "Monday",
+        "hours": "10 AM to 8 PM"
+      },
+      {
+        "day": "Friday",
+        "hours": "3 to 9 PM"
+      }
+    ],
+    "website": "https://g03.example.com"
+  },
+  {
+    "placeId": "fictional-place-g04",
+    "title": "Fictional Mini Market Orthodontics",
+    "categoryName": "Orthodontist",
+    "categories": ["Orthodontist"],
+    "totalScore": 4.2,
+    "reviewsCount": 47,
+    "address": "4 Fictional Boulevard, Gulberg V, Lahore, Pakistan",
+    "neighborhood": "Gulberg V",
+    "city": "Lahore",
+    "countryCode": "PK",
+    "location": {
+      "lat": 31.516,
+      "lng": 74.355
+    },
+    "phone": "0300 0000024",
+    "phoneUnformatted": "+923000000024",
+    "url": "https://maps.example.com/place/fictional-place-g04",
+    "permanentlyClosed": false,
+    "temporarilyClosed": false,
+    "isAdvertisement": false,
+    "bookingLinks": [],
+    "reserveTableUrl": null,
+    "tableReservationLinks": [],
+    "openingHours": [
+      {
+        "day": "Monday",
+        "hours": "10 AM to 8 PM"
+      },
+      {
+        "day": "Friday",
+        "hours": "3 to 9 PM"
+      }
+    ],
+    "website": "https://g04.example.com"
+  }
+]
