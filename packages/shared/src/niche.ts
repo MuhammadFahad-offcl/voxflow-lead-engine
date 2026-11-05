@@ -50,6 +50,8 @@ const SignalWeights = z
 
 /** A niche's ideal-client rules (FR-8), as `NicheProfile.idealClient` stores them. */
 export const IdealClient = z.object({
+  // Defaults to off: a stored niche version from before this rule keeps behaving as it did.
+  excludeClosed: z.boolean().default(false),
   privateClinicOnly: z.boolean(),
   minRating: z.number().min(0).max(5),
   minReviewCount: z.number().int().nonnegative(),

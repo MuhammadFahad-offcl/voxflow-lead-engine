@@ -37,8 +37,9 @@ export const CompassPlaceItem = z.object({
   phoneUnformatted: z.string().optional(),
   website: z.string().optional(),
   url: z.url(),
-  permanentlyClosed: z.boolean(),
-  temporarilyClosed: z.boolean(),
+  // Optional because a place with no status must be kept, not dropped as an invalid item (FR-8).
+  permanentlyClosed: z.boolean().nullish(),
+  temporarilyClosed: z.boolean().nullish(),
   isAdvertisement: z.boolean(),
   // The listing side of no_online_booking (founder decision on #14): Google "Book" or a booking site.
   bookingLinks: z.array(z.object({ name: z.string(), url: z.url() })),

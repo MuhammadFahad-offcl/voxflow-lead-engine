@@ -13,7 +13,13 @@ const CHAIN_MIN_PLACES = 3;
 /** The fields of a Compass place the filter reads. */
 export type FilterablePlace = Pick<
   CompassPlaceItem,
-  'title' | 'categoryName' | 'categories' | 'totalScore' | 'reviewsCount'
+  | 'title'
+  | 'categoryName'
+  | 'categories'
+  | 'totalScore'
+  | 'reviewsCount'
+  | 'permanentlyClosed'
+  | 'temporarilyClosed'
 >;
 
 /** The filter's verdict; `reason` is what `Lead.filterReason` stores and the dashboard shows. */
@@ -52,14 +58,32 @@ export function countChainNames(titles: readonly string[]): Map<string, number> 
   return counts;
 }
 
+// The keyword and its plural, so "hospital" also matches "City Hospitals".
+const keywordForms = (keyword: string): string[] => {
+  const singular = normalizeName(keyword);
+  if (/[^aeiou]y$/.test(singular)) return [singular, `${singular.slice(0, -1)}ies`];
+  return [singular, /(?:s|x|z|ch|sh)$/.test(singular) ? `${singular}es` : `${singular}s`];
+};
+
 // Whole words only: `includes` alone would drop "Trusted Smiles" for the keyword "trust".
-const containsWords = (text: string, words: string): boolean =>
-  ` ${normalizeName(text)} `.includes(` ${normalizeName(words)} `);
+const containsKeyword = (text: string, keyword: string): boolean => {
+  const padded = ` ${normalizeName(text)} `;
+  return keywordForms(keyword).some((form) => padded.includes(` ${form} `));
+};
+
+// Only a flag that is true counts: a place with no status stays in.
+const closedReason = (place: FilterablePlace, rules: IdealClient): string | null => {
+  if (!rules.excludeClosed) return null;
+  if (place.permanentlyClosed === true) return 'permanently closed';
+  return place.temporarilyClosed === true ? 'temporarily closed' : null;
+};
 
 /**
  * Applies a niche's ideal-client rules to one place.
  *
- * Does not look at closed or advertised places, only at the rules FR-8 names.
+ * Does not look at advertised places, only at the rules FR-8 names.
+ * Does not match a keyword inside a longer word, and expects keywords written in the singular: the
+ * plural is worked out here, not the other way round.
  * "Private" has no field of its own: a place counts as private when none of its Maps categories
  * holds one of the niche's excluded words.
  * @param place - The place's filter fields.
@@ -72,15 +96,18 @@ export function idealClientFilter(
   rules: IdealClient,
   chainCounts: ReadonlyMap<string, number>,
 ): FilterResult {
+  const closed = closedReason(place, rules);
+  if (closed !== null) return { pass: false, reason: closed };
+
   const keywords = rules.excludeNameKeywords;
   if (rules.privateClinicOnly) {
     const categories = [place.categoryName, ...place.categories].filter((name) => name !== null);
-    const found = categories.find((name) => keywords.some((word) => containsWords(name, word)));
+    const found = categories.find((name) => keywords.some((word) => containsKeyword(name, word)));
     if (found !== undefined) {
       return { pass: false, reason: `not a private clinic: category "${found}"` };
     }
   }
-  const keyword = keywords.find((word) => containsWords(place.title, word));
+  const keyword = keywords.find((word) => containsKeyword(place.title, word));
   if (keyword !== undefined) return { pass: false, reason: `name contains "${keyword}"` };
 
   if (place.totalScore === null) return { pass: false, reason: 'no rating' };
