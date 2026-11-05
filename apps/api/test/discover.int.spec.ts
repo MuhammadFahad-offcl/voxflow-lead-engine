@@ -415,7 +415,7 @@ describe('discoverCampaign: chains', () => {
 describe('discoverCampaign: an area with no polygon', () => {
   it('pauses with the area named, having started nothing', async () => {
     const leadSource = new SpyLeadSource();
-    const claim = await newCampaign(['DHA', 'Gulberg']);
+    const claim = await newCampaign(['DHA', 'Cantt']);
 
     await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
 
@@ -424,7 +424,7 @@ describe('discoverCampaign: an area with no polygon', () => {
     expect(await campaignRow(claim.id)).toMatchObject({
       status: 'PAUSED',
       pausedFrom: 'DISCOVERING',
-      pauseReason: expect.stringContaining('Gulberg'),
+      pauseReason: expect.stringContaining('Cantt'),
       discoveryClaimedAt: null,
     });
   });

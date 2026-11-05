@@ -2,7 +2,8 @@
  * The structured logger of the API and worker: pino, one JSON object per line.
  *
  * Serves: NFR-10 (logs carry campaign, lead and attempt IDs), ADR-0014 (pino over HazelJS's logger).
- * Used by: apps/api/src/bootstrap.ts, apps/api/src/worker.ts.
+ * Used by: apps/api/src/bootstrap.ts, apps/api/src/worker.ts,
+ * apps/api/src/pipeline/discover.step.ts, apps/api/src/scheduler/campaign-runner.ts.
  */
 import {
   pino,
