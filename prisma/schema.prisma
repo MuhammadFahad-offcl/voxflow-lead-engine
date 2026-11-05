@@ -207,7 +207,7 @@ model Lead {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
-  campaignId     String // the campaign that first found it
+  campaignId     String // the campaign that first found it, or a later one that reopened it (FR-7)
   campaign       Campaign     @relation(fields: [campaignId], references: [id])
 
   placeId     String

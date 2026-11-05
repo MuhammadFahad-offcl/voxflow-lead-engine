@@ -9,9 +9,11 @@ import { errorFields, type Logger } from '../logging/logger.js';
 import { discoverCampaign, type DiscoverDeps } from '../pipeline/discover.step.js';
 
 const RUNNER_INTERVAL_MS = 10_000;
-// Must outlast one search, which the claim is renewed before: the Apify adapter's 11-minute wait.
+// Must outlast one search, which the claim is renewed before: the Apify adapter's 30-second start
+// limit, its 11-minute wait for the run, then reading and storing the results.
 const DISCOVERY_LEASE_MS = 15 * 60 * 1000;
-// A start is one request, so this is generous, and it fits HazelJS's 30-second shutdown limit.
+// Fits HazelJS's 30-second shutdown limit. A start usually answers well inside this, but its own
+// limit is 30 s; one that outlasts this wait leaves a record the next pass pauses on.
 const START_SAVE_WAIT_MS = 10_000;
 
 /**
@@ -39,8 +41,9 @@ export async function runCampaignRunnerOnce(deps: DiscoverDeps): Promise<boolean
  * Does not stop on an error: one bad campaign must not end the worker.
  * @param deps - What the discover step needs.
  * @param intervalMs - Pause between passes, in milliseconds.
- * @returns A function that stops the loop and refuses new paid starts, then waits up to the given
- * milliseconds for a start in progress; it resolves false when that wait ran out.
+ * @returns A function that stops the loop and refuses a new reservation and start, then waits up
+ * to the given milliseconds for one in progress, which still sends its start; it resolves false when
+ * that wait ran out.
  */
 export function startCampaignRunner(
   deps: DiscoverDeps,

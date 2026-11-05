@@ -4,10 +4,9 @@
  * Serves: FR-5 to FR-8, FR-33, ADR-0010, ADR-0015 (pass 1; reviews are #12), NFR-1, NFR-2.
  * Used by: apps/api/src/scheduler/campaign-runner.ts, apps/api/test/discover.int.spec.ts.
  */
-import { IdealClient, SpendCaps } from '@voxflow/shared';
+import { IdealClient } from '@voxflow/shared';
 import { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
 import type { Claim, DiscoveryCampaign, DiscoveryRepository } from '../db/discovery.repository.js';
-import { Prisma } from '../generated/prisma/client.js';
 import { errorFields, type Logger } from '../logging/logger.js';
 import type { LeadSourcePort, PlaceSearch } from '../ports/lead-source.port.js';
 import { findAreaPolygon, missingAreas, type AreaPolygons } from './area-polygons.js';
@@ -56,8 +55,8 @@ interface StartedRun {
 
 /**
  * Why a search could not go on. `uncertainRecordId` names a record whose run may exist; PAUSED means
- * storing the search already paused the campaign; STOP means this runner lost its claim or the
- * worker is shutting down.
+ * storing the search already paused the campaign; STOP means this runner lost its claim, its run
+ * was refused, or the worker is shutting down.
  */
 type SearchStop =
   | { kind: 'PAUSE'; reason: string; uncertainRecordId?: string }
@@ -104,21 +103,19 @@ const reserveAndStart = async (
   const { repository, leadSource } = deps;
   const { term, area } = cell;
   const { organizationId, city, maxResultsPerSearch: maxResults } = campaign;
-  const caps = SpendCaps.parse(campaign.organization.settings?.spendCaps);
-  const capUsd = new Prisma.Decimal(caps.apifyDailyUsd);
   const chargeLimitUsd = leadSource.chargeLimitUsd(maxResults);
   const now = deps.now();
   const reservation = await repository.reserveWithinCap(claim, {
     organizationId,
     amountUsd: chargeLimitUsd,
-    capUsd,
     dayStart: karachiDayStart(now),
     at: now,
     note: searchNote({ term, area, runId: null }),
   });
   if (reservation.outcome === 'CLAIM_LOST') return { kind: 'STOP' };
   if (reservation.outcome === 'OVER_CAP') {
-    return { kind: 'PAUSE', reason: capPauseReason(reservation.spent, chargeLimitUsd, capUsd) };
+    const { spent, capUsd } = reservation;
+    return { kind: 'PAUSE', reason: capPauseReason(spent, chargeLimitUsd, capUsd) };
   }
   const { recordId } = reservation;
   let runId: string;
@@ -155,6 +152,7 @@ const startPaidRun = async (
   claim: Claim,
   cell: GridCell,
 ): Promise<SearchStop | StartedRun> => {
+  // The gate is checked once, here: a section it let in still starts its run during a shutdown.
   const result = await deps.startGate.run(() => reserveAndStart(deps, campaign, claim, cell));
   return result === 'CLOSED' ? { kind: 'STOP' } : result;
 };
@@ -195,7 +193,7 @@ const collectAndStore = async (
     deps.logger.error({ campaignId: campaign.id, ...errorFields(error) }, 'Apify read failed');
     return {
       kind: 'PAUSE',
-      reason: `Could not read the Apify run for "${cell.term}" in ${cell.area}. Resuming reads it again without paying.`,
+      reason: `Could not read the Apify run for "${cell.term}" in ${cell.area}. Resuming reads it again without paying. If the run was removed from Apify, resuming cannot clear this: a new campaign is the way out.`,
     };
   }
   const { organizationId, id: campaignId, city } = campaign;
@@ -325,17 +323,22 @@ const runGrid = async (deps: DiscoverDeps, held: { claim: Claim }): Promise<Disc
  *
  * Safe to repeat: a search's `CostRecord` is the proof of what happened. It is written before the
  * start, holding the run's charge limit, by the same transaction that checks the daily cap; the run
- * id follows the start. A stored search is skipped, one with a run id is collected again, and only
- * a search with no record starts a paid run.
+ * id follows the start. A stored search is skipped and one with a run id is collected again. A paid
+ * run starts only for a search with no record, or over a CHECK_APIFY record the founder resumed.
  * A record with no run id means a run may or may not exist, so this pauses instead of starting one
  * and the reason sends the founder to the Apify console. Resuming means "I checked": the record is
  * marked abandoned, keeps its reserved amount on the day's total, and a new run starts for that
  * search under a new reservation.
  * Does not know whether the founder really checked: resuming without checking can pay for one extra
  * run, capped by that run's limit and counted in the day's total.
- * Does not stop for one bad item, nor retry a failed start or a run that went wrong: what such a
- * run returned is stored and the campaign pauses with a reason. Resuming moves on to the next
- * search; paying for that search again is the founder's decision.
+ * Does not stop for one bad item.
+ * Does not retry a failed start by itself: a run may exist, so the campaign pauses for the check
+ * above, and resuming abandons that record and pays again under a new reservation.
+ * Does not retry a run that went wrong: what it returned is stored and the campaign pauses with a
+ * reason. Resuming moves on to the next search, because paying for that search again is the
+ * founder's decision: it needs a new campaign.
+ * Does not store a run whose record was abandoned or whose campaign left DISCOVERING: its run id
+ * goes to the log and the pass stops.
  * Does not let an unexpected error leave the campaign running: it pauses with a fixed reason, so
  * the error is not retried after every lease (NFR-1).
  * @param deps - Its dependencies.

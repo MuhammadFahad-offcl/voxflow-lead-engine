@@ -2,9 +2,11 @@
  * Database access for discovery: claims, the per-search cost records, and storing places.
  *
  * Serves: FR-3, FR-5, FR-7, FR-8, FR-33; hazeljs-conventions (repositories, atomic worker claims).
- * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/scheduler/campaign-runner.ts.
+ * Used by: apps/api/src/app.module.ts, apps/api/src/worker.ts,
+ * apps/api/src/pipeline/discover.step.ts, apps/api/test/*.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
+import { SpendCaps } from '@voxflow/shared';
 import { Prisma, type CostRecord } from '../generated/prisma/client.js';
 import { TEMPORARILY_CLOSED_REASON } from '../pipeline/ideal-client-filter.js';
 import { readSearchNote } from '../pipeline/search-plan.js';
@@ -17,10 +19,9 @@ export interface Claim {
   claimedAt: Date;
 }
 
-// What discovery reads: the campaign, its niche's rules and terms, and the organization's caps.
+// What discovery reads with the campaign: its niche's rules and terms.
 const FOR_DISCOVERY = {
   nicheProfile: { select: { searchTerms: true, idealClient: true } },
-  organization: { select: { settings: { select: { spendCaps: true } } } },
 } as const;
 
 /** A campaign with everything discovery reads. */
@@ -55,7 +56,7 @@ interface StoredCounts {
 /** What {@link DiscoveryRepository.reserveWithinCap} decided. */
 export type Reservation =
   | { outcome: 'RESERVED'; recordId: string }
-  | { outcome: 'OVER_CAP'; spent: Prisma.Decimal }
+  | { outcome: 'OVER_CAP'; spent: Prisma.Decimal; capUsd: Prisma.Decimal }
   | { outcome: 'CLAIM_LOST' };
 
 // The rows only the live holder of a claim can match.
@@ -104,13 +105,16 @@ const reopenPlaces = async (
     select: { id: true, placeId: true },
   });
   const fresh = new Map(openRows.map((row) => [row.placeId, row]));
+  let reopened = 0;
   for (const { id, placeId } of closed) {
-    await tx.lead.update({
-      where: { id },
+    // Repeats the check: a second campaign that was waiting on this row must now match nothing.
+    const { count } = await tx.lead.updateMany({
+      where: { id, status: 'FILTERED_OUT', filterReason: TEMPORARILY_CLOSED_REASON },
       data: { ...fresh.get(placeId), campaignId, status: 'DISCOVERED', filterReason: null },
     });
+    reopened += count;
   }
-  return closed.length;
+  return reopened;
 };
 
 // Marks the search done and adds its places and counts; the caller holds the record's row.
@@ -197,7 +201,7 @@ export class DiscoveryRepository {
   /**
    * Reads a campaign for discovery.
    * @param id - Campaign id.
-   * @returns The campaign with its niche and settings.
+   * @returns The campaign with its niche.
    * @throws Prisma's not-found error when it does not exist.
    */
   loadCampaign(id: string): Promise<DiscoveryCampaign> {
@@ -304,31 +308,32 @@ export class DiscoveryRepository {
    * The amount is the limit until the true charge is known, so a crashed run still counts.
    * The advisory lock makes an organization's runners take turns, so a second one sees the first's
    * reservation. The claim is checked under it and that row stays locked until commit, so a runner
-   * whose lease another took over can reserve nothing.
+   * whose lease another took over can reserve nothing. The cap is read under it too, so lowering it
+   * in Settings holds from the next reservation, even in the middle of a pass.
    * Does not start the run, and the lock ends with this call: the caller makes its Apify request
    * after this returns, never inside the transaction.
    * @param claim - The claim held; the record belongs to its campaign.
    * @param reservation - What to reserve and the limits to reserve it under.
    * @param reservation.organizationId - Owner of the spend.
    * @param reservation.amountUsd - The run's charge limit, in US dollars.
-   * @param reservation.capUsd - The daily cap, in US dollars.
    * @param reservation.dayStart - When the capped day began.
    * @param reservation.at - The record's time, on the caller's clock.
    * @param reservation.note - From `searchNote`, with a null run id.
    * @returns The new record's id, or what stopped it: over the cap, or the claim lost.
+   * @throws Prisma's not-found error when the organization has no settings; ZodError when its
+   * `spendCaps` are invalid. Nothing is reserved then.
    */
   reserveWithinCap(
     claim: Claim,
     reservation: {
       organizationId: string;
       amountUsd: Prisma.Decimal;
-      capUsd: Prisma.Decimal;
       dayStart: Date;
       at: Date;
       note: string;
     },
   ): Promise<Reservation> {
-    const { organizationId, amountUsd, capUsd, dayStart, at, note } = reservation;
+    const { organizationId, amountUsd, dayStart, at, note } = reservation;
     const lockName = `apify-spend:${organizationId}`;
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockName}, 0))`;
@@ -338,8 +343,13 @@ export class DiscoveryRepository {
         data: { discoveryClaimedAt: claim.claimedAt },
       });
       if (count === 0) return { outcome: 'CLAIM_LOST' };
+      const { spendCaps } = await tx.settings.findUniqueOrThrow({
+        where: { organizationId },
+        select: { spendCaps: true },
+      });
+      const capUsd = new Prisma.Decimal(SpendCaps.parse(spendCaps).apifyDailyUsd);
       const spent = await this.apifySpentSince(organizationId, dayStart, tx);
-      if (wouldPassCap(spent, amountUsd, capUsd)) return { outcome: 'OVER_CAP', spent };
+      if (wouldPassCap(spent, amountUsd, capUsd)) return { outcome: 'OVER_CAP', spent, capUsd };
       const { id } = await tx.costRecord.create({
         data: { organizationId, campaignId: claim.id, service: 'APIFY', amountUsd, at, note },
         select: { id: true },

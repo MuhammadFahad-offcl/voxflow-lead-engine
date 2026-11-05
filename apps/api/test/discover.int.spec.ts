@@ -471,6 +471,19 @@ describe('discoverCampaign: the Apify daily cap', () => {
     );
   });
 
+  it('obeys a cap lowered in the middle of a pass', async () => {
+    const leadSource = new SpyLeadSource({
+      onCollect: (collectNumber) => (collectNumber === 1 ? setApifyCap('0.61') : Promise.resolve()),
+      runFor: () => ({ costUsd: null }),
+    });
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
+
+    expect(leadSource.starts).toHaveLength(1);
+    expect((await campaignRow(claim.id)).pauseReason).toContain('the cap is $0.61');
+  });
+
   it('lets a lower cap per search use a lower limit', async () => {
     await spendEarlier('1.45', NOW);
     const leadSource = new SpyLeadSource();
@@ -796,7 +809,6 @@ describe('discoverCampaign: two runners and one cap', () => {
         const reservation = await repository.reserveWithinCap(other, {
           organizationId,
           amountUsd: new Prisma.Decimal('0.61'),
-          capUsd: new Prisma.Decimal('2.00'),
           dayStart: karachiDayStart(NOW),
           at: NOW,
           note: 'fictional note',
@@ -920,6 +932,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
 
     await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
     expect((await campaignRow(claim.id)).pauseReason).toContain('without paying');
+    expect((await campaignRow(claim.id)).pauseReason).toContain('a new campaign is the way out');
     await discoverCampaign(deps(leadSource), await resume(claim.id));
 
     expect(leadSource.starts).toHaveLength(4);
