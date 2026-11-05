@@ -63,6 +63,10 @@ type SearchStop =
 /** One grid cell with everything needed to run it. */
 type GridCell = Pick<PlaceSearch, 'term' | 'area' | 'polygon'>;
 
+// Fixed, because the error itself may echo row values; its name and code go to the log.
+const UNEXPECTED_ERROR_REASON =
+  'Discovery stopped on an unexpected error: the worker log has its name and code. Resuming carries on from the saved searches.';
+
 // What every pause over a possible run tells the founder: the check comes before the resume.
 const CHECK_FIRST =
   "Check the Apify console first. Resuming means you checked: a new run starts for this search, and the amount already reserved stays on the day's total.";
@@ -239,6 +243,56 @@ const filterAndFinish = async (
   return deps.repository.finishDiscovery(claim, rejections);
 };
 
+const stopPass = async (deps: DiscoverDeps, claim: Claim): Promise<DiscoverResult> => {
+  // Otherwise a campaign an operator paused and resumed would wait out the whole lease.
+  await deps.repository.releaseClaim(claim);
+  return 'STOPPED';
+};
+
+const pausePass = async (
+  deps: DiscoverDeps,
+  claim: Claim,
+  reason: string,
+  uncertainRecordId?: string,
+): Promise<DiscoverResult> => {
+  deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
+  const paused =
+    uncertainRecordId === undefined
+      ? await deps.repository.pause(claim, reason)
+      : await deps.repository.pauseForCheck(claim, uncertainRecordId, reason);
+  return paused ? 'PAUSED' : stopPass(deps, claim);
+};
+
+// `held` always names the newest claim, so a throw can still be paused under it.
+const runGrid = async (deps: DiscoverDeps, held: { claim: Claim }): Promise<DiscoverResult> => {
+  const { repository, polygons } = deps;
+  const campaign = await repository.loadCampaign(held.claim.id);
+  const { city, areas } = campaign;
+  const missing = missingAreas(polygons, city, areas);
+  if (missing.length > 0) {
+    const reason = `No polygon for ${missing.join(', ')}: add it to config/areas first.`;
+    return pausePass(deps, held.claim, reason);
+  }
+
+  const searches = await readKnownSearches(repository, campaign.id);
+  for (const { term, area } of buildGrid(campaign.nicheProfile.searchTerms, areas)) {
+    const known = searches.get(searchKey({ term, area }));
+    if (known?.stored === true) continue;
+    const renewed = await repository.renewClaim(held.claim, deps.now());
+    if (renewed === null) return stopPass(deps, held.claim);
+    held.claim = renewed;
+    const cell = cellOf(polygons, city, term, area);
+    const stopped = await runSearch(deps, campaign, renewed, cell, known);
+    if (stopped?.kind === 'PAUSED') return 'PAUSED';
+    if (stopped?.kind === 'CLAIM_LOST') return stopPass(deps, renewed);
+    if (stopped !== null) {
+      return pausePass(deps, renewed, stopped.reason, stopped.uncertainRecordId);
+    }
+  }
+  const finished = await filterAndFinish(deps, campaign, held.claim);
+  return finished ? 'ENRICHING' : stopPass(deps, held.claim);
+};
+
 /**
  * Runs what is left of a campaign's grid, then the filter, then moves it to ENRICHING.
  *
@@ -255,54 +309,23 @@ const filterAndFinish = async (
  * Does not stop for one bad item, nor retry a failed start or a run that went wrong: what such a
  * run returned is stored and the campaign pauses with a reason. Resuming moves on to the next
  * search; paying for that search again is the founder's decision.
+ * Does not let an unexpected error leave the campaign running: it pauses with a fixed reason, so
+ * the error is not retried after every lease (NFR-1).
  * @param deps - Its dependencies.
  * @param claimed - The claim on the campaign, from the runner.
  * @returns ENRICHING when done; PAUSED when it paused the campaign; STOPPED when the claim was
  * lost, because an operator paused the campaign or another runner took it over.
- * @throws ZodError when the settings or niche JSON is invalid; Prisma errors from the database.
+ * @throws Prisma errors, only when the database refuses even the pause.
  */
 export async function discoverCampaign(
   deps: DiscoverDeps,
   claimed: Claim,
 ): Promise<DiscoverResult> {
-  const { repository, polygons } = deps;
-  const stop = async (claim: Claim): Promise<DiscoverResult> => {
-    // Otherwise a campaign an operator paused and resumed would wait out the whole lease.
-    await repository.releaseClaim(claim);
-    return 'STOPPED';
-  };
-  const pause = async (
-    reason: string,
-    claim: Claim,
-    uncertainRecordId?: string,
-  ): Promise<DiscoverResult> => {
-    deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
-    const paused =
-      uncertainRecordId === undefined
-        ? await repository.pause(claim, reason)
-        : await repository.pauseForCheck(claim, uncertainRecordId, reason);
-    return paused ? 'PAUSED' : stop(claim);
-  };
-  const campaign = await repository.loadCampaign(claimed.id);
-  const { city, areas } = campaign;
-  const missing = missingAreas(polygons, city, areas);
-  if (missing.length > 0) {
-    return pause(`No polygon for ${missing.join(', ')}: add it to config/areas first.`, claimed);
+  const held = { claim: claimed };
+  try {
+    return await runGrid(deps, held);
+  } catch (error) {
+    deps.logger.error({ campaignId: claimed.id, ...errorFields(error) }, 'discover pass failed');
+    return pausePass(deps, held.claim, UNEXPECTED_ERROR_REASON);
   }
-
-  let claim = claimed;
-  const searches = await readKnownSearches(repository, campaign.id);
-  for (const { term, area } of buildGrid(campaign.nicheProfile.searchTerms, areas)) {
-    const known = searches.get(searchKey({ term, area }));
-    if (known?.stored === true) continue;
-    const renewed = await repository.renewClaim(claim, deps.now());
-    if (renewed === null) return stop(claim);
-    claim = renewed;
-    const cell = cellOf(polygons, city, term, area);
-    const stopped = await runSearch(deps, campaign, claim, cell, known);
-    if (stopped?.kind === 'PAUSED') return 'PAUSED';
-    if (stopped?.kind === 'CLAIM_LOST') return stop(claim);
-    if (stopped !== null) return pause(stopped.reason, claim, stopped.uncertainRecordId);
-  }
-  return (await filterAndFinish(deps, campaign, claim)) ? 'ENRICHING' : stop(claim);
 }

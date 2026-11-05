@@ -13,6 +13,7 @@ import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.
 import { DiscoveryRepository } from '../src/db/discovery.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { seed } from '../src/db/seed.js';
+import type { Prisma } from '../src/generated/prisma/client.js';
 import { createLogger, type Logger } from '../src/logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from '../src/pipeline/area-polygons.js';
 import type { DiscoverDeps } from '../src/pipeline/discover.step.js';
@@ -246,6 +247,56 @@ describe('campaign runner lease', () => {
 
     expect(claimed.filter(Boolean)).toHaveLength(1);
     expect(starts).toHaveLength(4);
+  });
+});
+
+// Proves an unexpected error ends in a visible pause, not a campaign retried after every lease.
+describe('campaign runner on an unexpected error', () => {
+  it('pauses the campaign with the fixed reason and does not pick it up again', async () => {
+    const id = await createCampaign();
+    const { organizationId } = await row(id);
+    const { spendCaps } = await prisma.settings.findUniqueOrThrow({ where: { organizationId } });
+    await prisma.settings.update({
+      where: { organizationId },
+      data: { spendCaps: { broken: true } },
+    });
+
+    await expect(runCampaignRunnerOnce(deps)).resolves.toBe(true);
+    await prisma.settings.update({
+      where: { organizationId },
+      data: { spendCaps: spendCaps as Prisma.InputJsonObject },
+    });
+
+    expect(await row(id)).toMatchObject({
+      status: 'PAUSED',
+      pausedFrom: 'DISCOVERING',
+      pauseReason: expect.stringContaining('unexpected error'),
+      discoveryClaimedAt: null,
+    });
+    await expect(runCampaignRunnerOnce(deps)).resolves.toBe(false);
+    expect(starts).toHaveLength(0);
+  });
+
+  it('logs the error name and code only, never its message', async () => {
+    const error = jest.fn();
+    const warn = jest.fn();
+    const id = await createCampaign();
+    const failing: DiscoverDeps = {
+      ...deps,
+      logger: { error, warn, info: jest.fn() } as unknown as Logger,
+      leadSource: {
+        ...deps.leadSource,
+        start: () => Promise.reject(new Error('value +923000000001 failed')),
+      },
+    };
+
+    await runCampaignRunnerOnce(failing);
+
+    expect(JSON.stringify(error.mock.calls)).not.toContain('+923000000001');
+    expect(error).toHaveBeenCalledWith(
+      { campaignId: id, errorName: 'Error', errorCode: null },
+      'Apify start failed',
+    );
   });
 });
 
