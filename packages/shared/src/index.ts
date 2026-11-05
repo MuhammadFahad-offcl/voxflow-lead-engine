@@ -22,3 +22,4 @@ export type HealthResponse = z.infer<typeof HealthResponse>;
 export { Booking, CallingHours, DEFAULT_SETTINGS, LlmModels, SpendCaps } from './settings.js';
 export { CatalogFile, IdealClient, NicheFile } from './niche.js';
 export { CampaignSummary, CreateCampaignInput } from './campaign.js';
+export { AreaFile, AreaPolygon } from './areas.js';

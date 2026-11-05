@@ -1,0 +1,29 @@
+{
+  "meta": {
+    "note": "One GeoJSON polygon per campaign area, because Compass finds nothing from text locations here (ADR-0015). Coordinates are [longitude, latitude]. An area left out of this file is refused before any charge."
+  },
+  "city": "Lahore",
+  "areas": [
+    {
+      "name": "DHA",
+      "source": {
+        "origin": "Hand-drawn box over DHA phases 1-6 from scripts/spikes/apify-compare.ts; it found 20 places in the #9 spike (ADR-0015)",
+        "osmObject": null,
+        "retrievedOn": "2026-11-04",
+        "licence": null
+      },
+      "polygon": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.37, 31.43],
+            [74.47, 31.43],
+            [74.47, 31.51],
+            [74.37, 31.51],
+            [74.37, 31.43]
+          ]
+        ]
+      }
+    }
+  ]
+}
