@@ -6,6 +6,7 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { resolve } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
 import type { CompassPlaceItem } from '../src/adapters/lead-source/apify-items.js';
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
 import { DiscoveryRepository, type Claim } from '../src/db/discovery.repository.js';
@@ -24,6 +25,8 @@ import { testEnv } from './test-env.js';
 const logger = createLogger('error');
 const organizationId = SEED_ORGANIZATION_ID;
 const polygons = loadAreaPolygons(AREAS_DIR);
+// A fixed clock: the cap counts this Asia/Karachi day, whatever time the tests really run.
+const NOW = new Date('2026-11-05T07:00:00.000Z');
 
 let prisma: PrismaProvider;
 let repository: DiscoveryRepository;
@@ -37,7 +40,7 @@ class SpyLeadSource implements LeadSourcePort {
   constructor(
     private readonly hooks: {
       onStart?: (startNumber: number) => Promise<void>;
-      onCollect?: (collectNumber: number) => void;
+      onCollect?: (collectNumber: number) => Promise<void>;
       itemsFor?: (term: string) => CompassPlaceItem[];
     } = {},
   ) {}
@@ -54,19 +57,19 @@ class SpyLeadSource implements LeadSourcePort {
 
   async collect(runId: string): Promise<CollectedRun> {
     this.collects.push(runId);
-    this.hooks.onCollect?.(this.collects.length);
+    await this.hooks.onCollect?.(this.collects.length);
     const run = await this.fake.collect(runId);
     const term = (JSON.parse(runId) as { term: string }).term;
     return this.hooks.itemsFor === undefined ? run : { ...run, items: this.hooks.itemsFor(term) };
   }
 }
 
-const deps = (leadSource: LeadSourcePort): DiscoverDeps => ({
-  repository,
+const deps = (leadSource: LeadSourcePort, repo = repository): DiscoverDeps => ({
+  repository: repo,
   leadSource,
   polygons,
   logger,
-  now: () => new Date(),
+  now: () => NOW,
 });
 
 const newCampaign = async (areas: string[] = ['DHA']): Promise<Claim> => {
@@ -100,6 +103,12 @@ const resume = async (id: string): Promise<Claim> => {
   return { id, claimedAt };
 };
 
+// What a second runner does once a lease has run out.
+const takeOver = async (id: string, at: Date): Promise<Claim> => {
+  await prisma.campaign.update({ where: { id }, data: { discoveryClaimedAt: at } });
+  return { id, claimedAt: at };
+};
+
 const setApifyCap = async (apifyDailyUsd: string): Promise<void> => {
   const { spendCaps } = await prisma.settings.findUniqueOrThrow({ where: { organizationId } });
   await prisma.settings.update({
@@ -119,18 +128,21 @@ const reservedSearch = (campaignId: string, amountUsd: string, runId: string | n
       campaignId,
       service: 'APIFY',
       amountUsd,
+      at: NOW,
       note: searchNote({ term: 'dental clinic', area: 'DHA', runId }),
     },
   });
 
-const campaignRow = (id: string) => prisma.campaign.findUniqueOrThrow({ where: { id } });
-const costs = (campaignId: string) =>
-  prisma.costRecord.findMany({ where: { campaignId }, orderBy: { at: 'asc' } });
+const spentToday = () => repository.apifySpentSince(organizationId, karachiDayStart(NOW));
 const notes = async (campaignId: string) =>
   (await costs(campaignId)).map(({ note, amountUsd }) => ({
     ...readSearchNote(note),
     amountUsd: amountUsd.toFixed(2),
   }));
+
+const campaignRow = (id: string) => prisma.campaign.findUniqueOrThrow({ where: { id } });
+const costs = (campaignId: string) =>
+  prisma.costRecord.findMany({ where: { campaignId }, orderBy: { at: 'asc' } });
 const lead = (placeId: string) =>
   prisma.lead.findUniqueOrThrow({
     where: { organizationId_placeId: { organizationId, placeId } },
@@ -322,7 +334,7 @@ describe('discoverCampaign: an area with no polygon', () => {
 // Proves the daily cap stops a run that could pass it, on the Asia/Karachi day (FR-33, Q6).
 describe('discoverCampaign: the Apify daily cap', () => {
   it('pauses before starting when spend plus the charge limit would pass the cap', async () => {
-    await spendEarlier('1.40', new Date());
+    await spendEarlier('1.40', NOW);
     const leadSource = new SpyLeadSource();
     const claim = await newCampaign();
 
@@ -335,7 +347,7 @@ describe('discoverCampaign: the Apify daily cap', () => {
   });
 
   it('allows a run that could land exactly on the cap', async () => {
-    await spendEarlier('1.39', new Date());
+    await spendEarlier('1.39', NOW);
     const leadSource = new SpyLeadSource();
 
     await discoverCampaign(deps(leadSource), await newCampaign());
@@ -344,7 +356,7 @@ describe('discoverCampaign: the Apify daily cap', () => {
   });
 
   it('does not count spend from before midnight in Karachi', async () => {
-    const lastMomentYesterday = new Date(karachiDayStart(new Date()).getTime() - 1);
+    const lastMomentYesterday = new Date(karachiDayStart(NOW).getTime() - 1);
     await spendEarlier('5.00', lastMomentYesterday);
 
     await expect(discoverCampaign(deps(new SpyLeadSource()), await newCampaign())).resolves.toBe(
@@ -353,7 +365,7 @@ describe('discoverCampaign: the Apify daily cap', () => {
   });
 
   it('counts spend from the first moment of the Karachi day', async () => {
-    await spendEarlier('5.00', karachiDayStart(new Date()));
+    await spendEarlier('5.00', karachiDayStart(NOW));
 
     await expect(discoverCampaign(deps(new SpyLeadSource()), await newCampaign())).resolves.toBe(
       'PAUSED',
@@ -361,7 +373,7 @@ describe('discoverCampaign: the Apify daily cap', () => {
   });
 
   it('lets a lower cap per search use a lower limit', async () => {
-    await spendEarlier('1.45', new Date());
+    await spendEarlier('1.45', NOW);
     const leadSource = new SpyLeadSource();
     const claim = await newCampaign();
     await prisma.campaign.update({ where: { id: claim.id }, data: { maxResultsPerSearch: 30 } });
@@ -374,6 +386,10 @@ describe('discoverCampaign: the Apify daily cap', () => {
 
 // Proves the review's first blocker: a run with no saved id is never paid for again on its own.
 describe('discoverCampaign: a record with no run id', () => {
+  const finished = { status: 'ENRICHING', foundCount: 12, duplicateCount: 1, filteredCount: 2 };
+  const dentalStarts = (leadSource: SpyLeadSource) =>
+    leadSource.starts.filter((search) => search.term === 'dental clinic');
+
   it('pauses and starts nothing, keeping the reservation', async () => {
     const claim = await newCampaign();
     await reservedSearch(claim.id, '0.61', null);
@@ -398,11 +414,156 @@ describe('discoverCampaign: a record with no run id', () => {
       'ENRICHING',
     );
 
-    expect(resumed.starts.filter((search) => search.term === 'dental clinic')).toHaveLength(1);
+    expect(dentalStarts(resumed)).toHaveLength(1);
+    expect(await campaignRow(claim.id)).toMatchObject(finished);
     expect(await notes(claim.id)).toContainEqual(
       expect.objectContaining({ state: 'ABANDONED', amountUsd: '0.61' }),
     );
     expect(await costs(claim.id)).toHaveLength(5);
+    expect((await spentToday()).toFixed(3)).toBe('0.682');
+  });
+
+  it('on resume, still obeys the cap, with the abandoned amount counted', async () => {
+    await setApifyCap('1.00');
+    const claim = await newCampaign();
+    await reservedSearch(claim.id, '0.61', null);
+    await discoverCampaign(deps(new SpyLeadSource()), claim);
+    const resumed = new SpyLeadSource();
+
+    await expect(discoverCampaign(deps(resumed), await resume(claim.id))).resolves.toBe('PAUSED');
+
+    expect(resumed.starts).toHaveLength(0);
+    expect((await campaignRow(claim.id)).pauseReason).toContain('$0.61 spent today');
+  });
+
+  it('pauses over a failed run-id save, naming the run, and starts nothing more', async () => {
+    class FailsSave extends DiscoveryRepository {
+      override saveRunId(): Promise<void> {
+        return Promise.reject(new Error('fictional database error'));
+      }
+    }
+    const leadSource = new SpyLeadSource();
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign(deps(leadSource, new FailsSave(prisma)), claim)).resolves.toBe(
+      'PAUSED',
+    );
+
+    expect(dentalStarts(leadSource)).toHaveLength(1);
+    expect(leadSource.collects).toHaveLength(0);
+    expect((await campaignRow(claim.id)).pauseReason).toContain('its id could not be saved');
+    expect(await notes(claim.id)).toEqual([
+      expect.objectContaining({ runId: null, state: 'CHECK_APIFY', amountUsd: '0.61' }),
+    ]);
+  });
+
+  it('pays once after a database outage right after Apify accepted the start', async () => {
+    class Outage extends DiscoveryRepository {
+      override saveRunId(): Promise<void> {
+        return Promise.reject(new Error('fictional outage'));
+      }
+      override pauseForCheck(): Promise<boolean> {
+        return Promise.reject(new Error('fictional outage'));
+      }
+    }
+    const leadSource = new SpyLeadSource();
+    const claim = await newCampaign();
+    await discoverCampaign(deps(leadSource, new Outage(prisma)), claim).catch(() => null);
+
+    const restart = await takeOver(claim.id, new Date(NOW.getTime() + 1));
+    await expect(discoverCampaign(deps(leadSource), restart)).resolves.toBe('PAUSED');
+
+    expect(dentalStarts(leadSource)).toHaveLength(1);
+    expect((await spentToday()).toFixed(2)).toBe('0.61');
+  });
+});
+
+// Proves the review's second blocker: the cap check and reservation cannot be raced past (FR-33).
+describe('discoverCampaign: two runners and one cap', () => {
+  it('lets one of two staggered campaigns start under a one-run cap', async () => {
+    await setApifyCap('0.61');
+    const leadSource = new SpyLeadSource({ onStart: () => sleep(100) });
+    const [first, second] = [await newCampaign(), await newCampaign()];
+
+    const results = await Promise.all([
+      discoverCampaign(deps(leadSource), first),
+      sleep(20).then(() => discoverCampaign(deps(leadSource), second)),
+    ]);
+
+    expect(leadSource.starts).toHaveLength(1);
+    expect(results.filter((result) => result === 'PAUSED')).toHaveLength(2);
+  });
+
+  it('holds no lock or transaction during the Apify request', async () => {
+    const other = await newCampaign();
+    const claim = await newCampaign();
+    const reservations: string[] = [];
+    const leadSource = new SpyLeadSource({
+      onStart: async (startNumber) => {
+        if (startNumber !== 1) return;
+        const reservation = await repository.reserveWithinCap(other, {
+          organizationId,
+          amountUsd: new Prisma.Decimal('0.61'),
+          capUsd: new Prisma.Decimal('2.00'),
+          dayStart: karachiDayStart(NOW),
+          at: NOW,
+          note: 'fictional note',
+        });
+        reservations.push(reservation.outcome);
+      },
+    });
+
+    await discoverCampaign(deps(leadSource), claim);
+
+    expect(reservations).toEqual(['RESERVED']);
+  });
+});
+
+// Proves a second worker taking over after a lease expires can neither pay again nor double-count.
+describe('discoverCampaign: two workers after a lease expires', () => {
+  const finished = { status: 'ENRICHING', foundCount: 12, duplicateCount: 1, filteredCount: 2 };
+
+  it('pauses the second worker while the first is inside its start, and pays once', async () => {
+    const claim = await newCampaign();
+    const second = new SpyLeadSource();
+    const results: string[] = [];
+    const first = new SpyLeadSource({
+      onStart: async (startNumber) => {
+        if (startNumber !== 1) return;
+        const taken = await takeOver(claim.id, new Date(NOW.getTime() + 1));
+        results.push(await discoverCampaign(deps(second), taken));
+      },
+    });
+
+    await expect(discoverCampaign(deps(first), claim)).resolves.toBe('STOPPED');
+
+    expect(results).toEqual(['PAUSED']);
+    expect(first.starts).toHaveLength(1);
+    expect(second.starts).toHaveLength(0);
+
+    const resumed = new SpyLeadSource();
+    await discoverCampaign(deps(resumed), await resume(claim.id));
+
+    expect(resumed.starts.map((search) => search.term)).not.toContain('dental clinic');
+    expect(await campaignRow(claim.id)).toMatchObject(finished);
+  });
+
+  it('stores a run once when both workers collect it', async () => {
+    const claim = await newCampaign();
+    const second = new SpyLeadSource();
+    const first = new SpyLeadSource({
+      onCollect: async (collectNumber) => {
+        if (collectNumber !== 1) return;
+        await discoverCampaign(deps(second), await takeOver(claim.id, new Date(NOW.getTime() + 1)));
+      },
+    });
+
+    await expect(discoverCampaign(deps(first), claim)).resolves.toBe('STOPPED');
+
+    expect(first.starts).toHaveLength(1);
+    expect(second.starts.map((search) => search.term)).not.toContain('dental clinic');
+    expect(await campaignRow(claim.id)).toMatchObject(finished);
+    expect(await costs(claim.id)).toHaveLength(4);
   });
 });
 
@@ -458,9 +619,10 @@ describe('discoverCampaign: stopping and carrying on', () => {
 
   it('after a failed read, pauses and reads the same run again on resume', async () => {
     const leadSource = new SpyLeadSource({
-      onCollect: (collectNumber) => {
-        if (collectNumber === 1) throw new Error('fictional network failure');
-      },
+      onCollect: (collectNumber) =>
+        collectNumber === 1
+          ? Promise.reject(new Error('fictional network failure'))
+          : Promise.resolve(),
     });
     const claim = await newCampaign();
 
@@ -492,6 +654,24 @@ describe('discoverCampaign: stopping and carrying on', () => {
         amountUsd: '0.61',
       }),
     );
+    expect((await spentToday()).toFixed(3)).toBe('0.682');
+  });
+
+  it('resuming after a failed start abandons that record and pays under a new one', async () => {
+    const failing = new SpyLeadSource({
+      onStart: (startNumber) =>
+        startNumber === 1 ? Promise.reject(new Error('fictional 503')) : Promise.resolve(),
+    });
+    const claim = await newCampaign();
+    await discoverCampaign(deps(failing), claim);
+
+    await discoverCampaign(deps(new SpyLeadSource()), await resume(claim.id));
+
+    expect(await campaignRow(claim.id)).toMatchObject(expected);
+    expect(await notes(claim.id)).toContainEqual(
+      expect.objectContaining({ runId: null, state: 'ABANDONED', amountUsd: '0.61' }),
+    );
+    expect((await spentToday()).toFixed(3)).toBe('0.682');
   });
 
   it('stops without another start when an operator pauses it mid-run', async () => {
@@ -510,6 +690,29 @@ describe('discoverCampaign: stopping and carrying on', () => {
 
     expect(leadSource.starts).toHaveLength(2);
     expect(await campaignRow(claim.id)).toMatchObject({ status: 'PAUSED', pauseReason: null });
+  });
+
+  it('stops without a start when the claim is lost before the reservation', async () => {
+    const claim = await newCampaign();
+    class LosesClaim extends DiscoveryRepository {
+      override async reserveWithinCap(
+        ...args: Parameters<DiscoveryRepository['reserveWithinCap']>
+      ) {
+        await prisma.campaign.update({
+          where: { id: claim.id },
+          data: { discoveryClaimedAt: new Date(NOW.getTime() + 1) },
+        });
+        return super.reserveWithinCap(...args);
+      }
+    }
+    const leadSource = new SpyLeadSource();
+
+    await expect(discoverCampaign(deps(leadSource, new LosesClaim(prisma)), claim)).resolves.toBe(
+      'STOPPED',
+    );
+
+    expect(leadSource.starts).toHaveLength(0);
+    expect(await costs(claim.id)).toHaveLength(0);
   });
 
   it('changes nothing when run again after every search is stored', async () => {
