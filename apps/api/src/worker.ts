@@ -8,17 +8,30 @@
  * Used by: the `worker` and `dev:worker` scripts in apps/api/package.json (compiled dist/worker.js).
  */
 import { createApp, loadEnvOrExit, registerPrismaShutdown } from './bootstrap.js';
+import { DiscoveryRepository } from './db/discovery.repository.js';
 import { LOGGER, type Logger } from './logging/logger.js';
+import { AREAS_DIR, loadAreaPolygons } from './pipeline/area-polygons.js';
+import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
+import { startCampaignRunner } from './scheduler/campaign-runner.js';
 
 const env = loadEnvOrExit(process.env);
+// Before createApp: HazelJS swallows startup errors, and a bad area file must stop the worker here.
+const polygons = loadAreaPolygons(AREAS_DIR);
 const app = await createApp(env);
-const logger = app.getContainer().resolve<Logger>(LOGGER);
+const container = app.getContainer();
+const logger = container.resolve<Logger>(LOGGER);
 
-// Nothing else keeps the event loop busy until the first worker loop exists (#15), so the process
-// would exit at once. Not cleared: shutdown always ends with process.exit.
-setInterval(() => undefined, 2 ** 30);
 registerPrismaShutdown(app);
 // The API gets these from listen(); on SIGINT/SIGTERM they run the handlers above, then exit 0.
 app.getShutdownManager().setupSignalHandlers();
+
+// Its timer also keeps the process alive; shutdown always ends with process.exit.
+startCampaignRunner({
+  repository: container.resolve(DiscoveryRepository),
+  leadSource: container.resolve<LeadSourcePort>(LEAD_SOURCE),
+  polygons,
+  logger,
+  now: () => new Date(),
+});
 
 logger.info('worker started');
