@@ -286,6 +286,8 @@ export class DiscoveryRepository {
   /**
    * Stores one finished search in a single transaction: its leads, its counts and its true charge.
    *
+   * A pause rides in the same transaction: the search counts as done from here on, so a crash
+   * between the two would lose the only word that it went wrong.
    * Setting `units` is what marks the search done. It comes first and only a null matches, so a
    * second runner that collected the same run waits on the row, matches nothing and adds nothing.
    * Does not touch places already stored: `skipDuplicates` leaves them as they are (FR-7).
@@ -294,15 +296,20 @@ export class DiscoveryRepository {
    * @param search.campaignId - `Campaign.id`.
    * @param search.rows - One lead row per result, repeats included.
    * @param search.costUsd - True charge in US dollars; null keeps the reserved amount.
-   * @returns How many results were new and how many were duplicates; null when already stored.
+   * @param search.pause - Given when the run went wrong: what to pause on.
+   * @param search.pause.claim - The claim held.
+   * @param search.pause.reason - Shown on the dashboard.
+   * @returns How many results were new, how many were duplicates and whether the campaign paused;
+   * null when already stored.
    */
   storeSearch(search: {
     recordId: string;
     campaignId: string;
     rows: Prisma.LeadCreateManyInput[];
     costUsd: Prisma.Decimal | null;
-  }): Promise<{ created: number; duplicates: number } | null> {
-    const { recordId, campaignId, rows, costUsd } = search;
+    pause?: { claim: Claim; reason: string };
+  }): Promise<{ created: number; duplicates: number; paused: boolean } | null> {
+    const { recordId, campaignId, rows, costUsd, pause } = search;
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.costRecord.updateMany({
         where: { id: recordId, units: null },
@@ -319,7 +326,12 @@ export class DiscoveryRepository {
         where: { id: campaignId },
         data: { foundCount: { increment: rows.length }, duplicateCount: { increment: duplicates } },
       });
-      return { created: created.length, duplicates };
+      if (pause === undefined) return { created: created.length, duplicates, paused: false };
+      const { count: paused } = await tx.campaign.updateMany({
+        where: heldBy(pause.claim),
+        data: pausedBecause(pause.reason),
+      });
+      return { created: created.length, duplicates, paused: paused === 1 };
     });
   }
 

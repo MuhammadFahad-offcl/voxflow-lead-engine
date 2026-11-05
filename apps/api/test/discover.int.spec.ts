@@ -41,7 +41,7 @@ class SpyLeadSource implements LeadSourcePort {
     private readonly hooks: {
       onStart?: (startNumber: number) => Promise<void>;
       onCollect?: (collectNumber: number) => Promise<void>;
-      itemsFor?: (term: string) => CompassPlaceItem[];
+      runFor?: (term: string) => Partial<CollectedRun>;
     } = {},
   ) {}
 
@@ -60,7 +60,7 @@ class SpyLeadSource implements LeadSourcePort {
     await this.hooks.onCollect?.(this.collects.length);
     const run = await this.fake.collect(runId);
     const term = (JSON.parse(runId) as { term: string }).term;
-    return this.hooks.itemsFor === undefined ? run : { ...run, items: this.hooks.itemsFor(term) };
+    return { ...run, ...this.hooks.runFor?.(term) };
   }
 }
 
@@ -258,8 +258,7 @@ describe('discoverCampaign: the fixture campaign', () => {
     const records = await costs(claim.id);
     expect(records).toHaveLength(4);
     expect(records.every((record) => record.service === 'APIFY')).toBe(true);
-    expect(records.filter((record) => record.units === 12)).toHaveLength(1);
-    expect(records.filter((record) => record.units === 0)).toHaveLength(3);
+    expect(records.map((record) => record.units)).toEqual([3, 3, 3, 3]);
     expect(
       records.reduce((sum, record) => sum.plus(record.amountUsd), new Prisma.Decimal(0)).toFixed(3),
     ).toBe('0.072');
@@ -296,15 +295,15 @@ describe('discoverCampaign: chains', () => {
       .then((run) => run.items);
     if (template === undefined) throw new Error('No fixture place');
     const branch = (placeId: string): CompassPlaceItem => ({ ...template, placeId });
-    const itemsFor = (term: string): CompassPlaceItem[] => {
-      if (term === 'dental clinic') return [branch('branch-1'), branch('branch-2')];
-      return term === 'dentist' ? [branch('branch-3')] : [];
+    const runFor = (term: string): Partial<CollectedRun> => {
+      if (term === 'dental clinic') return { items: [branch('branch-1'), branch('branch-2')] };
+      return { items: [branch(term === 'dentist' ? 'branch-3' : 'branch-1')] };
     };
     const claim = await newCampaign();
 
-    await discoverCampaign(deps(new SpyLeadSource({ itemsFor })), claim);
+    await discoverCampaign(deps(new SpyLeadSource({ runFor })), claim);
 
-    expect(await campaignRow(claim.id)).toMatchObject({ foundCount: 3, filteredCount: 3 });
+    expect(await campaignRow(claim.id)).toMatchObject({ foundCount: 5, filteredCount: 3 });
     expect(await lead('branch-1')).toMatchObject({
       status: 'FILTERED_OUT',
       filterReason: 'chain: 3 places with this name in the campaign',
@@ -465,6 +464,9 @@ describe('discoverCampaign: a record with no run id', () => {
       override pauseForCheck(): Promise<boolean> {
         return Promise.reject(new Error('fictional outage'));
       }
+      override pause(): Promise<boolean> {
+        return Promise.reject(new Error('fictional outage'));
+      }
     }
     const leadSource = new SpyLeadSource();
     const claim = await newCampaign();
@@ -475,6 +477,83 @@ describe('discoverCampaign: a record with no run id', () => {
 
     expect(dentalStarts(leadSource)).toHaveLength(1);
     expect((await spentToday()).toFixed(2)).toBe('0.61');
+  });
+});
+
+// Proves a paid run that went wrong keeps what it returned, pauses, and is never re-run by itself.
+describe('discoverCampaign: a run that went wrong', () => {
+  const partial = (status: CollectedRun['status']) => (term: string) =>
+    term === 'dentist' ? { status } : {};
+
+  it.each(['FAILED', 'TIMED-OUT'] as const)('keeps a %s run and pauses', async (status) => {
+    const leadSource = new SpyLeadSource({ runFor: partial(status) });
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
+
+    expect(leadSource.starts).toHaveLength(2);
+    expect(await campaignRow(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pausedFrom: 'DISCOVERING',
+      pauseReason: expect.stringContaining(`ended as ${status}`),
+      foundCount: 6,
+      discoveryClaimedAt: null,
+    });
+    expect(await prisma.lead.count({ where: { campaignId: claim.id } })).toBe(6);
+  });
+
+  it('does not re-run that search on resume, and moves on to the next', async () => {
+    const claim = await newCampaign();
+    await discoverCampaign(deps(new SpyLeadSource({ runFor: partial('FAILED') })), claim);
+    const resumed = new SpyLeadSource();
+
+    await expect(discoverCampaign(deps(resumed), await resume(claim.id))).resolves.toBe(
+      'ENRICHING',
+    );
+
+    expect(resumed.starts.map((search) => search.term)).toEqual(['dental surgeon', 'orthodontist']);
+    expect(await costs(claim.id)).toHaveLength(4);
+  });
+
+  it('pauses when every item was invalid, and stores none', async () => {
+    const runFor = (term: string) =>
+      term === 'dental clinic' ? { items: [], skippedCount: 3 } : {};
+    const leadSource = new SpyLeadSource({ runFor });
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
+
+    expect(leadSource.starts).toHaveLength(1);
+    expect((await campaignRow(claim.id)).pauseReason).toContain("Compass's fields");
+    expect(await notes(claim.id)).toEqual([expect.objectContaining({ amountUsd: '0.02' })]);
+  });
+
+  it('pauses when a successful run found nothing, then needs no second pause', async () => {
+    const runFor = (term: string) => (term === 'dentist' ? { items: [] } : {});
+    const claim = await newCampaign();
+
+    await expect(discoverCampaign(deps(new SpyLeadSource({ runFor })), claim)).resolves.toBe(
+      'PAUSED',
+    );
+
+    expect((await campaignRow(claim.id)).pauseReason).toContain('found no places');
+    await expect(discoverCampaign(deps(new SpyLeadSource()), await resume(claim.id))).resolves.toBe(
+      'ENRICHING',
+    );
+  });
+
+  it('stops without pausing for a worker that lost its claim, keeping the results', async () => {
+    const claim = await newCampaign();
+    const leadSource = new SpyLeadSource({
+      onCollect: async () => {
+        await takeOver(claim.id, new Date(NOW.getTime() + 1));
+      },
+      runFor: () => ({ status: 'FAILED' }),
+    });
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('STOPPED');
+
+    expect(await campaignRow(claim.id)).toMatchObject({ status: 'DISCOVERING', foundCount: 3 });
   });
 });
 
@@ -572,7 +651,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
   const expected = { status: 'ENRICHING', foundCount: 12, duplicateCount: 1, filteredCount: 2 };
 
   it('after a cap pause, runs only the searches left', async () => {
-    // $0.61 fits, but $0.072 spent plus the next $0.61 does not.
+    // $0.61 fits, but $0.018 spent plus the next $0.61 does not.
     await setApifyCap('0.62');
     const first = new SpyLeadSource();
     const claim = await newCampaign();
@@ -603,8 +682,8 @@ describe('discoverCampaign: stopping and carrying on', () => {
     expect(leadSource.starts.map((search) => search.term)).not.toContain('dental clinic');
     expect(leadSource.collects).toContain(runId);
     expect(await campaignRow(claim.id)).toMatchObject(expected);
-    const reattached = (await costs(claim.id)).find((record) => record.units === 12);
-    expect(reattached?.amountUsd.toFixed(3)).toBe('0.072');
+    const reattached = (await costs(claim.id)).find((record) => record.note?.includes('clinic'));
+    expect(reattached?.amountUsd.toFixed(3)).toBe('0.018');
   });
 
   it('counts an unfinished run at its limit against the cap', async () => {
@@ -654,7 +733,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
         amountUsd: '0.61',
       }),
     );
-    expect((await spentToday()).toFixed(3)).toBe('0.682');
+    expect((await spentToday()).toFixed(3)).toBe('0.628');
   });
 
   it('resuming after a failed start abandons that record and pays under a new one', async () => {

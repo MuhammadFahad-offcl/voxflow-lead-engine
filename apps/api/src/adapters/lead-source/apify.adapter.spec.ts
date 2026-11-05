@@ -176,11 +176,12 @@ describe('ApifyLeadSourceAdapter.start failures', () => {
 
 // Proves reading is free and repeatable: results, the true charge, retries, and no new run.
 describe('ApifyLeadSourceAdapter.collect', () => {
-  it('returns the validated items and the true charge', async () => {
-    const { items, costUsd } = await adapter().collect(RUN_ID);
+  it('returns the validated items, the true charge and how the run ended', async () => {
+    const { items, costUsd, status, skippedCount } = await adapter().collect(RUN_ID);
 
     expect(items).toHaveLength(12);
     expect(costUsd?.toFixed(5)).toBe('0.07200');
+    expect({ status, skippedCount }).toEqual({ status: 'SUCCEEDED', skippedCount: 0 });
   });
 
   it('reattaches after a restart: a new adapter reads the run and starts nothing', async () => {
@@ -213,11 +214,18 @@ describe('ApifyLeadSourceAdapter.collect', () => {
   it('keeps what a failed run produced, because it was paid for', async () => {
     replies.run = [json(200, { data: { ...finishedRun, status: 'FAILED' } })];
 
-    const { items, costUsd } = await adapter().collect(RUN_ID);
+    const { items, costUsd, status } = await adapter().collect(RUN_ID);
 
     expect(items).toHaveLength(12);
     expect(costUsd).not.toBeNull();
+    expect(status).toBe('FAILED');
     expect(warn).toHaveBeenCalledWith({ runId: RUN_ID, status: 'FAILED' }, expect.any(String));
+  });
+
+  it('reports a timed-out run as timed out, with what it produced', async () => {
+    replies.run = [json(200, { data: { ...finishedRun, status: 'TIMED-OUT' } })];
+
+    await expect(adapter().collect(RUN_ID)).resolves.toMatchObject({ status: 'TIMED-OUT' });
   });
 
   it('refuses a run that is still going after the wait', async () => {
@@ -236,9 +244,10 @@ describe('ApifyLeadSourceAdapter.collect', () => {
     const bad = { placeId: 'fictional-bad', title: '', phone: '+923000000099' };
     replies.items = [json(200, [bad, ...places])];
 
-    const { items } = await adapter().collect(RUN_ID);
+    const { items, skippedCount } = await adapter().collect(RUN_ID);
 
     expect(items).toHaveLength(12);
+    expect(skippedCount).toBe(1);
     expect(warn).toHaveBeenCalledWith({ placeId: 'fictional-bad' }, expect.any(String));
     expect(JSON.stringify(warn.mock.calls)).not.toContain('+923000000099');
   });

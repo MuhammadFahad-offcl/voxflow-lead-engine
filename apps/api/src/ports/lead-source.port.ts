@@ -29,6 +29,10 @@ export interface CollectedRun {
   items: CompassPlaceItem[];
   /** True charge in US dollars, or null when the run did not say: keep the amount reserved. */
   costUsd: Prisma.Decimal | null;
+  /** How the run ended; anything but SUCCEEDED means `items` may be only part of the results. */
+  status: 'SUCCEEDED' | 'FAILED' | 'TIMED-OUT' | 'ABORTED';
+  /** How many items failed validation and were left out. */
+  skippedCount: number;
 }
 
 /** Finds places. Implemented by the Apify adapter and by a fixture-backed fake. */
@@ -58,7 +62,7 @@ export interface LeadSourcePort {
    * Does not start anything. Returns what a failed or timed-out run did produce, because that run
    * was paid for.
    * @param runId - Id from {@link LeadSourcePort.start}.
-   * @returns The valid items and the charge.
+   * @returns The valid items, the charge, how the run ended and how many items were invalid.
    * @throws When the run cannot be read, or is still running after the wait.
    */
   collect(runId: string): Promise<CollectedRun>;
