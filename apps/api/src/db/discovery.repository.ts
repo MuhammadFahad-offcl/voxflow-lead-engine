@@ -6,6 +6,7 @@
  */
 import { Injectable } from '@hazeljs/core';
 import { Prisma, type CostRecord } from '../generated/prisma/client.js';
+import { wouldPassCap } from '../pipeline/spend-cap.js';
 import { PrismaProvider } from './prisma.provider.js';
 
 /** A campaign held by one runner; `claimedAt` is the lease value only that runner knows. */
@@ -31,6 +32,38 @@ interface Rejection {
   leadId: string;
   reason: string;
 }
+
+/** What {@link DiscoveryRepository.reserveWithinCap} decided. */
+export type Reservation =
+  | { outcome: 'RESERVED'; recordId: string }
+  | { outcome: 'OVER_CAP'; spent: Prisma.Decimal }
+  | { outcome: 'CLAIM_LOST' };
+
+// The rows only the live holder of a claim can match.
+const heldBy = (claim: Claim) =>
+  ({
+    id: claim.id,
+    status: 'DISCOVERING',
+    discoveryClaimedAt: claim.claimedAt,
+  }) satisfies Prisma.CampaignWhereInput;
+
+const pausedBecause = (reason: string) =>
+  ({
+    status: 'PAUSED',
+    pausedFrom: 'DISCOVERING',
+    pauseReason: reason,
+    discoveryClaimedAt: null,
+  }) satisfies Prisma.CampaignUpdateManyMutationInput;
+
+// One statement, because a second runner may be writing the run id into the same note.
+const setSearchState = (
+  client: Pick<Prisma.TransactionClient, '$executeRaw'>,
+  recordId: string,
+  state: 'CHECK_APIFY' | 'ABANDONED',
+): Promise<number> =>
+  client.$executeRaw`UPDATE "CostRecord"
+    SET note = jsonb_set(note::jsonb, '{state}', to_jsonb(${state}::text))::text
+    WHERE id = ${recordId}`;
 
 /** Reads and writes what discovery needs. */
 @Injectable()
@@ -93,7 +126,7 @@ export class DiscoveryRepository {
    */
   async renewClaim(claim: Claim, now: Date): Promise<Claim | null> {
     const { count } = await this.prisma.campaign.updateMany({
-      where: { id: claim.id, status: 'DISCOVERING', discoveryClaimedAt: claim.claimedAt },
+      where: heldBy(claim),
       data: { discoveryClaimedAt: now },
     });
     return count === 1 ? { id: claim.id, claimedAt: now } : null;
@@ -118,15 +151,31 @@ export class DiscoveryRepository {
    */
   async pause(claim: Claim, reason: string): Promise<boolean> {
     const { count } = await this.prisma.campaign.updateMany({
-      where: { id: claim.id, status: 'DISCOVERING', discoveryClaimedAt: claim.claimedAt },
-      data: {
-        status: 'PAUSED',
-        pausedFrom: 'DISCOVERING',
-        pauseReason: reason,
-        discoveryClaimedAt: null,
-      },
+      where: heldBy(claim),
+      data: pausedBecause(reason),
     });
     return count === 1;
+  }
+
+  /**
+   * Pauses a campaign over a search whose paid run may exist, marking it for the founder's check.
+   *
+   * One transaction, so a later pass can trust the mark: CHECK_APIFY on a campaign that is
+   * discovering again can only mean the founder read this reason and resumed.
+   * @param claim - The claim held.
+   * @param recordId - The search's `CostRecord.id`.
+   * @param reason - Shown on the dashboard.
+   * @returns True when it paused; false when the claim was already lost, and nothing changed.
+   */
+  pauseForCheck(claim: Claim, recordId: string, reason: string): Promise<boolean> {
+    return this.prisma.$transaction(async (tx) => {
+      const { count } = await tx.campaign.updateMany({
+        where: heldBy(claim),
+        data: pausedBecause(reason),
+      });
+      if (count === 1) await setSearchState(tx, recordId, 'CHECK_APIFY');
+      return count === 1;
+    });
   }
 
   /**
@@ -145,10 +194,15 @@ export class DiscoveryRepository {
    * Adds up Apify spend since a moment, reservations of unfinished runs included.
    * @param organizationId - Owner of the spend.
    * @param since - Start of the period.
+   * @param client - The transaction to read in; by default, none.
    * @returns The total in US dollars.
    */
-  async apifySpentSince(organizationId: string, since: Date): Promise<Prisma.Decimal> {
-    const { _sum: sum } = await this.prisma.costRecord.aggregate({
+  async apifySpentSince(
+    organizationId: string,
+    since: Date,
+    client: Pick<Prisma.TransactionClient, 'costRecord'> = this.prisma,
+  ): Promise<Prisma.Decimal> {
+    const { _sum: sum } = await client.costRecord.aggregate({
       where: { organizationId, service: 'APIFY', at: { gte: since } },
       _sum: { amountUsd: true },
     });
@@ -176,6 +230,79 @@ export class DiscoveryRepository {
       select: { id: true },
     });
     return id;
+  }
+
+  /**
+   * Checks the daily cap and reserves a run's charge limit in one transaction, before any start.
+   *
+   * The advisory lock makes an organization's runners take turns, so a second one sees the first's
+   * reservation. The claim is checked under it and that row stays locked until commit, so a runner
+   * whose lease another took over can reserve nothing.
+   * Does not start the run, and the lock ends with this call: the caller makes its Apify request
+   * after this returns, never inside the transaction.
+   * @param claim - The claim held; the record belongs to its campaign.
+   * @param reservation - What to reserve and the limits to reserve it under.
+   * @param reservation.organizationId - Owner of the spend.
+   * @param reservation.amountUsd - The run's charge limit, in US dollars.
+   * @param reservation.capUsd - The daily cap, in US dollars.
+   * @param reservation.dayStart - When the capped day began.
+   * @param reservation.at - The record's time, on the caller's clock.
+   * @param reservation.note - From `searchNote`, with a null run id.
+   * @returns The new record's id, or what stopped it: over the cap, or the claim lost.
+   */
+  reserveWithinCap(
+    claim: Claim,
+    reservation: {
+      organizationId: string;
+      amountUsd: Prisma.Decimal;
+      capUsd: Prisma.Decimal;
+      dayStart: Date;
+      at: Date;
+      note: string;
+    },
+  ): Promise<Reservation> {
+    const { organizationId, amountUsd, capUsd, dayStart, at, note } = reservation;
+    const lockName = `apify-spend:${organizationId}`;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockName}, 0))`;
+      // Writes the same value: this only proves the claim and locks its row.
+      const { count } = await tx.campaign.updateMany({
+        where: heldBy(claim),
+        data: { discoveryClaimedAt: claim.claimedAt },
+      });
+      if (count === 0) return { outcome: 'CLAIM_LOST' };
+      const spent = await this.apifySpentSince(organizationId, dayStart, tx);
+      if (wouldPassCap(spent, amountUsd, capUsd)) return { outcome: 'OVER_CAP', spent };
+      const { id } = await tx.costRecord.create({
+        data: { organizationId, campaignId: claim.id, service: 'APIFY', amountUsd, at, note },
+        select: { id: true },
+      });
+      return { outcome: 'RESERVED', recordId: id };
+    });
+  }
+
+  /**
+   * Writes a started run's id into its reservation, so a restart collects instead of paying again.
+   *
+   * Does not check the claim: the run exists whoever holds the campaign now, so its id must be kept.
+   * @param recordId - The search's `CostRecord.id`.
+   * @param runId - The id Apify gave the run.
+   */
+  async saveRunId(recordId: string, runId: string): Promise<void> {
+    // One statement, because a second runner may be writing the state into the same note.
+    await this.prisma.$executeRaw`UPDATE "CostRecord"
+      SET note = jsonb_set(note::jsonb, '{runId}', to_jsonb(${runId}::text))::text
+      WHERE id = ${recordId}`;
+  }
+
+  /**
+   * Closes a search the founder resumed after being asked to check the Apify console.
+   *
+   * Does not touch the amount: a run may exist, so the reservation stays on that day's total.
+   * @param recordId - The search's `CostRecord.id`.
+   */
+  async abandonSearch(recordId: string): Promise<void> {
+    await setSearchState(this.prisma, recordId, 'ABANDONED');
   }
 
   /**
@@ -246,7 +373,7 @@ export class DiscoveryRepository {
   finishDiscovery(claim: Claim, rejections: readonly Rejection[]): Promise<boolean> {
     return this.prisma.$transaction(async (tx) => {
       const { count } = await tx.campaign.updateMany({
-        where: { id: claim.id, status: 'DISCOVERING', discoveryClaimedAt: claim.claimedAt },
+        where: heldBy(claim),
         data: { status: 'ENRICHING', discoveryClaimedAt: null },
       });
       if (count === 0) return false;

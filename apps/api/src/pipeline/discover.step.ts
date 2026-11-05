@@ -45,8 +45,9 @@ const readStartedSearches = async (
   const started = new Map<string, StartedSearch>();
   for (const { id, note, units } of await repository.searchRecords(campaignId)) {
     const search = readSearchNote(note);
-    if (search === null) continue;
-    const entry = { recordId: id, runId: search.runId, stored: units !== null };
+    const runId = search?.runId ?? null;
+    if (search === null || runId === null) continue;
+    const entry = { recordId: id, runId, stored: units !== null };
     started.set(searchKey(search), entry);
   }
   return started;
