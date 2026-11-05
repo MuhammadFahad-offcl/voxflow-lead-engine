@@ -7,7 +7,7 @@ Nov 3, 2026 · Muhammad Fahad
 | Field               | Value                                                                                                                                              |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Product             | VoxFlow Lead Engine                                                                                                                                |
-| Document version    | 0.3 (Apify costs measured in the #9 spike)                                                                                                         |
+| Document version    | 0.4 (FR-8 clarified: closed places and keyword forms)                                                                                              |
 | Status              | Draft, awaiting owner review                                                                                                                       |
 | Owner               | Muhammad Fahad, Founder, VoxFlow AI Solutions                                                                                                      |
 | Technical reviewer  | Claude                                                                                                                                             |
@@ -526,6 +526,7 @@ What comes after v1 is decided in early January 2027 from the December data, not
 
 | Date       | Version | Change                                                                                                |
 | ---------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| 5 Nov 2026 | 0.4     | FR-8 clarified: closed places are excluded, and keywords cover plurals and government or school names |
 | 4 Nov 2026 | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)             |
 | 3 Nov 2026 | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting |
 | 3 Nov 2026 | 0.1     | First draft for owner review                                                                          |

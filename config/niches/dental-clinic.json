@@ -8,7 +8,7 @@
     "sourceOfTruth": "docs/prd.md → Lead scoring model, Call design"
   },
   "slug": "dental-clinic",
-  "version": 1,
+  "version": 2,
   "name": "Dental clinics",
   "searchTerms": ["dental clinic", "dentist", "dental surgeon", "orthodontist"],
   "categoryKeywords": [
@@ -20,6 +20,7 @@
     "endodontist"
   ],
   "idealClient": {
+    "excludeClosed": true,
     "privateClinicOnly": true,
     "minRating": 4.0,
     "minReviewCount": 30,
@@ -30,7 +31,9 @@
       "college",
       "medical complex",
       "trust",
-      "foundation"
+      "foundation",
+      "government",
+      "school"
     ],
     "excludeChains": true,
     "chainRule": "same normalized name found at 3 or more places in one campaign"

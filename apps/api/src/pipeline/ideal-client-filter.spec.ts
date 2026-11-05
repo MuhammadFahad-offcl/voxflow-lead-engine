@@ -39,6 +39,41 @@ describe('idealClientFilter: pass', () => {
   });
 });
 
+// Proves closed places never become leads, and a missing status is not read as closed (FR-8).
+describe('idealClientFilter: closed places', () => {
+  it('drops a permanently closed place', () => {
+    expect(idealClientFilter(place({ permanentlyClosed: true }), rules, noChains)).toEqual({
+      pass: false,
+      reason: 'permanently closed',
+    });
+  });
+
+  it('drops a temporarily closed place', () => {
+    expect(idealClientFilter(place({ temporarilyClosed: true }), rules, noChains)).toEqual({
+      pass: false,
+      reason: 'temporarily closed',
+    });
+  });
+
+  it('keeps a place with no closed status', () => {
+    expect(idealClientFilter(place(), rules, noChains)).toEqual({ pass: true });
+  });
+
+  it('does not apply when the niche turns it off', () => {
+    const open = { ...rules, excludeClosed: false };
+
+    expect(idealClientFilter(place({ temporarilyClosed: true }), open, noChains).pass).toBe(true);
+  });
+
+  it('keeps an item with no status through validation', () => {
+    const item = structuredClone(repoFile('fixtures/places/dental-lahore.json')) as [object];
+    const { permanentlyClosed, temporarilyClosed, ...noStatus } = item[0] as CompassPlaceItem;
+
+    expect([permanentlyClosed, temporarilyClosed]).toEqual([false, false]);
+    expect(CompassPlaceItem.safeParse(noStatus).success).toBe(true);
+  });
+});
+
 // Proves "at least" means at least: the minimums themselves pass, one step below does not (FR-8).
 describe('idealClientFilter: rating and review boundaries', () => {
   it('passes a clinic at exactly 4.0 stars and 30 reviews', () => {
@@ -78,6 +113,20 @@ describe('idealClientFilter: name keywords', () => {
     });
   });
 
+  it.each([
+    ['City Hospitals', 'hospital'],
+    ['Fictional Universities Dental', 'university'],
+    ['Fictional Medical Complexes', 'medical complex'],
+    ['Fictional Government Dental Unit', 'government'],
+    ['Fictional School of Dentistry', 'school'],
+    ['Fictional Dental Schools', 'school'],
+  ])('drops %s for the keyword %s', (title, keyword) => {
+    expect(idealClientFilter(place({ title }), rules, noChains)).toEqual({
+      pass: false,
+      reason: `name contains "${keyword}"`,
+    });
+  });
+
   it('matches a two-word keyword across punctuation', () => {
     const title = 'Fictional Medical-Complex Dental';
 
@@ -111,6 +160,13 @@ describe('idealClientFilter: privateClinicOnly', () => {
     expect(idealClientFilter(place({ categories }), rules, noChains)).toEqual({
       pass: false,
       reason: 'not a private clinic: category "University hospital"',
+    });
+  });
+
+  it('drops a dental school by its category', () => {
+    expect(idealClientFilter(place({ categoryName: 'Dental school' }), rules, noChains)).toEqual({
+      pass: false,
+      reason: 'not a private clinic: category "Dental school"',
     });
   });
 
