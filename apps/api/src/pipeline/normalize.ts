@@ -2,7 +2,7 @@
  * Pure normalizers for the two contact fields of a scraped place: phone and website.
  *
  * Serves: FR-6, PRD "Lead scoring model" (mobile_number), ADR-0015 (Compass supplies both fields).
- * Used by: apps/api/src/pipeline/normalize.spec.ts; the discover step in #10.
+ * Used by: apps/api/src/pipeline/search-plan.ts, apps/api/src/pipeline/normalize.spec.ts.
  */
 // The /max build: the default one has no number-type metadata, so getType() would always be undefined.
 import { parsePhoneNumberFromString, type PhoneNumberType } from 'libphonenumber-js/max';

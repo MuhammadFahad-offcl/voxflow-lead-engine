@@ -2,9 +2,10 @@
   "meta": {
     "note": "One GeoJSON polygon per campaign area, because Compass finds nothing from text locations here (ADR-0015). Coordinates are [longitude, latitude]. An area left out of this file is refused before any charge.",
     "attribution": "Data © OpenStreetMap contributors, ODbL 1.0, https://www.openstreetmap.org/copyright",
-    "notInOpenStreetMap": [
-      "Gulberg: only a point and streets, no boundary",
-      "Johar Town: only streets, no boundary"
+    "approximate": [
+      "Gulberg and Johar Town are rough hand-drawn boxes, not boundaries: the founder is to check both on a map before a paid run. Their source says what each was drawn from.",
+      "Gulberg: OpenStreetMap has only points, streets and a small neighbourhood, no boundary.",
+      "Johar Town: drawn from street positions as decided, but on 2026-11-05 OpenStreetMap also held relation/21073631 (place=suburb), reaching further south and east than this box."
     ]
   },
   "city": "Lahore",
@@ -330,6 +331,48 @@
             [74.1495293, 31.3860317],
             [74.1495293, 31.3850975],
             [74.1480924, 31.3850173]
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Gulberg",
+      "source": {
+        "origin": "APPROXIMATE, hand-drawn box, not a boundary. The point node/2948760205 (31.5119955, 74.3430178) plus and minus 0.02 degrees, rounded to 3 decimals; Gulberg streets and way/626975669 fall inside it. Check it on a map.",
+        "osmObject": "node/2948760205 (place=suburb, a point)",
+        "retrievedOn": "2026-11-05",
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0, https://www.openstreetmap.org/copyright"
+      },
+      "polygon": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.323, 31.492],
+            [74.363, 31.492],
+            [74.363, 31.532],
+            [74.323, 31.532],
+            [74.323, 31.492]
+          ]
+        ]
+      }
+    },
+    {
+      "name": "Johar Town",
+      "source": {
+        "origin": "APPROXIMATE, hand-drawn box, not a boundary. The extent of the streets named Johar Town (south 31.4575, west 74.2490, north 31.4731, east 74.2829) plus 0.005 degrees on each side, rounded to 3 decimals. Check it on a map.",
+        "osmObject": "way/315245771, way/27642662, way/27642366, way/526597886 (streets)",
+        "retrievedOn": "2026-11-05",
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0, https://www.openstreetmap.org/copyright"
+      },
+      "polygon": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [74.244, 31.452],
+            [74.288, 31.452],
+            [74.288, 31.478],
+            [74.244, 31.478],
+            [74.244, 31.452]
           ]
         ]
       }

@@ -56,9 +56,9 @@ describe('config/areas', () => {
   });
 
   it('has no made-up shape for the two areas OpenStreetMap has no boundary for', () => {
-    expect(missingAreas(polygons, 'Lahore', ['Gulberg', 'Johar Town'])).toEqual([
-      'Gulberg',
-      'Johar Town',
+    expect(missingAreas(polygons, 'Lahore', ['Cantt', 'Garden Town'])).toEqual([
+      'Cantt',
+      'Garden Town',
     ]);
   });
 });

@@ -2,7 +2,7 @@
  * Pure pieces of discovery: the search grid, the note tracking a search, and a place's lead row.
  *
  * Serves: FR-2 (grid), FR-5, FR-6, FR-7; issue #10 (founder decision on Q3).
- * Used by: apps/api/src/pipeline/search-plan.spec.ts; the discover step in #10.
+ * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/pipeline/search-plan.spec.ts.
  */
 import { z } from 'zod';
 import type { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';

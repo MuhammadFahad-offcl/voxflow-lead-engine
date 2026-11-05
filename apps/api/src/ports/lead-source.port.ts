@@ -2,7 +2,8 @@
  * The port discovery uses to get Google Maps places, split so a paid run survives a restart.
  *
  * Serves: FR-5, FR-33, ADR-0007 (ports and adapters), ADR-0015 (pass 1 only; pass 2 comes in #12).
- * Used by: apps/api/src/adapters/lead-source/, apps/api/src/bootstrap.ts; the discover step in #10.
+ * Used by: apps/api/src/adapters/lead-source/, apps/api/src/bootstrap.ts,
+ * apps/api/src/pipeline/discover.step.ts, apps/api/src/pipeline/search-plan.ts.
  */
 import type { AreaPolygon } from '@voxflow/shared';
 import type { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';

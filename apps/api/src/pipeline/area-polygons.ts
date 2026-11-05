@@ -2,7 +2,8 @@
  * Loads the campaign area polygons and looks them up by city and area name.
  *
  * Serves: FR-2, ADR-0015 (Compass needs a polygon per area; its text location found 0 places).
- * Used by: apps/api/src/pipeline/area-polygons.spec.ts; the discover step and worker in #10.
+ * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/worker.ts,
+ * apps/api/src/pipeline/area-polygons.spec.ts.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';

@@ -5,7 +5,8 @@
  * Serves: FR-5 (discovery), FR-8 (filter fields), FR-10/FR-14 (phone, website, booking links),
  * FR-11 (the 30 newest reviews), ADR-0015 (hybrid two-pass design), CLAUDE.md (validate Apify items).
  * Used by: apps/api/src/adapters/lead-source/ (adapters and spec), apps/api/src/ports/lead-source.port.ts,
- * apps/api/src/pipeline/ideal-client-filter.ts.
+ * apps/api/src/pipeline/ideal-client-filter.ts, apps/api/src/pipeline/discover.step.ts,
+ * apps/api/src/pipeline/search-plan.ts.
  */
 import { z } from 'zod';
 import type { Logger } from '../../logging/logger.js';

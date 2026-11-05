@@ -2,7 +2,8 @@
  * The ideal-client filter: decides from pass-1 data alone whether a place is worth enriching.
  *
  * Serves: FR-8, ADR-0015 (the filter runs before any review is paid for).
- * Used by: apps/api/src/pipeline/ideal-client-filter.spec.ts; the discover step in #10.
+ * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/db/discovery.repository.ts,
+ * apps/api/src/pipeline/ideal-client-filter.spec.ts.
  */
 import type { IdealClient } from '@voxflow/shared';
 import type { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
