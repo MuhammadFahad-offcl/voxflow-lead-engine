@@ -148,6 +148,38 @@ describe('POST /campaigns', () => {
     expect(JSON.stringify(body)).not.toContain('fictional-secret-value');
   });
 
+  it('stores a lower cap per search for a cheap test campaign', async () => {
+    const { status, body } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+      maxResultsPerSearch: 30,
+    });
+
+    expect(status).toBe(201);
+    expect(body).toMatchObject({ maxResultsPerSearch: 30 });
+  });
+
+  it.each([[0], [101], [1.5], ['30']])(
+    'answers 400 for a cap per search of %j',
+    async (maxResultsPerSearch) => {
+      const { status, body } = await create({
+        nicheSlug: 'dental-clinic',
+        city: 'Lahore',
+        areas: ['DHA'],
+        maxResultsPerSearch,
+      });
+
+      expect(status).toBe(400);
+      expect(body['errors']).toEqual([
+        {
+          field: 'maxResultsPerSearch',
+          messages: ['maxResultsPerSearch must be a whole number from 1 to 100'],
+        },
+      ]);
+    },
+  );
+
   it('answers 404 for an unknown niche', async () => {
     const { status } = await create({ nicheSlug: 'bakery', city: 'Lahore', areas: ['DHA'] });
 
@@ -241,6 +273,25 @@ describe('POST /campaigns/:id/pause and /resume', () => {
     await prisma.campaign.update({ where: { id }, data: { status: 'COMPLETED' } });
 
     expect((await call('POST', `/campaigns/${id}/pause`)).status).toBe(409);
+  });
+
+  it('shows why the system paused a campaign, and forgets it on resume (FR-33)', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    await prisma.campaign.update({
+      where: { id },
+      data: { status: 'PAUSED', pausedFrom: 'DISCOVERING', pauseReason: 'Fictional cap reached' },
+    });
+
+    const paused = await call('GET', `/campaigns/${id}`);
+    const resumed = await call('POST', `/campaigns/${id}/resume`);
+
+    expect(paused.body).toMatchObject({ status: 'PAUSED', pauseReason: 'Fictional cap reached' });
+    expect(resumed.body).toMatchObject({ status: 'DISCOVERING', pauseReason: null });
   });
 
   it('refuses to resume from a pause that is not the one it read', async () => {

@@ -27,6 +27,17 @@ POST {{base}}/campaigns/{{created.response.body.id}}/pause
 ### Resume it in the status it was paused from (409 when it is not paused)
 POST {{base}}/campaigns/{{created.response.body.id}}/resume
 
+### Create a cheap test campaign: at most 30 results per search (1–100; 100 when left out)
+POST {{base}}/campaigns
+Content-Type: application/json
+
+{
+  "nicheSlug": "dental-clinic",
+  "city": "Lahore",
+  "areas": ["DHA"],
+  "maxResultsPerSearch": 30
+}
+
 ### 400: no areas, with the Zod message per field
 POST {{base}}/campaigns
 Content-Type: application/json

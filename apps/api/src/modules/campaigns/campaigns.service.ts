@@ -34,6 +34,7 @@ function toSummary(campaign: CampaignWithNiche): CampaignSummary {
     city: campaign.city,
     areas: campaign.areas,
     status: campaign.status,
+    pauseReason: campaign.pauseReason,
     grid: {
       terms: campaign.nicheProfile.searchTerms.length,
       areas: campaign.areas.length,
@@ -76,6 +77,9 @@ export class CampaignsService {
       city: input.city,
       areas: input.areas,
       searchCount: niche.searchTerms.length * input.areas.length,
+      ...(input.maxResultsPerSearch === undefined
+        ? {}
+        : { maxResultsPerSearch: input.maxResultsPerSearch }),
     });
     return toSummary(campaign);
   }
@@ -131,7 +135,7 @@ export class CampaignsService {
     if (campaign.status !== 'PAUSED' || target === null || !canTransition('PAUSED', target)) {
       throw new ConflictError(`A ${campaign.status} campaign cannot be resumed`);
     }
-    await this.changeStatus(campaign, { status: target, pausedFrom: null });
+    await this.changeStatus(campaign, { status: target, pausedFrom: null, pauseReason: null });
     return this.get(id);
   }
 
