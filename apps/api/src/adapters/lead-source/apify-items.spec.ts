@@ -18,6 +18,15 @@ const reviewItems = z.array(ScraperlinkReviewsItem).parse(fixture('reviews/denta
 const reviews = reviewItems.flatMap((item) => item.reviews);
 const texts = reviews.map((review) => review.text ?? '');
 
+// Proves a real listing with no review count stays a place, so the filter can record why it failed.
+describe('CompassPlaceItem', () => {
+  it('reads a null reviewsCount as 0, as real Compass items send for a new listing', () => {
+    const [place] = places;
+    const item = CompassPlaceItem.parse({ ...place, reviewsCount: null });
+    expect(item.reviewsCount).toBe(0);
+  });
+});
+
 // Proves the place fixture has the Compass item shape and the cases the pipeline must handle.
 describe('CompassPlaceItem fixture', () => {
   it('holds 12 places with one duplicate place id, for dedupe (FR-7)', () => {

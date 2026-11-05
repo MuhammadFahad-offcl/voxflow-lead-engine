@@ -64,7 +64,8 @@ export const CampaignSummary = z.object({
   city: z.string(),
   areas: z.array(z.string()),
   status: CampaignStatus,
-  // FR-33: why the system paused it, e.g. a spend cap; null for an operator pause or when not paused.
+  // FR-33: why the system paused it, e.g. a spend cap; null when not paused, and for an operator pause
+  // unless a failed run's reason was added to it.
   pauseReason: z.string().nullable(),
   // FR-2: one search per niche search term per area, each capped at maxResultsPerSearch.
   grid: z.object({

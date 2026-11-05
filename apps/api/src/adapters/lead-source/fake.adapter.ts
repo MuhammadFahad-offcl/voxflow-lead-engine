@@ -16,8 +16,9 @@ import { assertChargeLimit, runChargeLimitUsd } from './compass-input.js';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, '../../../../../fixtures/places');
 // The niche's terms share the fixtures, each row going to one term. Serving all of them to every
-// term would count each place 4 times, and the fixture campaign must end with 12 found, 1 duplicate;
+// term would count each place 4 times, and the DHA campaign must end with 12 found, 1 duplicate;
 // serving them to one term would leave 3 searches empty, and an empty search pauses a campaign.
+// So an area needs at least 4 rows: only DHA and Gulberg have them, and other areas pause in demo.
 const FIXTURE_TERMS = ['dental clinic', 'dentist', 'dental surgeon', 'orthodontist'];
 // Fictional, so demo campaigns show cost figures of the right size.
 const PLACE_CHARGE_USD = new Prisma.Decimal('0.006');

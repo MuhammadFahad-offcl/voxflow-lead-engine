@@ -126,6 +126,24 @@ describe('campaign runner in demo mode', () => {
     });
   });
 
+  it('takes a DHA + Gulberg campaign to ENRICHING with no empty-search pause', async () => {
+    const body = { nicheSlug: 'dental-clinic', city: 'Lahore', areas: ['DHA', 'Gulberg'] };
+    const id = String((await post('/campaigns', body))['id']);
+
+    await expect(runCampaignRunnerOnce(deps)).resolves.toBe(true);
+
+    expect(starts).toHaveLength(8);
+    expect(await row(id)).toMatchObject({
+      status: 'ENRICHING',
+      pauseReason: null,
+      foundCount: 16,
+      duplicateCount: 1,
+      filteredCount: 2,
+    });
+    expect(await prisma.lead.count({ where: { area: 'DHA' } })).toBe(11);
+    expect(await prisma.lead.count({ where: { area: 'Gulberg' } })).toBe(4);
+  });
+
   it('has nothing to do without a DISCOVERING campaign', async () => {
     await expect(runCampaignRunnerOnce(deps)).resolves.toBe(false);
   });

@@ -221,7 +221,13 @@ const collectAndStore = async (
   if (reason === null) return null;
   // A stale worker stored this run first and could not pause; the holder of the claim still can.
   if (stored === null) return { kind: 'PAUSE', reason };
-  if (!stored.paused) return { kind: 'STOP' };
+  if (!stored.paused) {
+    deps.logger.warn(
+      { campaignId, term, area, reason },
+      'run stored, but a lost claim could not pause',
+    );
+    return { kind: 'STOP' };
+  }
   deps.logger.warn({ campaignId, reason }, 'campaign paused');
   return { kind: 'PAUSED' };
 };

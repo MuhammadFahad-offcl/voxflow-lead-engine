@@ -111,6 +111,7 @@ export function runProblem(
  *
  * Does not apply the ideal-client filter: that needs the whole campaign's names, so it runs last.
  * `rawPlace` is the validated item: `bookingLinks` (#14) and the closed flags stay available there.
+ * Does not look for a mobile in `phone` once `phoneUnformatted` gave a valid number.
  * @param place - The validated place.
  * @param owner - Organization and campaign that found it, and the search's area and city.
  * @param owner.organizationId - `Organization.id`.

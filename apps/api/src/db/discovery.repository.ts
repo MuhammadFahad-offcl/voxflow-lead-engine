@@ -421,8 +421,8 @@ export class DiscoveryRepository {
   > {
     const { recordId, campaignId, pause } = search;
     return this.prisma.$transaction(async (tx) => {
-      // Writes the same value: this only proves the status and locks the row, before the record's
-      // row as pauseForCheck does, so the two cannot deadlock.
+      // Writes the same value: this only proves the status and, while DISCOVERING, locks the row
+      // before the record's row, as pauseForCheck does, so the two cannot deadlock on that path.
       const { count: discovering } = await tx.campaign.updateMany({
         where: { id: campaignId, status: 'DISCOVERING' },
         data: { status: 'DISCOVERING' },
