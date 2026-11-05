@@ -150,6 +150,42 @@ describe('idealClientFilter: name keywords', () => {
     });
   });
 
+  it.each([
+    ['Bright Smile Dental Clinic, School Road'],
+    ['Dr Asad Dental Clinic - College Road'],
+    ['Smile Care Hospital Road Lahore'],
+    ['Ali Dental, University Avenue'],
+    ['Fictional Dental, Hospital Rd'],
+    ['Fictional Dental, College Street'],
+  ])('keeps %s: a keyword before a road word is an address', (title) => {
+    expect(idealClientFilter(place({ title }), rules, noChains)).toEqual({ pass: true });
+  });
+
+  it.each([
+    ['Govt Dental Clinic', 'govt'],
+    ['Government Dental Clinic', 'government'],
+    ['City Hospitals', 'hospital'],
+    ['Trust Dental Care', 'trust'],
+    ['Hospital Road Hospital', 'hospital'],
+  ])('still drops %s for the keyword %s', (title, keyword) => {
+    expect(idealClientFilter(place({ title }), rules, noChains)).toEqual({
+      pass: false,
+      reason: `name contains "${keyword}"`,
+    });
+  });
+
+  it('still drops the category "Dental school" and keeps "Trusted Smiles"', () => {
+    const school = place({ categoryName: 'Dental school', categories: [] });
+
+    expect(idealClientFilter(school, rules, noChains)).toEqual({
+      pass: false,
+      reason: 'not a private clinic: category "Dental school"',
+    });
+    expect(idealClientFilter(place({ title: 'Trusted Smiles' }), rules, noChains)).toEqual({
+      pass: true,
+    });
+  });
+
   it('keeps a clinic whose name only contains a keyword inside a longer word', () => {
     const title = 'Fictional Trusted Smiles Dental';
 

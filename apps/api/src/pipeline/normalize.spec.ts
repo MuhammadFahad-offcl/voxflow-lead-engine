@@ -49,6 +49,32 @@ describe('normalizePhone: numbers that are not mobiles', () => {
   });
 });
 
+// Proves a listing with several numbers gives its mobile, else its first valid one (FR-6).
+describe('normalizePhone: several numbers in one listing', () => {
+  it.each([
+    ['0300-1234567 - 0321-7654321', '+923001234567'],
+    ['0300 1234567 or 0321 7654321', '+923001234567'],
+    ['0300 1234567 OR 0321 7654321', '+923001234567'],
+    ['042-35123456, 0300-1234567', '+923001234567'],
+    ['042-35123456 - 0300-1234567', '+923001234567'],
+    ['042 35123456 or 0300 1234567', '+923001234567'],
+    ['042 111 222 333 / 0300-1234567', '+923001234567'],
+  ])('takes the first mobile of %s', (raw, e164) => {
+    expect(normalizePhone(raw)).toEqual({ e164, type: 'MOBILE' });
+  });
+
+  it('keeps the first valid number when none is a mobile', () => {
+    expect(normalizePhone('042 35123456 or 042 35123457')).toEqual({
+      e164: '+924235123456',
+      type: 'LANDLINE',
+    });
+  });
+
+  it('reads a spaced dash inside one number as one number', () => {
+    expect(normalizePhone('0300 - 1234567')).toEqual({ e164: '+923001234567', type: 'MOBILE' });
+  });
+});
+
 // Proves bad input gives "no phone" rather than a wrong number the caller would dial (FR-6).
 describe('normalizePhone: junk', () => {
   it.each([
@@ -132,6 +158,7 @@ describe('normalizeUrl: junk', () => {
     ['https://db.internal'],
     ['printer.lan'],
     ['https://127.0.0.1.nip.io:4000'],
+    ['https://127.0.0.1.sslip.io:4000'],
     ['ftp://example.com'],
     ['file:///etc/hosts'],
     ['mailto:clinic@example.com'],

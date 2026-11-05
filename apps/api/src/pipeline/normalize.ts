@@ -26,24 +26,31 @@ const toPhoneType = (type: PhoneNumberType | undefined): PhoneType => {
 };
 
 // Listings join several numbers with these, e.g. "0300-1234567 / 0321-7654321".
-const NUMBER_SEPARATOR = /[/,;|]/;
+const NUMBER_SEPARATOR = /[/,;|]| or /i;
+// Joins two numbers too, but "0300 - 1234567" is one, so the unsplit text stays a candidate.
+const SPACED_DASH = ' - ';
+
+const readNumber = (text: string): NormalizedPhone[] => {
+  const phone = parsePhoneNumberFromString(text, 'PK');
+  if (phone?.country !== 'PK' || !phone.isValid()) return [];
+  return [{ e164: phone.number, type: toPhoneType(phone.getType()) }];
+};
 
 /**
  * Reads a phone number as written on a listing, assuming Pakistan when it has no country code.
  *
  * Does not keep valid foreign numbers: every stored phone is +92 (FR-6), and v1 only calls Pakistan.
- * Does not keep more than one number: a listing with several gives its first valid Pakistani one.
+ * Does not keep more than one number: a listing with several gives its first mobile, because that
+ * earns the mobile_number signal and takes a call; with no mobile, its first valid Pakistani number.
  * @param raw - The number as scraped, e.g. "0300-1234567" or "042 35123456".
  * @returns The E.164 number and its type; `e164` is null when there is no valid Pakistani number.
  */
 export function normalizePhone(raw: string): NormalizedPhone {
-  for (const part of raw.split(NUMBER_SEPARATOR)) {
-    const phone = parsePhoneNumberFromString(part, 'PK');
-    if (phone?.country === 'PK' && phone.isValid()) {
-      return { e164: phone.number, type: toPhoneType(phone.getType()) };
-    }
-  }
-  return NO_PHONE;
+  const phones = raw
+    .split(NUMBER_SEPARATOR)
+    .flatMap((part) => [...part.split(SPACED_DASH), part])
+    .flatMap(readNumber);
+  return phones.find((phone) => phone.type === 'MOBILE') ?? phones[0] ?? NO_PHONE;
 }
 
 // Ad-click and campaign ids. A list, not "every parameter": a real site can need its own query.
@@ -51,8 +58,9 @@ const TRACKING_PARAM =
   /^(?:utm_.*|gclid|gbraid|wbraid|dclid|fbclid|msclkid|yclid|igshid|mc_[ce]id)$/i;
 // Ends in a letters-only or punycode TLD, which rules out localhost, IP addresses and "N/A".
 const PUBLIC_HOST = /\.(?:[a-z]{2,}|xn--[a-z0-9-]+)$/;
-// These pass the check above but name a local machine; nip.io names resolve to any IP they spell.
-const LOCAL_HOST = /\.(?:localhost|local|internal|lan|nip\.io)$/;
+// Examples only, not a full list: these pass the check above but name a local machine, and nip.io
+// and sslip.io names resolve to any IP they spell. The real guard is #11's resolved-address check.
+const LOCAL_HOST = /\.(?:localhost|local|internal|lan|nip\.io|sslip\.io)$/;
 const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
 
 // A loop, not a /+$ regex: that one backtracks badly on a long scraped path.

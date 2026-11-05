@@ -20,7 +20,7 @@ let prisma: PrismaClient;
 const counts = async () => ({
   organizations: await prisma.organization.count(),
   settings: await prisma.settings.count(),
-  niches: await prisma.nicheProfile.count({ where: { slug: 'dental-clinic', version: 2 } }),
+  niches: await prisma.nicheProfile.count({ where: { slug: 'dental-clinic', version: 3 } }),
   services: await prisma.service.count(),
 });
 
