@@ -38,6 +38,19 @@ export function createLogger(level: LevelWithSilent, destination?: DestinationSt
   return destination === undefined ? pino(options) : pino(options, destination);
 }
 
+/**
+ * Picks the parts of an error that are safe to log.
+ *
+ * Does not keep the message: a Prisma or Apify message can echo row values, phones included.
+ * @param error - Whatever was caught.
+ * @returns The error's name, and its code when it has one (a Prisma `P2028`, a Node `ECONNRESET`).
+ */
+export function errorFields(error: unknown): { errorName: string; errorCode: string | null } {
+  if (!(error instanceof Error)) return { errorName: typeof error, errorCode: null };
+  const code = 'code' in error && typeof error.code === 'string' ? error.code : null;
+  return { errorName: error.name, errorCode: code };
+}
+
 /** The IDs that tie a log line to one campaign, lead or call attempt (NFR-10). */
 export interface LogContext {
   /** `Campaign.id`. */

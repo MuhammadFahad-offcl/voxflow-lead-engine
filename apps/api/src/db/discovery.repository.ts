@@ -116,7 +116,7 @@ export class DiscoveryRepository {
   }
 
   /**
-   * Extends a claim, the check that makes a paid start safe.
+   * Extends a claim before each search, so a live run is not taken for an abandoned one.
    *
    * Does not succeed when the campaign left DISCOVERING (an operator paused it) or another runner
    * took over the lease: both mean this runner must stop.
@@ -179,7 +179,7 @@ export class DiscoveryRepository {
   }
 
   /**
-   * Lists a campaign's Apify cost records, each one search started or stored.
+   * Lists a campaign's Apify cost records: one per search reserved, started, stored or abandoned.
    * @param campaignId - Campaign id.
    * @returns The records.
    */
@@ -210,31 +210,9 @@ export class DiscoveryRepository {
   }
 
   /**
-   * Saves a started run. The amount is its limit until the true charge is known, so a crashed
-   * run still counts against the daily cap.
-   * @param data - Owner, campaign, limit in US dollars, and the search note.
-   * @param data.organizationId - `Organization.id`.
-   * @param data.campaignId - `Campaign.id`.
-   * @param data.amountUsd - The run's charge limit.
-   * @param data.note - From `searchNote`.
-   * @returns The new record's id.
-   */
-  async reserveSearch(data: {
-    organizationId: string;
-    campaignId: string;
-    amountUsd: Prisma.Decimal;
-    note: string;
-  }): Promise<string> {
-    const { id } = await this.prisma.costRecord.create({
-      data: { ...data, service: 'APIFY' },
-      select: { id: true },
-    });
-    return id;
-  }
-
-  /**
    * Checks the daily cap and reserves a run's charge limit in one transaction, before any start.
    *
+   * The amount is the limit until the true charge is known, so a crashed run still counts.
    * The advisory lock makes an organization's runners take turns, so a second one sees the first's
    * reservation. The claim is checked under it and that row stays locked until commit, so a runner
    * whose lease another took over can reserve nothing.

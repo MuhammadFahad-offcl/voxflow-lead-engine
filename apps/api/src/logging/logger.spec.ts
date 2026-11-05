@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import type { DestinationStream } from 'pino';
-import { childLogger, createLogger } from './logger.js';
+import { childLogger, createLogger, errorFields } from './logger.js';
 
 const capture = (): { stream: DestinationStream; lines: () => Record<string, unknown>[] } => {
   const written: string[] = [];
@@ -15,6 +15,26 @@ const capture = (): { stream: DestinationStream; lines: () => Record<string, unk
     lines: () => written.map((line) => JSON.parse(line) as Record<string, unknown>),
   };
 };
+
+// Proves a caught error can be logged without its message, which may echo a phone number (NFR-5).
+describe('errorFields', () => {
+  it('keeps the name and code and drops the message', () => {
+    const error = Object.assign(new Error('value +923000000001 failed'), { code: 'P2002' });
+
+    expect(errorFields(error)).toEqual({ errorName: 'Error', errorCode: 'P2002' });
+  });
+
+  it('gives a null code for an error without one', () => {
+    expect(errorFields(new TypeError('fictional'))).toEqual({
+      errorName: 'TypeError',
+      errorCode: null,
+    });
+  });
+
+  it('names the type of something that is not an error', () => {
+    expect(errorFields('+923000000001')).toEqual({ errorName: 'string', errorCode: null });
+  });
+});
 
 // Proves every line is one JSON object with a word level, ISO time and the campaign/lead/attempt IDs.
 describe('createLogger', () => {
