@@ -4,6 +4,7 @@
  * Serves: FR-3, NFR-1, NFR-2, docs/architecture.md §9, issue #10.
  * Used by: apps/api/src/worker.ts, apps/api/test/campaign-runner.int.spec.ts.
  */
+import { errorFields } from '../logging/logger.js';
 import { discoverCampaign, type DiscoverDeps } from '../pipeline/discover.step.js';
 
 const RUNNER_INTERVAL_MS = 10_000;
@@ -13,8 +14,9 @@ const DISCOVERY_LEASE_MS = 15 * 60 * 1000;
 /**
  * Runs one pass: claims at most one campaign and discovers it.
  *
- * Does not catch errors: {@link startCampaignRunner} logs them. A claim left behind by an error
- * expires with its lease, and the next pass carries on from the campaign's cost records.
+ * Does not catch errors: `discoverCampaign` pauses its campaign on any it can, so what reaches here
+ * means the database refused even the pause. {@link startCampaignRunner} logs it; the claim left
+ * behind expires with its lease, and the next pass carries on from the campaign's cost records.
  * @param deps - What the discover step needs.
  * @returns True when a campaign was claimed; false when there was nothing to do.
  * @throws What `discoverCampaign` throws.
@@ -46,7 +48,7 @@ export function startCampaignRunner(
     try {
       await runCampaignRunnerOnce(deps);
     } catch (error) {
-      deps.logger.error({ error: String(error) }, 'campaign runner pass failed');
+      deps.logger.error(errorFields(error), 'campaign runner pass failed');
     }
     if (!stopped) timer = setTimeout(() => void tick(), intervalMs);
   };
