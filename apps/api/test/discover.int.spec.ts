@@ -4,7 +4,7 @@
  * Serves: FR-5 to FR-8, FR-33, NFR-1, NFR-2; issue #10 acceptance criteria.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
 import type { CompassPlaceItem } from '../src/adapters/lead-source/apify-items.js';
@@ -654,6 +654,119 @@ describe('discoverCampaign: a run that went wrong', () => {
     await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('STOPPED');
 
     expect(await campaignRow(claim.id)).toMatchObject({ status: 'DISCOVERING', foundCount: 3 });
+  });
+});
+
+// Proves a run that went wrong reaches the founder before more is paid, whoever gets to store it.
+describe('discoverCampaign: a failed run racing a pause or a second worker', () => {
+  const failed = () => ({ status: 'FAILED' as const });
+  const pausedCalls = (warn: { mock: { calls: unknown[][] } }) =>
+    warn.mock.calls.filter(([, message]) => message === 'campaign paused');
+
+  it('shows the reason on an operator pause, and pays nothing more on resume', async () => {
+    const warn = jest.spyOn(logger, 'warn');
+    const claim = await newCampaign();
+    const leadSource = new SpyLeadSource({
+      onCollect: async () => {
+        await prisma.campaign.update({
+          where: { id: claim.id },
+          data: { status: 'PAUSED', pausedFrom: 'DISCOVERING' },
+        });
+      },
+      runFor: failed,
+    });
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('STOPPED');
+
+    expect(await campaignRow(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pauseReason: expect.stringContaining('ended as FAILED'),
+    });
+    expect(pausedCalls(warn)).toHaveLength(0);
+
+    const resumed = new SpyLeadSource({ runFor: failed });
+    await expect(discoverCampaign(deps(resumed), await resume(claim.id))).resolves.toBe('PAUSED');
+
+    expect(resumed.starts).toHaveLength(0);
+    expect(resumed.collects).toEqual(leadSource.collects);
+    expect(await campaignRow(claim.id)).toMatchObject({
+      pauseReason: expect.stringContaining('ended as FAILED'),
+      foundCount: 3,
+    });
+    expect(pausedCalls(warn)).toHaveLength(1);
+    warn.mockRestore();
+  });
+
+  it('pauses under the real holder when a stale worker stored the failed run first', async () => {
+    const warn = jest.spyOn(logger, 'warn');
+    const claim = await newCampaign();
+    let holderIsReading = (): void => undefined;
+    const reading = new Promise<void>((resolve) => {
+      holderIsReading = resolve;
+    });
+    const stale = new SpyLeadSource({ onCollect: () => reading, runFor: failed });
+    const stalePass = discoverCampaign(deps(stale), claim);
+    while (stale.collects.length === 0) await sleep(5);
+    const later = new Date(NOW.getTime() + 1);
+    const taken = await takeOver(claim.id, later);
+    const holder = new SpyLeadSource({
+      onCollect: async () => {
+        holderIsReading();
+        await stalePass;
+      },
+      runFor: failed,
+    });
+
+    // Its own clock: renewing at NOW would hand the stale worker its lease value back.
+    await expect(discoverCampaign({ ...deps(holder), now: () => later }, taken)).resolves.toBe(
+      'PAUSED',
+    );
+
+    await expect(stalePass).resolves.toBe('STOPPED');
+    expect(await campaignRow(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pauseReason: expect.stringContaining('ended as FAILED'),
+      foundCount: 3,
+      discoveryClaimedAt: null,
+    });
+    expect(holder.starts).toHaveLength(0);
+    expect(pausedCalls(warn)).toHaveLength(1);
+    warn.mockRestore();
+  });
+
+  it('stores nothing from a stale start into an abandoned record, keeping its run id', async () => {
+    const warn = jest.spyOn(logger, 'warn');
+    const claim = await newCampaign();
+    let finishStart = (): void => undefined;
+    const stuck = new Promise<void>((resolve) => {
+      finishStart = resolve;
+    });
+    const stale = new SpyLeadSource({
+      onStart: (startNumber) => (startNumber === 1 ? stuck : Promise.resolve()),
+    });
+    const stalePass = discoverCampaign(deps(stale), claim);
+    while (stale.starts.length === 0) await sleep(5);
+    const taken = await takeOver(claim.id, new Date(NOW.getTime() + 1));
+    await expect(discoverCampaign(deps(new SpyLeadSource()), taken)).resolves.toBe('PAUSED');
+    await expect(discoverCampaign(deps(new SpyLeadSource()), await resume(claim.id))).resolves.toBe(
+      'ENRICHING',
+    );
+
+    finishStart();
+
+    await expect(stalePass).resolves.toBe('STOPPED');
+    expect(await campaignRow(claim.id)).toMatchObject({
+      status: 'ENRICHING',
+      foundCount: 12,
+      duplicateCount: 1,
+    });
+    const abandoned = (await notes(claim.id)).find(({ state }) => state === 'ABANDONED');
+    expect(abandoned).toMatchObject({ amountUsd: '0.61', runId: expect.any(String) });
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ runId: abandoned?.runId }),
+      expect.stringContaining('not stored'),
+    );
+    warn.mockRestore();
   });
 });
 
