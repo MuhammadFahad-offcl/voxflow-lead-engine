@@ -15,7 +15,7 @@ import { Prisma } from '../src/generated/prisma/client.js';
 import { createLogger } from '../src/logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from '../src/pipeline/area-polygons.js';
 import { discoverCampaign, type DiscoverDeps } from '../src/pipeline/discover.step.js';
-import { searchNote } from '../src/pipeline/search-plan.js';
+import { readSearchNote, searchNote } from '../src/pipeline/search-plan.js';
 import { karachiDayStart } from '../src/pipeline/spend-cap.js';
 import type { CollectedRun, LeadSourcePort, PlaceSearch } from '../src/ports/lead-source.port.js';
 import { createTestDatabase } from './test-database.js';
@@ -111,9 +111,26 @@ const setApifyCap = async (apifyDailyUsd: string): Promise<void> => {
 const spendEarlier = (amountUsd: string, at: Date) =>
   prisma.costRecord.create({ data: { organizationId, service: 'APIFY', amountUsd, at } });
 
+// A search's record as an earlier pass left it; a null run id is what a crash leaves.
+const reservedSearch = (campaignId: string, amountUsd: string, runId: string | null) =>
+  prisma.costRecord.create({
+    data: {
+      organizationId,
+      campaignId,
+      service: 'APIFY',
+      amountUsd,
+      note: searchNote({ term: 'dental clinic', area: 'DHA', runId }),
+    },
+  });
+
 const campaignRow = (id: string) => prisma.campaign.findUniqueOrThrow({ where: { id } });
 const costs = (campaignId: string) =>
   prisma.costRecord.findMany({ where: { campaignId }, orderBy: { at: 'asc' } });
+const notes = async (campaignId: string) =>
+  (await costs(campaignId)).map(({ note, amountUsd }) => ({
+    ...readSearchNote(note),
+    amountUsd: amountUsd.toFixed(2),
+  }));
 const lead = (placeId: string) =>
   prisma.lead.findUniqueOrThrow({
     where: { organizationId_placeId: { organizationId, placeId } },
@@ -355,6 +372,40 @@ describe('discoverCampaign: the Apify daily cap', () => {
   });
 });
 
+// Proves the review's first blocker: a run with no saved id is never paid for again on its own.
+describe('discoverCampaign: a record with no run id', () => {
+  it('pauses and starts nothing, keeping the reservation', async () => {
+    const claim = await newCampaign();
+    await reservedSearch(claim.id, '0.61', null);
+    const leadSource = new SpyLeadSource();
+
+    await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
+
+    expect(leadSource.starts).toHaveLength(0);
+    expect((await campaignRow(claim.id)).pauseReason).toContain('Check the Apify console first');
+    expect(await notes(claim.id)).toEqual([
+      expect.objectContaining({ runId: null, state: 'CHECK_APIFY', amountUsd: '0.61' }),
+    ]);
+  });
+
+  it('on resume, abandons it, keeps its amount and starts under a new reservation', async () => {
+    const claim = await newCampaign();
+    await reservedSearch(claim.id, '0.61', null);
+    await discoverCampaign(deps(new SpyLeadSource()), claim);
+    const resumed = new SpyLeadSource();
+
+    await expect(discoverCampaign(deps(resumed), await resume(claim.id))).resolves.toBe(
+      'ENRICHING',
+    );
+
+    expect(resumed.starts.filter((search) => search.term === 'dental clinic')).toHaveLength(1);
+    expect(await notes(claim.id)).toContainEqual(
+      expect.objectContaining({ state: 'ABANDONED', amountUsd: '0.61' }),
+    );
+    expect(await costs(claim.id)).toHaveLength(5);
+  });
+});
+
 // Proves discover can stop anywhere and finish later with the same counts and no extra paid run.
 describe('discoverCampaign: stopping and carrying on', () => {
   const expected = { status: 'ENRICHING', foundCount: 12, duplicateCount: 1, filteredCount: 2 };
@@ -383,12 +434,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
   it('reattaches to a run saved before a crash, instead of paying again', async () => {
     const claim = await newCampaign();
     const runId = JSON.stringify({ term: 'dental clinic', area: 'DHA', maxResults: 100 });
-    await repository.reserveSearch({
-      organizationId,
-      campaignId: claim.id,
-      amountUsd: new Prisma.Decimal('0.61'),
-      note: searchNote({ term: 'dental clinic', area: 'DHA', runId }),
-    });
+    await reservedSearch(claim.id, '0.61', runId);
     const leadSource = new SpyLeadSource();
 
     await discoverCampaign(deps(leadSource), claim);
@@ -402,12 +448,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
 
   it('counts an unfinished run at its limit against the cap', async () => {
     const earlier = await newCampaign();
-    await repository.reserveSearch({
-      organizationId,
-      campaignId: earlier.id,
-      amountUsd: new Prisma.Decimal('1.50'),
-      note: searchNote({ term: 'dental clinic', area: 'DHA', runId: 'fictional' }),
-    });
+    await reservedSearch(earlier.id, '1.50', 'fictional');
     const leadSource = new SpyLeadSource();
 
     await discoverCampaign(deps(leadSource), await newCampaign());
@@ -432,7 +473,7 @@ describe('discoverCampaign: stopping and carrying on', () => {
     expect(await campaignRow(claim.id)).toMatchObject(expected);
   });
 
-  it('after a failed start, pauses and tells the founder to check for a run', async () => {
+  it('after a failed start, pauses, keeps the reservation and asks for a check', async () => {
     const leadSource = new SpyLeadSource({
       onStart: (startNumber) =>
         startNumber === 2 ? Promise.reject(new Error('fictional 503')) : Promise.resolve(),
@@ -442,8 +483,15 @@ describe('discoverCampaign: stopping and carrying on', () => {
     await expect(discoverCampaign(deps(leadSource), claim)).resolves.toBe('PAUSED');
 
     expect(leadSource.starts).toHaveLength(2);
-    expect((await campaignRow(claim.id)).pauseReason).toContain('check the Apify console');
-    expect(await costs(claim.id)).toHaveLength(1);
+    expect((await campaignRow(claim.id)).pauseReason).toContain('Check the Apify console first');
+    expect(await notes(claim.id)).toContainEqual(
+      expect.objectContaining({
+        term: 'dentist',
+        runId: null,
+        state: 'CHECK_APIFY',
+        amountUsd: '0.61',
+      }),
+    );
   });
 
   it('stops without another start when an operator pauses it mid-run', async () => {

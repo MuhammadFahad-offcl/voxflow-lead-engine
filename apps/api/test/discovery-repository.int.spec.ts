@@ -31,13 +31,12 @@ const newClaim = async (): Promise<Claim> => {
   return { id, claimedAt };
 };
 
-const reserve = (campaignId: string, amountUsd = '0.61'): Promise<string> =>
-  repository.reserveSearch({
-    organizationId,
-    campaignId,
-    amountUsd: new Prisma.Decimal(amountUsd),
-    note: 'fictional note',
+const reserve = async (campaignId: string, amountUsd = '0.61'): Promise<string> => {
+  const { id } = await prisma.costRecord.create({
+    data: { organizationId, campaignId, service: 'APIFY', amountUsd, note: 'fictional note' },
   });
+  return id;
+};
 
 const row = (campaignId: string, placeId: string): Prisma.LeadCreateManyInput => ({
   organizationId,

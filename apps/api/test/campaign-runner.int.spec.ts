@@ -222,11 +222,14 @@ describe('campaign runner lease', () => {
     await claimedAgo(id, LEASE_MS + 60_000);
     const search = { term: 'dental clinic', area: 'DHA', maxResults: 100 };
     const { organizationId } = await row(id);
-    await deps.repository.reserveSearch({
-      organizationId,
-      campaignId: id,
-      amountUsd: deps.leadSource.chargeLimitUsd(100),
-      note: searchNote({ term: search.term, area: search.area, runId: JSON.stringify(search) }),
+    await prisma.costRecord.create({
+      data: {
+        organizationId,
+        campaignId: id,
+        service: 'APIFY',
+        amountUsd: deps.leadSource.chargeLimitUsd(100),
+        note: searchNote({ term: search.term, area: search.area, runId: JSON.stringify(search) }),
+      },
     });
 
     await expect(runCampaignRunnerOnce(deps)).resolves.toBe(true);

@@ -8,12 +8,12 @@ import { IdealClient, SpendCaps } from '@voxflow/shared';
 import { CompassPlaceItem } from '../adapters/lead-source/apify-items.js';
 import type { Claim, DiscoveryCampaign, DiscoveryRepository } from '../db/discovery.repository.js';
 import { Prisma } from '../generated/prisma/client.js';
-import type { Logger } from '../logging/logger.js';
+import { errorFields, type Logger } from '../logging/logger.js';
 import type { LeadSourcePort, PlaceSearch } from '../ports/lead-source.port.js';
 import { findAreaPolygon, missingAreas, type AreaPolygons } from './area-polygons.js';
 import { countChainNames, idealClientFilter } from './ideal-client-filter.js';
 import { buildGrid, readSearchNote, searchKey, searchNote, toLeadRow } from './search-plan.js';
-import { capPauseReason, karachiDayStart, wouldPassCap } from './spend-cap.js';
+import { capPauseReason, karachiDayStart } from './spend-cap.js';
 
 /** What the step needs from outside. */
 export interface DiscoverDeps {
@@ -28,78 +28,142 @@ export interface DiscoverDeps {
 /** How a discover pass ended. */
 type DiscoverResult = 'ENRICHING' | 'PAUSED' | 'STOPPED';
 
-/** A search this campaign already started, read back from its cost record. */
-interface StartedSearch {
+/** A search this campaign already reserved, read back from its cost record. */
+interface KnownSearch {
   recordId: string;
-  runId: string;
+  /** Null when no run id was saved: the run may or may not exist. */
+  runId: string | null;
+  /** True once a pass paused so the founder could look for this search's run. */
+  checkRequested: boolean;
   stored: boolean;
 }
+
+/** A search with a run to read. */
+interface StartedRun {
+  recordId: string;
+  runId: string;
+}
+
+/** Why a search could not go on. `uncertainRecordId` names a record whose run may exist. */
+type SearchStop =
+  { kind: 'PAUSE'; reason: string; uncertainRecordId?: string } | { kind: 'CLAIM_LOST' };
 
 /** One grid cell with everything needed to run it. */
 type GridCell = Pick<PlaceSearch, 'term' | 'area' | 'polygon'>;
 
-const readStartedSearches = async (
+// What every pause over a possible run tells the founder: the check comes before the resume.
+const CHECK_FIRST =
+  "Check the Apify console first. Resuming means you checked: a new run starts for this search, and the amount already reserved stays on the day's total.";
+
+const readKnownSearches = async (
   repository: DiscoveryRepository,
   campaignId: string,
-): Promise<Map<string, StartedSearch>> => {
-  const started = new Map<string, StartedSearch>();
+): Promise<Map<string, KnownSearch>> => {
+  const known = new Map<string, KnownSearch>();
   for (const { id, note, units } of await repository.searchRecords(campaignId)) {
     const search = readSearchNote(note);
-    const runId = search?.runId ?? null;
-    if (search === null || runId === null) continue;
-    const entry = { recordId: id, runId, stored: units !== null };
-    started.set(searchKey(search), entry);
+    // An abandoned record is closed: its search goes on under a newer record, or a new one.
+    if (search === null || search.state === 'ABANDONED') continue;
+    known.set(searchKey(search), {
+      recordId: id,
+      runId: search.runId,
+      checkRequested: search.state === 'CHECK_APIFY',
+      stored: units !== null,
+    });
   }
-  return started;
+  return known;
 };
 
-// Returns the started search, or why the campaign must pause instead.
+// The reservation is committed before the request goes out, and no transaction spans the request.
 const startPaidRun = async (
   deps: DiscoverDeps,
   campaign: DiscoveryCampaign,
+  claim: Claim,
   cell: GridCell,
-): Promise<{ reason: string } | StartedSearch> => {
+): Promise<SearchStop | StartedRun> => {
   const { repository, leadSource } = deps;
+  const { term, area } = cell;
   const { organizationId, city, maxResultsPerSearch: maxResults } = campaign;
   const caps = SpendCaps.parse(campaign.organization.settings?.spendCaps);
-  const cap = new Prisma.Decimal(caps.apifyDailyUsd);
+  const capUsd = new Prisma.Decimal(caps.apifyDailyUsd);
   const chargeLimitUsd = leadSource.chargeLimitUsd(maxResults);
-  const spent = await repository.apifySpentSince(organizationId, karachiDayStart(deps.now()));
-  if (wouldPassCap(spent, chargeLimitUsd, cap)) {
-    return { reason: capPauseReason(spent, chargeLimitUsd, cap) };
+  const now = deps.now();
+  const reservation = await repository.reserveWithinCap(claim, {
+    organizationId,
+    amountUsd: chargeLimitUsd,
+    capUsd,
+    dayStart: karachiDayStart(now),
+    at: now,
+    note: searchNote({ term, area, runId: null }),
+  });
+  if (reservation.outcome === 'CLAIM_LOST') return { kind: 'CLAIM_LOST' };
+  if (reservation.outcome === 'OVER_CAP') {
+    return { kind: 'PAUSE', reason: capPauseReason(reservation.spent, chargeLimitUsd, capUsd) };
   }
+  const { recordId } = reservation;
   let runId: string;
   try {
     runId = await leadSource.start({ ...cell, city, maxResults, chargeLimitUsd });
   } catch (error) {
-    deps.logger.error({ campaignId: campaign.id, error: String(error) }, 'Apify start failed');
+    deps.logger.error({ campaignId: campaign.id, ...errorFields(error) }, 'Apify start failed');
     // Not resumed by itself: the failed request may still have started a charging run.
     return {
-      reason: `Apify start failed for "${cell.term}" in ${cell.area}. A run may exist: check the Apify console before resuming.`,
+      kind: 'PAUSE',
+      reason: `Apify start failed for "${term}" in ${area}, but a run may exist. ${CHECK_FIRST}`,
+      uncertainRecordId: recordId,
     };
   }
-  const note = searchNote({ term: cell.term, area: cell.area, runId });
-  const recordId = await repository.reserveSearch({
-    organizationId,
-    campaignId: campaign.id,
-    amountUsd: chargeLimitUsd,
-    note,
-  });
-  return { recordId, runId, stored: false };
+  try {
+    await repository.saveRunId(recordId, runId);
+  } catch (error) {
+    deps.logger.error(
+      { campaignId: campaign.id, runId, ...errorFields(error) },
+      'run id not saved',
+    );
+    return {
+      kind: 'PAUSE',
+      reason: `Apify run ${runId} started for "${term}" in ${area}, but its id could not be saved. ${CHECK_FIRST}`,
+      uncertainRecordId: recordId,
+    };
+  }
+  return { recordId, runId };
+};
+
+// Decides what a known search needs next; only the founder's resume can lead to a new paid run.
+const continueSearch = async (
+  deps: DiscoverDeps,
+  campaign: DiscoveryCampaign,
+  claim: Claim,
+  cell: GridCell,
+  known: KnownSearch,
+): Promise<SearchStop | StartedRun> => {
+  const { recordId, runId } = known;
+  if (runId !== null) return { recordId, runId };
+  if (!known.checkRequested) {
+    return {
+      kind: 'PAUSE',
+      reason: `A paid run for "${cell.term}" in ${cell.area} may have started, but no run id was saved. ${CHECK_FIRST}`,
+      uncertainRecordId: recordId,
+    };
+  }
+  await deps.repository.abandonSearch(recordId);
+  deps.logger.warn({ campaignId: campaign.id, recordId }, 'search abandoned on resume');
+  return startPaidRun(deps, campaign, claim, cell);
 };
 
 const collectAndStore = async (
   deps: DiscoverDeps,
   campaign: DiscoveryCampaign,
   cell: GridCell,
-  search: StartedSearch,
-): Promise<{ reason: string } | null> => {
+  search: StartedRun,
+): Promise<SearchStop | null> => {
   let collected;
   try {
     collected = await deps.leadSource.collect(search.runId);
   } catch (error) {
-    deps.logger.error({ campaignId: campaign.id, error: String(error) }, 'Apify read failed');
+    deps.logger.error({ campaignId: campaign.id, ...errorFields(error) }, 'Apify read failed');
     return {
+      kind: 'PAUSE',
       reason: `Could not read the Apify run for "${cell.term}" in ${cell.area}. Resuming reads it again without paying.`,
     };
   }
@@ -115,15 +179,19 @@ const collectAndStore = async (
   return null;
 };
 
-// Picks a search up from wherever it got to; returns why to pause, or null once it is stored.
+// Picks a search up from wherever it got to; returns why it stopped, or null once it is stored.
 const runSearch = async (
   deps: DiscoverDeps,
   campaign: DiscoveryCampaign,
+  claim: Claim,
   cell: GridCell,
-  known: StartedSearch | undefined,
-): Promise<{ reason: string } | null> => {
-  const search = known ?? (await startPaidRun(deps, campaign, cell));
-  if ('reason' in search) return search;
+  known: KnownSearch | undefined,
+): Promise<SearchStop | null> => {
+  const search =
+    known === undefined
+      ? await startPaidRun(deps, campaign, claim, cell)
+      : await continueSearch(deps, campaign, claim, cell, known);
+  if ('kind' in search) return search;
   return collectAndStore(deps, campaign, cell, search);
 };
 
@@ -155,12 +223,16 @@ const filterAndFinish = async (
 /**
  * Runs what is left of a campaign's grid, then the filter, then moves it to ENRICHING.
  *
- * Safe to repeat: a search's `CostRecord` is the proof of what happened. A stored one is skipped,
- * an unfinished one is collected again from its saved run id, and only a search with no record
- * starts a paid run, after the claim is renewed and the daily cap is checked.
- * Does not close this one gap: a crash after Apify accepts a start and before the run id is saved
- * leaves no record, so that search starts a second paid run on restart. The first run is
- * bounded by its own charge limit and is not in the daily total.
+ * Safe to repeat: a search's `CostRecord` is the proof of what happened. It is written before the
+ * start, holding the run's charge limit, by the same transaction that checks the daily cap; the run
+ * id follows the start. A stored search is skipped, one with a run id is collected again, and only
+ * a search with no record starts a paid run.
+ * A record with no run id means a run may or may not exist, so this pauses instead of starting one
+ * and the reason sends the founder to the Apify console. Resuming means "I checked": the record is
+ * marked abandoned, keeps its reserved amount on the day's total, and a new run starts for that
+ * search under a new reservation.
+ * Does not know whether the founder really checked: resuming without checking can pay for one extra
+ * run, capped by that run's limit and counted in the day's total.
  * Does not stop for one bad item, nor retry a failed start: it pauses with a reason, and resuming
  * is the founder's decision.
  * @param deps - Its dependencies.
@@ -174,14 +246,22 @@ export async function discoverCampaign(
   claimed: Claim,
 ): Promise<DiscoverResult> {
   const { repository, polygons } = deps;
-  const pause = async (reason: string, claim: Claim): Promise<DiscoverResult> => {
-    deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
-    return (await repository.pause(claim, reason)) ? 'PAUSED' : 'STOPPED';
-  };
   const stop = async (claim: Claim): Promise<DiscoverResult> => {
     // Otherwise a campaign an operator paused and resumed would wait out the whole lease.
     await repository.releaseClaim(claim);
     return 'STOPPED';
+  };
+  const pause = async (
+    reason: string,
+    claim: Claim,
+    uncertainRecordId?: string,
+  ): Promise<DiscoverResult> => {
+    deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
+    const paused =
+      uncertainRecordId === undefined
+        ? await repository.pause(claim, reason)
+        : await repository.pauseForCheck(claim, uncertainRecordId, reason);
+    return paused ? 'PAUSED' : stop(claim);
   };
   const campaign = await repository.loadCampaign(claimed.id);
   const { city, areas } = campaign;
@@ -191,15 +271,17 @@ export async function discoverCampaign(
   }
 
   let claim = claimed;
-  const started = await readStartedSearches(repository, campaign.id);
+  const searches = await readKnownSearches(repository, campaign.id);
   for (const { term, area } of buildGrid(campaign.nicheProfile.searchTerms, areas)) {
-    const known = started.get(searchKey({ term, area }));
+    const known = searches.get(searchKey({ term, area }));
     if (known?.stored === true) continue;
     const renewed = await repository.renewClaim(claim, deps.now());
     if (renewed === null) return stop(claim);
     claim = renewed;
-    const failure = await runSearch(deps, campaign, cellOf(polygons, city, term, area), known);
-    if (failure !== null) return pause(failure.reason, claim);
+    const cell = cellOf(polygons, city, term, area);
+    const stopped = await runSearch(deps, campaign, claim, cell, known);
+    if (stopped?.kind === 'CLAIM_LOST') return stop(claim);
+    if (stopped !== null) return pause(stopped.reason, claim, stopped.uncertainRecordId);
   }
   return (await filterAndFinish(deps, campaign, claim)) ? 'ENRICHING' : stop(claim);
 }
