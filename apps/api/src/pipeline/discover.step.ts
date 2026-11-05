@@ -177,6 +177,11 @@ export async function discoverCampaign(
     deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
     return (await repository.pause(claim, reason)) ? 'PAUSED' : 'STOPPED';
   };
+  const stop = async (claim: Claim): Promise<DiscoverResult> => {
+    // Otherwise a campaign an operator paused and resumed would wait out the whole lease.
+    await repository.releaseClaim(claim);
+    return 'STOPPED';
+  };
   const campaign = await repository.loadCampaign(claimed.id);
   const { city, areas } = campaign;
   const missing = missingAreas(polygons, city, areas);
@@ -190,10 +195,10 @@ export async function discoverCampaign(
     const known = started.get(searchKey({ term, area }));
     if (known?.stored === true) continue;
     const renewed = await repository.renewClaim(claim, deps.now());
-    if (renewed === null) return 'STOPPED';
+    if (renewed === null) return stop(claim);
     claim = renewed;
     const failure = await runSearch(deps, campaign, cellOf(polygons, city, term, area), known);
     if (failure !== null) return pause(failure.reason, claim);
   }
-  return (await filterAndFinish(deps, campaign, claim)) ? 'ENRICHING' : 'STOPPED';
+  return (await filterAndFinish(deps, campaign, claim)) ? 'ENRICHING' : stop(claim);
 }

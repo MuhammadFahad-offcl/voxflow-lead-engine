@@ -42,6 +42,37 @@ export class DiscoveryRepository {
   constructor(private readonly prisma: PrismaProvider) {}
 
   /**
+   * Claims the oldest campaign waiting for discovery, or one whose runner's lease ran out.
+   *
+   * The UPDATE repeats the condition, so when two runners pick the same campaign Postgres makes
+   * the second wait and re-check: it matches nothing, and only one claim comes back.
+   * @param now - The lease time; it is also the claim's proof of ownership.
+   * @param leaseMs - How old a claim must be to count as abandoned, in milliseconds.
+   * @returns The claim, or null when nothing is free or another runner won.
+   */
+  async claimNext(now: Date, leaseMs: number): Promise<Claim | null> {
+    const claimable = {
+      status: 'DISCOVERING',
+      OR: [
+        { discoveryClaimedAt: null },
+        { discoveryClaimedAt: { lt: new Date(now.getTime() - leaseMs) } },
+      ],
+    } satisfies Prisma.CampaignWhereInput;
+    const candidate = await this.prisma.campaign.findFirst({
+      where: claimable,
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    if (candidate === null) return null;
+    const claimed = await this.prisma.campaign.updateManyAndReturn({
+      where: { id: candidate.id, ...claimable },
+      data: { discoveryClaimedAt: now },
+      select: { id: true },
+    });
+    return claimed.length === 1 ? { id: candidate.id, claimedAt: now } : null;
+  }
+
+  /**
    * Reads a campaign for discovery.
    * @param id - Campaign id.
    * @returns The campaign with its niche and settings.

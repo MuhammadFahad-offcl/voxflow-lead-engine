@@ -5,6 +5,7 @@
  * Used by: apps/api/src/bootstrap.ts.
  */
 import { HazelModule } from '@hazeljs/core';
+import { DiscoveryRepository } from './db/discovery.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
 
@@ -13,5 +14,5 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
  *
  * Does not declare `GET /health` or `GET /ready`: they are built into `HazelApp`.
  */
-@HazelModule({ imports: [CampaignsModule], providers: [PrismaProvider] })
+@HazelModule({ imports: [CampaignsModule], providers: [PrismaProvider, DiscoveryRepository] })
 export class AppModule {}

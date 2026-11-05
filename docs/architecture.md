@@ -133,7 +133,9 @@ sequenceDiagram
 ### 5.1 Campaign stage (function code, no LLM)
 
 1. **Grid** (FR-2): `searchTerms × areas` from the niche profile and campaign. Each search capped at `maxResultsPerSearch` (default 100). If the chosen Apify actor supports a city-wide or polygon search with equal coverage, the grid collapses to one search per term — decided in Cycle 1 and recorded in ADR-0010.
-2. **Discover** (FR-5–FR-8): run the actor per search, validate each item with the `ApifyPlace` Zod schema, normalize phone to E.164 `+92…` and URL, upsert by `(organizationId, placeId)`. A row that already exists increments the campaign's `duplicateCount` and is not re-processed. Ideal-client filter sets `status = FILTERED_OUT` + `filterReason`.
+2. **Discover** (FR-5–FR-8, ADR-0015 pass 1): run Compass per search with the area's polygon from `config/areas/`, validate each item with `CompassPlaceItem` (an invalid item is logged by place ID and skipped), normalize phone to E.164 `+92…` and URL, insert by `(organizationId, placeId)`. A row that already exists increments the campaign's `duplicateCount` and is not re-processed. After the last search, the ideal-client filter sets `status = FILTERED_OUT` + `filterReason`, because chains need the whole campaign's names.
+   - **Paying once:** each search has one `CostRecord`, saved with its run ID right after `LeadSourcePort.start` and holding the run's charge limit until `collect` gives the true charge. A stored search is skipped; an unfinished one is collected again from its run ID. A crash between Apify accepting a start and that save is the one gap left: the search would start a second paid run on restart.
+   - **Stopping:** before each start the runner renews its lease on `Campaign.discoveryClaimedAt`, and pauses the campaign with a `pauseReason` if the day's Apify spend (Asia/Karachi day) plus the run's charge limit would pass the cap. An area with no polygon pauses it before any charge.
 
 ### 5.2 Lead stage — one `AgentGraph` run per lead
 
@@ -184,7 +186,7 @@ Checked before every `placeCall` (FR-21). Each denial is stored on the attempt a
 
 | Port             | Real adapter                                                      | Fake adapter (demo + tests)                                          | Used by                |
 | ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------- |
-| `LeadSourcePort` | Apify actor (chosen Cycle 1)                                      | `fixtures/places/*.json`                                             | discover               |
+| `LeadSourcePort` | Apify: Compass places (ADR-0015); reviews come in #12             | `fixtures/places/*.json`                                             | discover               |
 | `WebReaderPort`  | fetch + Cheerio, Lightpanda via `puppeteer-core` CDP              | `fixtures/sites/*.html`                                              | enrich                 |
 | `WebContextPort` | Perplexity Search API                                             | `fixtures/context/*.json`                                            | enrich                 |
 | `LlmPort`        | `@hazeljs/ai` → Anthropic (and OpenAI for the Cycle 2 comparison) | recorded responses in `fixtures/llm/`                                | agents                 |
