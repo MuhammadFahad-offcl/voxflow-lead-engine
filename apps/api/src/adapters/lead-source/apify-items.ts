@@ -4,10 +4,11 @@
  *
  * Serves: FR-5 (discovery), FR-8 (filter fields), FR-10/FR-14 (phone, website, booking links),
  * FR-11 (the 30 newest reviews), ADR-0015 (hybrid two-pass design), CLAUDE.md (validate Apify items).
- * Used by: apps/api/src/adapters/lead-source/apify-items.spec.ts,
- * apps/api/src/pipeline/ideal-client-filter.ts; the Apify adapter in #10.
+ * Used by: apps/api/src/adapters/lead-source/ (adapters and spec), apps/api/src/ports/lead-source.port.ts,
+ * apps/api/src/pipeline/ideal-client-filter.ts.
  */
 import { z } from 'zod';
+import type { Logger } from '../../logging/logger.js';
 
 // Apify returns dates as ISO strings; anything Date cannot read is refused here, not at scoring time.
 const IsoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), 'not a date');
@@ -49,6 +50,30 @@ export const CompassPlaceItem = z.object({
 });
 /** Parsed Compass place. Shares the schema's name so one import gives both. */
 export type CompassPlaceItem = z.infer<typeof CompassPlaceItem>;
+
+const WithPlaceId = z.object({ placeId: z.string() });
+
+/**
+ * Validates dataset items, keeping the good ones.
+ *
+ * Does not throw on a bad item: one strange place must not lose a paid run. Logs its place id only,
+ * never the item or the Zod message, because both can hold a phone number.
+ * @param items - Raw dataset items.
+ * @param logger - Where to report what was skipped.
+ * @returns The valid places, in order.
+ */
+export function parsePlaceItems(
+  items: readonly unknown[],
+  logger: Pick<Logger, 'warn'>,
+): CompassPlaceItem[] {
+  return items.flatMap((item) => {
+    const place = CompassPlaceItem.safeParse(item);
+    if (place.success) return [place.data];
+    const placeId = WithPlaceId.safeParse(item).data?.placeId ?? 'unknown';
+    logger.warn({ placeId }, 'skipped an invalid Apify place item');
+    return [];
+  });
+}
 
 /**
  * One review from scraperlink/google-maps-scraper.
