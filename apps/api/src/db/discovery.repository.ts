@@ -7,6 +7,7 @@
 import { Injectable } from '@hazeljs/core';
 import { Prisma, type CostRecord } from '../generated/prisma/client.js';
 import { TEMPORARILY_CLOSED_REASON } from '../pipeline/ideal-client-filter.js';
+import { readSearchNote } from '../pipeline/search-plan.js';
 import { wouldPassCap } from '../pipeline/spend-cap.js';
 import { PrismaProvider } from './prisma.provider.js';
 
@@ -32,6 +33,23 @@ export type SearchRecord = Pick<CostRecord, 'id' | 'note' | 'units'>;
 interface Rejection {
   leadId: string;
   reason: string;
+}
+
+/** A finished search and what it returned, for {@link DiscoveryRepository.storeSearch}. */
+interface SearchToStore {
+  recordId: string;
+  campaignId: string;
+  rows: Prisma.LeadCreateManyInput[];
+  openPlaceIds?: readonly string[];
+  costUsd: Prisma.Decimal | null;
+  pause?: { claim: Claim; reason: string };
+}
+
+/** How a search's results counted. */
+interface StoredCounts {
+  created: number;
+  reopened: number;
+  duplicates: number;
 }
 
 /** What {@link DiscoveryRepository.reserveWithinCap} decided. */
@@ -93,6 +111,47 @@ const reopenPlaces = async (
     });
   }
   return closed.length;
+};
+
+// Marks the search done and adds its places and counts; the caller holds the record's row.
+const writeSearch = async (
+  tx: Prisma.TransactionClient,
+  search: SearchToStore,
+): Promise<StoredCounts> => {
+  const { recordId, campaignId, rows, openPlaceIds = [], costUsd } = search;
+  await tx.costRecord.update({
+    where: { id: recordId },
+    data: { units: rows.length, ...(costUsd === null ? {} : { amountUsd: costUsd }) },
+  });
+  const created = await tx.lead.createManyAndReturn({
+    data: rows,
+    skipDuplicates: true,
+    select: { placeId: true },
+  });
+  const createdIds = new Set(created.map(({ placeId }) => placeId));
+  const open = new Set(openPlaceIds);
+  const repeats = rows.filter(({ placeId }) => open.has(placeId) && !createdIds.has(placeId));
+  const reopened = await reopenPlaces(tx, campaignId, repeats);
+  const duplicates = rows.length - created.length - reopened;
+  await tx.campaign.update({
+    where: { id: campaignId },
+    data: { foundCount: { increment: rows.length }, duplicateCount: { increment: duplicates } },
+  });
+  return { created: created.length, reopened, duplicates };
+};
+
+// An operator's pause has no reason, and a reason already there is the one the founder should read.
+const addPauseReason = async (
+  tx: Prisma.TransactionClient,
+  campaignId: string,
+  reason: string | undefined,
+): Promise<boolean> => {
+  if (reason === undefined) return false;
+  const { count } = await tx.campaign.updateMany({
+    where: { id: campaignId, status: 'PAUSED', pausedFrom: 'DISCOVERING', pauseReason: null },
+    data: { pauseReason: reason },
+  });
+  return count === 1;
 };
 
 /** Reads and writes what discovery needs. */
@@ -292,7 +351,8 @@ export class DiscoveryRepository {
   /**
    * Writes a started run's id into its reservation, so a restart collects instead of paying again.
    *
-   * Does not check the claim: the run exists whoever holds the campaign now, so its id must be kept.
+   * Does not check the claim or the record's state: the run exists whoever holds the campaign now,
+   * so its id must be kept, even on an abandoned record that {@link storeSearch} will refuse.
    * @param recordId - The search's `CostRecord.id`.
    * @param runId - The id Apify gave the run.
    */
@@ -318,8 +378,15 @@ export class DiscoveryRepository {
    *
    * A pause rides in the same transaction: the search counts as done from here on, so a crash
    * between the two would lose the only word that it went wrong.
-   * Setting `units` is what marks the search done. It comes first and only a null matches, so a
-   * second runner that collected the same run waits on the row, matches nothing and adds nothing.
+   * Setting `units` is what marks the search done. The record's row is locked first, so a second
+   * runner that collected the same run waits there, finds `units` set and adds nothing.
+   * Refuses a record that was abandoned, because a newer record covers its search, and a campaign
+   * that is not discovering, because a late worker must not change a campaign that moved on. The
+   * refused run keeps its reserved amount and nothing is marked done, so a campaign that resumes
+   * reads the same run again without paying. The caller logs the run id.
+   * When a pause cannot apply because the campaign is already paused from DISCOVERING with no
+   * reason, as an operator's pause is, the reason is written there: the founder reads it before
+   * resuming. Does not overwrite a reason that is already set.
    * Does not touch places already stored (FR-7), with one exception: a place filtered out as
    * temporarily closed that this search shows open moves to this campaign with its fresh data, back
    * in DISCOVERED, so the filter judges it again at the end of the pass. It counts as new here, not
@@ -334,43 +401,33 @@ export class DiscoveryRepository {
    * @param search.pause.claim - The claim held.
    * @param search.pause.reason - Shown on the dashboard.
    * @returns How many results were new, reopened or duplicates, and whether the campaign paused;
-   * null when already stored.
+   * `refused` when nothing was stored, with whether the reason was written; null when already
+   * stored.
    */
-  storeSearch(search: {
-    recordId: string;
-    campaignId: string;
-    rows: Prisma.LeadCreateManyInput[];
-    openPlaceIds?: readonly string[];
-    costUsd: Prisma.Decimal | null;
-    pause?: { claim: Claim; reason: string };
-  }): Promise<{
-    created: number;
-    reopened: number;
-    duplicates: number;
-    paused: boolean;
-  } | null> {
-    const { recordId, campaignId, rows, openPlaceIds = [], costUsd, pause } = search;
+  storeSearch(
+    search: SearchToStore,
+  ): Promise<
+    (StoredCounts & { paused: boolean }) | { refused: true; reasonSaved: boolean } | null
+  > {
+    const { recordId, campaignId, pause } = search;
     return this.prisma.$transaction(async (tx) => {
-      const { count } = await tx.costRecord.updateMany({
-        where: { id: recordId, units: null },
-        data: { units: rows.length, ...(costUsd === null ? {} : { amountUsd: costUsd }) },
+      // Writes the same value: this only proves the status and locks the row, before the record's
+      // row as pauseForCheck does, so the two cannot deadlock.
+      const { count: discovering } = await tx.campaign.updateMany({
+        where: { id: campaignId, status: 'DISCOVERING' },
+        data: { status: 'DISCOVERING' },
       });
-      if (count === 0) return null;
-      const created = await tx.lead.createManyAndReturn({
-        data: rows,
-        skipDuplicates: true,
-        select: { placeId: true },
-      });
-      const createdIds = new Set(created.map(({ placeId }) => placeId));
-      const open = new Set(openPlaceIds);
-      const repeats = rows.filter(({ placeId }) => open.has(placeId) && !createdIds.has(placeId));
-      const reopened = await reopenPlaces(tx, campaignId, repeats);
-      const duplicates = rows.length - created.length - reopened;
-      await tx.campaign.update({
-        where: { id: campaignId },
-        data: { foundCount: { increment: rows.length }, duplicateCount: { increment: duplicates } },
-      });
-      const counts = { created: created.length, reopened, duplicates };
+      // Locked, because abandonSearch may be closing this record right now.
+      const [record] = await tx.$queryRaw<Pick<CostRecord, 'note' | 'units'>[]>`
+        SELECT note, units FROM "CostRecord" WHERE id = ${recordId} FOR UPDATE`;
+      if (record?.units !== null) {
+        await addPauseReason(tx, campaignId, pause?.reason);
+        return null;
+      }
+      if (discovering === 0 || readSearchNote(record.note)?.state === 'ABANDONED') {
+        return { refused: true, reasonSaved: await addPauseReason(tx, campaignId, pause?.reason) };
+      }
+      const counts = await writeSearch(tx, search);
       if (pause === undefined) return { ...counts, paused: false };
       const { count: paused } = await tx.campaign.updateMany({
         where: heldBy(pause.claim),

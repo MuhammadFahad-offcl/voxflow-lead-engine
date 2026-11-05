@@ -47,6 +47,8 @@ const row = (campaignId: string, placeId: string): Prisma.LeadCreateManyInput =>
 });
 
 const campaign = (id: string) => prisma.campaign.findUniqueOrThrow({ where: { id } });
+// The same campaign under a lease value it no longer has.
+const stale = ({ id }: Claim): Claim => ({ id, claimedAt: new Date(0) });
 const later = new Date('2026-11-05T07:05:00.000Z');
 const dayStart = new Date('2026-11-04T19:00:00.000Z');
 const reservedNote = searchNote({ term: 'fictional term', area: 'DHA', runId: null });
@@ -505,6 +507,104 @@ describe('storeSearch', () => {
 
     expect(results.filter((result) => result !== null)).toHaveLength(1);
     expect(await campaign(campaignId)).toMatchObject({ foundCount: 2, duplicateCount: 0 });
+  });
+});
+
+// Proves a late worker cannot add to a closed search or a campaign that moved on, and that a failed
+// run's reason still reaches the founder over an operator's pause (FR-33).
+describe('storeSearch refusals', () => {
+  const failedSearch = async (claim: Claim, note?: string) => {
+    const recordId = await reserve(claim.id);
+    if (note !== undefined) {
+      await prisma.costRecord.update({ where: { id: recordId }, data: { note } });
+    }
+    return {
+      recordId,
+      campaignId: claim.id,
+      rows: [row(claim.id, 'a')],
+      costUsd: new Prisma.Decimal('0.01'),
+      pause: { claim, reason: 'Fictional run problem' },
+    };
+  };
+  const expectNothingStored = async (claim: Claim, recordId: string) => {
+    expect(await campaign(claim.id)).toMatchObject({ foundCount: 0, duplicateCount: 0 });
+    expect(await prisma.lead.count()).toBe(0);
+    const record = await prisma.costRecord.findUniqueOrThrow({ where: { id: recordId } });
+    expect(record.units).toBeNull();
+    expect(record.amountUsd.toFixed(2)).toBe('0.61');
+  };
+
+  it('refuses an abandoned record, keeping its reservation', async () => {
+    const claim = await newClaim();
+    const note = searchNote({ term: 'fictional term', area: 'DHA', runId: 'run-1' });
+    const search = await failedSearch(claim, note);
+    await repository.abandonSearch(search.recordId);
+
+    await expect(repository.storeSearch(search)).resolves.toMatchObject({ refused: true });
+
+    await expectNothingStored(claim, search.recordId);
+    expect(await campaign(claim.id)).toMatchObject({ status: 'DISCOVERING', pauseReason: null });
+  });
+
+  it('refuses a campaign that moved on, and writes no reason on it', async () => {
+    const claim = await newClaim();
+    const search = await failedSearch(claim);
+    await prisma.campaign.update({ where: { id: claim.id }, data: { status: 'ENRICHING' } });
+
+    await expect(repository.storeSearch(search)).resolves.toEqual({
+      refused: true,
+      reasonSaved: false,
+    });
+
+    await expectNothingStored(claim, search.recordId);
+    expect((await campaign(claim.id)).pauseReason).toBeNull();
+  });
+
+  it('writes the reason on an operator pause, without storing the run', async () => {
+    const claim = await newClaim();
+    const search = await failedSearch(claim);
+    await prisma.campaign.update({
+      where: { id: claim.id },
+      data: { status: 'PAUSED', pausedFrom: 'DISCOVERING' },
+    });
+
+    await expect(repository.storeSearch(search)).resolves.toEqual({
+      refused: true,
+      reasonSaved: true,
+    });
+
+    await expectNothingStored(claim, search.recordId);
+    expect(await campaign(claim.id)).toMatchObject({
+      status: 'PAUSED',
+      pauseReason: 'Fictional run problem',
+    });
+  });
+
+  it('leaves a reason already set on a paused campaign', async () => {
+    const claim = await newClaim();
+    const search = await failedSearch(claim);
+    await prisma.campaign.update({
+      where: { id: claim.id },
+      data: { status: 'PAUSED', pausedFrom: 'DISCOVERING', pauseReason: 'The first reason' },
+    });
+
+    await expect(repository.storeSearch(search)).resolves.toMatchObject({ reasonSaved: false });
+
+    expect((await campaign(claim.id)).pauseReason).toBe('The first reason');
+  });
+
+  it('still writes the reason when another worker stored the search first', async () => {
+    const claim = await newClaim();
+    const search = await failedSearch(claim);
+    await repository.storeSearch({ ...search, pause: { ...search.pause, claim: stale(claim) } });
+    await prisma.campaign.update({
+      where: { id: claim.id },
+      data: { status: 'PAUSED', pausedFrom: 'DISCOVERING' },
+    });
+
+    await expect(repository.storeSearch(search)).resolves.toBeNull();
+
+    expect((await campaign(claim.id)).pauseReason).toBe('Fictional run problem');
   });
 });
 

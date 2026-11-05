@@ -96,7 +96,7 @@ describe('runProblem', () => {
     const reason = runProblem({ ...good, status }, search);
 
     expect(reason).toContain(`ended as ${status}`);
-    expect(reason).toContain('Valid places stored: 1');
+    expect(reason).toContain('Valid places returned: 1');
     expect(reason).toContain('Nothing re-runs by itself');
   });
 

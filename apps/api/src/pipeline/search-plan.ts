@@ -78,8 +78,9 @@ export function readSearchNote(note: string | null): SearchNote | null {
   }
 }
 
-// A paid search that went wrong is stored as done, so resuming must not imply a retry.
-const MOVES_ON = 'Nothing re-runs by itself: resuming moves on to the next search.';
+// A paid search that went wrong is not paid for again, so resuming must not imply a retry. It says
+// "the searches left" because a run refused by an operator's pause is read once more, for free.
+const MOVES_ON = 'Nothing re-runs by itself: resuming carries on with the searches left.';
 
 /**
  * Says what is wrong with a collected run, for the pause that follows it.
@@ -96,7 +97,7 @@ export function runProblem(
   const name = `"${search.term}" in ${search.area}`;
   const found = String(run.items.length);
   if (run.status !== 'SUCCEEDED') {
-    return `The Apify run for ${name} ended as ${run.status}. Valid places stored: ${found}. ${MOVES_ON}`;
+    return `The Apify run for ${name} ended as ${run.status}. Valid places returned: ${found}. ${MOVES_ON}`;
   }
   if (run.items.length > 0) return null;
   if (run.skippedCount > 0) {

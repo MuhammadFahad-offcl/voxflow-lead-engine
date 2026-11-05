@@ -210,11 +210,22 @@ const collectAndStore = async (
     ...(reason === null ? {} : { pause: { claim, reason } }),
   });
   const { term, area } = cell;
+  if (stored !== null && 'refused' in stored) {
+    const { runId } = search;
+    deps.logger.warn(
+      { campaignId, term, area, runId, reason, reasonSaved: stored.reasonSaved },
+      'run not stored: its record is abandoned or the campaign left discovery',
+    );
+    return { kind: 'STOP' };
+  }
   const { status, skippedCount } = collected;
   deps.logger.info({ campaignId, term, area, status, skippedCount, stored }, 'search stored');
   if (reason === null) return null;
+  // A stale worker stored this run first and could not pause; the holder of the claim still can.
+  if (stored === null) return { kind: 'PAUSE', reason };
+  if (!stored.paused) return { kind: 'STOP' };
   deps.logger.warn({ campaignId, reason }, 'campaign paused');
-  return { kind: stored?.paused === true ? 'PAUSED' : 'STOP' };
+  return { kind: 'PAUSED' };
 };
 
 // Picks a search up from wherever it got to; returns why it stopped, or null once it is stored.
@@ -270,11 +281,12 @@ const pausePass = async (
   reason: string,
   uncertainRecordId?: string,
 ): Promise<DiscoverResult> => {
-  deps.logger.warn({ campaignId: claim.id, reason }, 'campaign paused');
   const paused =
     uncertainRecordId === undefined
       ? await deps.repository.pause(claim, reason)
       : await deps.repository.pauseForCheck(claim, uncertainRecordId, reason);
+  const message = paused ? 'campaign paused' : 'claim lost, so this pass did not pause';
+  deps.logger.warn({ campaignId: claim.id, reason }, message);
   return paused ? 'PAUSED' : stopPass(deps, claim);
 };
 
