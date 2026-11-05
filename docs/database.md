@@ -62,8 +62,8 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 
 - `Campaign.discoveryClaimedAt` is the campaign runner's expiring lease (#10). The runner claims a `DISCOVERING` campaign by setting it, renews it before each search and clears it when it stops. A claim older than the lease counts as abandoned, so a crashed worker's campaign is picked up again.
 - `Campaign.pauseReason` says why the system paused a campaign, for example a spend cap (FR-33). It is null for an operator pause, and resume clears it.
-
 - A discovery search has one live `CostRecord` (service `APIFY`), written before its paid run starts. Its `note` is JSON with `term`, `area`, `runId` and `state`. `runId` is null until Apify accepts the start. `state` is `OPEN`, `CHECK_APIFY` (the campaign paused so the founder can look for its run) or `ABANDONED` (he resumed; a new record takes over and this one keeps its amount). `units` stays null until the search is stored; until then `amountUsd` holds the run's charge limit, so an unfinished run counts against the daily cap.
+- `Lead.campaignId` is the campaign that first found a place, with one exception: a place filtered out as temporarily closed moves to the campaign whose search later shows it open. It counts as new there, not as a duplicate. The first campaign keeps its counts.
 
 ## Retention (NFR-6)
 

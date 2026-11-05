@@ -22,6 +22,9 @@ export type FilterablePlace = Pick<
   | 'temporarilyClosed'
 >;
 
+/** The `Lead.filterReason` of a temporarily closed place: the one reason a later search can undo. */
+export const TEMPORARILY_CLOSED_REASON = 'temporarily closed';
+
 /** The filter's verdict; `reason` is what `Lead.filterReason` stores and the dashboard shows. */
 type FilterResult = { pass: true } | { pass: false; reason: string };
 
@@ -75,8 +78,19 @@ const containsKeyword = (text: string, keyword: string): boolean => {
 const closedReason = (place: FilterablePlace, rules: IdealClient): string | null => {
   if (!rules.excludeClosed) return null;
   if (place.permanentlyClosed === true) return 'permanently closed';
-  return place.temporarilyClosed === true ? 'temporarily closed' : null;
+  return place.temporarilyClosed === true ? TEMPORARILY_CLOSED_REASON : null;
 };
+
+/**
+ * Says whether a place's listing shows it open.
+ * @param place - Its two closed flags.
+ * @returns True unless a flag is true, so a place with no status counts as open.
+ */
+export function isOpen(
+  place: Pick<FilterablePlace, 'permanentlyClosed' | 'temporarilyClosed'>,
+): boolean {
+  return place.permanentlyClosed !== true && place.temporarilyClosed !== true;
+}
 
 /**
  * Applies a niche's ideal-client rules to one place.

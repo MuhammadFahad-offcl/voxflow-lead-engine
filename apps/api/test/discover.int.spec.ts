@@ -42,7 +42,7 @@ class SpyLeadSource implements LeadSourcePort {
     private readonly hooks: {
       onStart?: (startNumber: number) => Promise<void>;
       onCollect?: (collectNumber: number) => Promise<void>;
-      runFor?: (term: string) => Partial<CollectedRun>;
+      runFor?: (term: string, run: CollectedRun) => Partial<CollectedRun>;
     } = {},
   ) {}
 
@@ -61,7 +61,7 @@ class SpyLeadSource implements LeadSourcePort {
     await this.hooks.onCollect?.(this.collects.length);
     const run = await this.fake.collect(runId);
     const term = (JSON.parse(runId) as { term: string }).term;
-    return { ...run, ...this.hooks.runFor?.(term) };
+    return { ...run, ...this.hooks.runFor?.(term, run) };
   }
 }
 
@@ -286,6 +286,104 @@ describe('discoverCampaign: a second campaign', () => {
     });
     expect(await prisma.lead.count()).toBe(11);
     expect(await lead('fictional-place-p01')).toMatchObject({ campaignId: first.id });
+  });
+});
+
+// Proves the one exception to FR-7: a place closed for a while can still become a lead.
+describe('discoverCampaign: a temporarily closed place that reopens', () => {
+  const placeId = 'fictional-place-p09';
+  const withPlace = (change: Partial<CompassPlaceItem>) =>
+    new SpyLeadSource({
+      runFor: (_term, run) => ({
+        items: run.items.map((item) => (item.placeId === placeId ? { ...item, ...change } : item)),
+      }),
+    });
+
+  const closedInFirstCampaign = async (): Promise<Claim> => {
+    const first = await newCampaign();
+    await discoverCampaign(deps(withPlace({ temporarilyClosed: true })), first);
+    expect(await lead(placeId)).toMatchObject({
+      status: 'FILTERED_OUT',
+      filterReason: 'temporarily closed',
+    });
+    return first;
+  };
+
+  it('becomes a lead of the campaign that saw it open, with the counts to match', async () => {
+    const first = await closedInFirstCampaign();
+    const second = await newCampaign();
+
+    await discoverCampaign(deps(new SpyLeadSource()), second);
+
+    expect(await lead(placeId)).toMatchObject({
+      campaignId: second.id,
+      status: 'DISCOVERED',
+      filterReason: null,
+      rawPlace: { temporarilyClosed: false },
+    });
+    expect(await campaignRow(second.id)).toMatchObject({
+      status: 'ENRICHING',
+      foundCount: 12,
+      duplicateCount: 11,
+      filteredCount: 0,
+    });
+    expect(await campaignRow(first.id)).toMatchObject({
+      foundCount: 12,
+      duplicateCount: 1,
+      filteredCount: 3,
+    });
+  });
+
+  it('is filtered again, so it can fail another rule this time', async () => {
+    await closedInFirstCampaign();
+    const second = await newCampaign();
+
+    await discoverCampaign(deps(withPlace({ totalScore: 3.1 })), second);
+
+    expect(await lead(placeId)).toMatchObject({
+      campaignId: second.id,
+      status: 'FILTERED_OUT',
+      filterReason: 'rating 3.1 is below the minimum 4',
+    });
+    expect(await campaignRow(second.id)).toMatchObject({ duplicateCount: 11, filteredCount: 1 });
+  });
+
+  it('stays a plain duplicate while it is still closed', async () => {
+    const first = await closedInFirstCampaign();
+    const second = await newCampaign();
+
+    await discoverCampaign(deps(withPlace({ temporarilyClosed: true })), second);
+
+    expect(await lead(placeId)).toMatchObject({ campaignId: first.id, status: 'FILTERED_OUT' });
+    expect(await campaignRow(second.id)).toMatchObject({ duplicateCount: 12, filteredCount: 0 });
+  });
+
+  it('stays a plain duplicate when it has closed for good', async () => {
+    const first = await closedInFirstCampaign();
+    const second = await newCampaign();
+
+    await discoverCampaign(deps(withPlace({ permanentlyClosed: true })), second);
+
+    expect(await lead(placeId)).toMatchObject({
+      campaignId: first.id,
+      filterReason: 'temporarily closed',
+    });
+    expect(await campaignRow(second.id)).toMatchObject({ duplicateCount: 12 });
+  });
+
+  it('leaves a place filtered for any other reason as a plain duplicate', async () => {
+    const first = await newCampaign();
+    await discoverCampaign(deps(new SpyLeadSource()), first);
+    const second = await newCampaign();
+
+    await discoverCampaign(deps(new SpyLeadSource()), second);
+
+    expect(await lead('fictional-place-p05')).toMatchObject({
+      campaignId: first.id,
+      status: 'FILTERED_OUT',
+      filterReason: 'rating 3.6 is below the minimum 4',
+    });
+    expect(await campaignRow(second.id)).toMatchObject({ duplicateCount: 12, filteredCount: 0 });
   });
 });
 
