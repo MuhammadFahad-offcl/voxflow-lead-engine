@@ -1,4 +1,4 @@
-# Cycle 1 — Scored leads (3–9 Nov 2026)
+# Cycle 1 — Scored leads (3–13 Nov 2026)
 
 **Cycle goal:** from the dashboard, create a "dental clinic, Lahore, DHA + Gulberg" campaign and get a lead table of enriched, scored leads — every point backed by evidence — exportable to CSV. Works fully in `DEMO_MODE=true` and with real Apify/Perplexity/Haiku.
 

@@ -1,6 +1,6 @@
-# Cycle 4 — Booking and operations, v1.0 (24–30 Nov 2026)
+# Cycle 4 — Booking and operations, v1.0 (28 Nov–4 Dec 2026)
 
-**Cycle goal:** during the call the AI agent offers two real free slots and books a Google Meet video call on your calendar; you send the confirmation with one click; the system runs reliably on your laptop (tunnel, backups, retention, funnel, alerts). Ship **v1.0.0 on 30 Nov**, live run in December.
+**Cycle goal:** during the call the AI agent offers two real free slots and books a Google Meet video call on your calendar; you send the confirmation with one click; the system runs reliably on your laptop (tunnel, backups, retention, funnel, alerts). Ship **v1.0.0 on 4 Dec**, live run in December.
 
 **[YOU] before you start this cycle**
 
@@ -181,4 +181,4 @@ Issue #<#>: v1.0 release. Trace: all NFRs, PRD "Release plan".
 
 ## Cycle 4 close
 
-Run **S-8** with `<N> = 4`. Tag `v1.0.0`. Live run starts 1 December.
+Run **S-8** with `<N> = 4`. Tag `v1.0.0`. Live run starts 5 December.

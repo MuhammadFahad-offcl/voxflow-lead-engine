@@ -7,11 +7,11 @@ Nov 3, 2026 · Muhammad Fahad
 | Field               | Value                                                                                                                                              |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Product             | VoxFlow Lead Engine                                                                                                                                |
-| Document version    | 0.4 (FR-7 and FR-8 clarified: closed places and keyword forms)                                                                                     |
+| Document version    | 0.5 (Cycle 1 slipped 4 days; later cycles shifted)                                                                                                 |
 | Status              | Draft, awaiting owner review                                                                                                                       |
 | Owner               | Muhammad Fahad, Founder, VoxFlow AI Solutions                                                                                                      |
 | Technical reviewer  | Claude                                                                                                                                             |
-| Target release      | v1.0 by Nov 30, 2026                                                                                                                               |
+| Target release      | v1.0 by Dec 4, 2026                                                                                                                                |
 | Related documents   | VoxFlow Lead Engine — HazelJS Build Plan (earlier plan; this PRD supersedes its scope and schedule), VoxFlow Lead Engine — Tech Stack Fundamentals |
 | Repository location | `docs/prd.md` (source of truth; changes go through pull requests)                                                                                  |
 
@@ -34,7 +34,7 @@ The v1 pipeline, end to end:
 
 v1 stops at the call. Email, automated WhatsApp and follow-up sequences are out of scope until the system has run for one month on real data.
 
-Three outcomes define success: 2 new clients a month for VoxFlow, a working public HazelJS submission by 23 Nov 2026, and a codebase built to junior-developer industry standards.
+Three outcomes define success: 2 new clients a month for VoxFlow, a working public HazelJS submission by 27 Nov 2026, and a codebase built to junior-developer industry standards.
 
 ## Problem statement
 
@@ -61,7 +61,7 @@ The headline goal is 2 new VoxFlow clients a month from AI calls, measured over 
 | G4  | Save founder time           | Founder's daily time spent operating the engine             | ≤ 30 minutes a day                           | Self-reported, weekly                 |
 | G5  | Keep LLM cost low           | Pipeline LLM spend (Claude Haiku 5.5)                       | < $10 per month, hard cap                    | Cost page, daily                      |
 | G6  | Never stall                 | Campaigns that finish without manual repair                 | 100% (failed leads isolated and retryable)   | Per campaign                          |
-| G7  | Ship the HazelJS submission | Public repo submitted; runs from a fresh clone in demo mode | Submitted by 23 Nov 2026; setup ≤ 10 minutes | Fresh-clone test before submitting    |
+| G7  | Ship the HazelJS submission | Public repo submitted; runs from a fresh clone in demo mode | Submitted by 27 Nov 2026; setup ≤ 10 minutes | Fresh-clone test before submitting    |
 | G8  | Build like a company        | Merges through pull requests with green CI                  | 100% of merges                               | GitHub history                        |
 | G9  | Test what matters           | Line coverage on scoring rules and adapters                 | ≥ 80%                                        | CI coverage report                    |
 
@@ -387,7 +387,7 @@ The LLM cost cap covers the pipeline's own Haiku calls. The model Vapi uses duri
 
 ## Release plan
 
-v1 ships in four one-week Scrum cycles, from 3 to 30 November 2026, then runs live through December. Each cycle ends with a working increment the founder can use from that day on.
+v1 ships in four Scrum cycles, from 3 November to 4 December 2026, then runs live through December. Cycle 1 slipped 4 days, so it ran 11 days; the others are one week each. Each cycle ends with a working increment the founder can use from that day on.
 
 ```mermaid
 gantt
@@ -395,15 +395,15 @@ gantt
   dateFormat YYYY-MM-DD
   axisFormat %d %b
   section Build
-  Cycle 1 Scored leads            :c1, 2026-11-03, 7d
-  Cycle 2 Solutions and scripts   :c2, 2026-11-10, 7d
-  Cycle 3 AI calls                :c3, 2026-11-17, 7d
-  Cycle 4 Booking and operations  :c4, 2026-11-24, 7d
+  Cycle 1 Scored leads            :c1, 2026-11-03, 11d
+  Cycle 2 Solutions and scripts   :c2, 2026-11-14, 7d
+  Cycle 3 AI calls                :c3, 2026-11-21, 7d
+  Cycle 4 Booking and operations  :c4, 2026-11-28, 7d
   section Milestones
-  HazelJS submission              :milestone, m1, 2026-11-23, 0d
-  v1.0 release                    :milestone, m2, 2026-11-30, 0d
+  HazelJS submission              :milestone, m1, 2026-11-27, 0d
+  v1.0 release                    :milestone, m2, 2026-12-04, 0d
   section Run
-  Live run                        :live, 2026-12-01, 31d
+  Live run                        :live, 2026-12-05, 27d
   Review                          :milestone, m3, 2027-01-04, 0d
 ```
 
@@ -415,10 +415,10 @@ gantt
    - Exit: the eval set passes in CI; an approval survives a restart.
 3. **Cycle 3, AI calls (HazelJS submission).** Deliverable: approved campaigns are called by the Urdu AI agent, and results, reasons and English remarks appear on the dashboard.
    - Scope: FR-20 to FR-24, FR-28, FR-29, FR-33, FR-35, FR-36; README and demo video.
-   - Exit: test calls to the founder's own phones produce correct outcomes; demo mode runs from a fresh clone in ≤ 10 minutes; submission sent on 23 November.
+   - Exit: test calls to the founder's own phones produce correct outcomes; demo mode runs from a fresh clone in ≤ 10 minutes; submission sent on 27 November.
 4. **Cycle 4, Booking and operations (v1.0).** Deliverable: interested businesses are booked into the founder's calendar during the call; the engine runs reliably on the laptop.
    - Scope: FR-25 to FR-27, FR-31, FR-34; Cloudflare Tunnel; nightly backups; alerts; cost page.
-   - Exit: a test call books a real calendar event with a Meet link; a backup restore succeeds; v1.0 tagged on 30 November.
+   - Exit: a test call books a real calendar event with a Meet link; a backup restore succeeds; v1.0 tagged on 4 December.
 
 ### Definition of done
 
@@ -526,6 +526,7 @@ What comes after v1 is decided in early January 2027 from the December data, not
 
 | Date       | Version | Change                                                                                                |
 | ---------- | ------- | ----------------------------------------------------------------------------------------------------- |
+| 9 Nov 2026 | 0.5     | Cycle 1 slipped 4 days; HazelJS has no fixed deadline (Q9)                                            |
 | 5 Nov 2026 | 0.4     | FR-8: closed places, keyword plurals, government or school names. FR-7: reopened places re-checked    |
 | 4 Nov 2026 | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)             |
 | 3 Nov 2026 | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting |
