@@ -1,4 +1,4 @@
-# Cycle 2 — Solutions and scripts (10–16 Nov 2026)
+# Cycle 2 — Solutions and scripts (14–20 Nov 2026)
 
 **Cycle goal:** every warm or hot lead gets exactly one catalog service (with the evidence that justifies it) and a personalised Urdu call script; the founder reviews the campaign once and approves or rejects it. Pending approval survives a restart.
 

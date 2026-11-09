@@ -1,7 +1,7 @@
 # HazelJS ambassador submission
 
 - **Submit at:** https://hazeljs.ai/build#submit with the public GitHub repo link.
-- **Target date:** 23 Nov 2026 (end of Cycle 3, tag `v0.3.0`). The HazelJS email sets no separate deadline; the Q4 build challenge closes 31 Dec 2026.
+- **Target date:** 27 Nov 2026 (end of Cycle 3, tag `v0.3.0`). The HazelJS email sets no separate deadline; the Q4 build challenge closes 31 Dec 2026.
 - **Challenge field:** Other / custom project.
 
 ## How the project maps to the evaluation criteria

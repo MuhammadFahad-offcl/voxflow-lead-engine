@@ -13,10 +13,10 @@ Read docs/backlog.md, docs/prd.md (Release plan) and .github/ISSUE_TEMPLATE/feat
 
 Using the gh CLI, in repo MuhammadFahad-offcl/voxflow-lead-engine:
 1. Create 4 milestones with due dates:
-   "Cycle 1 — Scored leads" due 2026-11-09,
-   "Cycle 2 — Solutions and scripts" due 2026-11-16,
-   "Cycle 3 — AI calls" due 2026-11-23,
-   "Cycle 4 — Booking and operations" due 2026-11-30.
+   "Cycle 1 — Scored leads" due 2026-11-13,
+   "Cycle 2 — Solutions and scripts" due 2026-11-20,
+   "Cycle 3 — AI calls" due 2026-11-27,
+   "Cycle 4 — Booking and operations" due 2026-12-04.
 2. Create labels if missing: feature, chore, ci, spike, test, docs, experiment, release, bug.
 3. Create one issue per backlog line, in backlog order, in the right milestone:
    - title = the backlog line's text up to the first " — " (keep the conventional prefix, e.g. "feat: campaigns API ...")

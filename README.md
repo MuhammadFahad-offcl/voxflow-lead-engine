@@ -6,7 +6,7 @@ An AI agent system that finds local businesses, scores how much they need AI aut
 
 Built by [VoxFlow AI Solutions](https://voxflow.agency) with [HazelJS](https://hazeljs.ai) agents. First niche: dental clinics in Lahore.
 
-> **Status:** v1 in development (3–30 Nov 2026). See [`docs/backlog.md`](docs/backlog.md).
+> **Status:** v1 in development (3 Nov–4 Dec 2026). See [`docs/backlog.md`](docs/backlog.md).
 
 ## How it works
 

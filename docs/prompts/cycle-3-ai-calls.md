@@ -1,6 +1,6 @@
-# Cycle 3 — AI calls and HazelJS submission (17–23 Nov 2026)
+# Cycle 3 — AI calls and HazelJS submission (21–27 Nov 2026)
 
-**Cycle goal:** approved campaigns are called by the Urdu Vapi agent inside calling hours, every call is checked by Gatekeeper policies first, results (result, reason, English remarks) appear on the dashboard, attempt 2 and do-not-call work. Submit to HazelJS on **23 Nov**.
+**Cycle goal:** approved campaigns are called by the Urdu Vapi agent inside calling hours, every call is checked by Gatekeeper policies first, results (result, reason, English remarks) appear on the dashboard, attempt 2 and do-not-call work. Submit to HazelJS on **27 Nov**.
 
 **[YOU] before you start this cycle**
 
@@ -207,7 +207,7 @@ Issue #<#>: HazelJS submission. Trace: NFR-11, docs/hazeljs-submission.md (crite
    result → code tour of lead.graph.ts, approval agent, Gatekeeper policies → tests/CI.
 5. Tag v0.3.0 with release notes.
 [YOU]: record the video, upload unlisted to YouTube, add the link to README, submit the repo at
-https://hazeljs.ai/build#submit on 23 Nov.
+https://hazeljs.ai/build#submit on 27 Nov.
 ```
 
 ---

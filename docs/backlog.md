@@ -2,7 +2,7 @@
 
 Create one GitHub issue per line (use the Feature template). Each names the FR/NFR it implements. Order inside a cycle is the build order.
 
-## Cycle 1 — Scored leads (3–9 Nov 2026)
+## Cycle 1 — Scored leads (3–13 Nov 2026)
 
 1. chore: monorepo scaffold (pnpm workspaces: `apps/api`, `apps/web`, `packages/shared`), strict tsconfig, ESLint, Prettier, Knip — NFR-8
 2. ci: GitHub Actions — install, typecheck, lint, Knip, test, gitleaks; commitlint; Husky + lint-staged — NFR-5, NFR-8
@@ -19,7 +19,7 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 13. feat: lead `AgentGraph` (enrich → score) with per-lead status, error, retry — FR-32
 14. feat: dashboard — campaigns list, new campaign form, lead table with filters + CSV export — FR-30 (part), US-14
 
-## Cycle 2 — Solutions and scripts (10–16 Nov)
+## Cycle 2 — Solutions and scripts (14–20 Nov)
 
 1. feat: catalog CRUD + embeddings (`EmbeddingPort`) + pgvector search; seed from `config/catalog/services.json` — FR-16
 2. spike: `@hazeljs/rag` pgvector store vs own repository; ADR — FR-16
@@ -30,7 +30,7 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 7. feat: approval agent with durable suspend + approve/reject API + approval screen — FR-19
 8. feat: lead detail page (evidence, score breakdown, solution, script) — FR-30 (part)
 
-## Cycle 3 — AI calls, HazelJS submission (17–23 Nov)
+## Cycle 3 — AI calls, HazelJS submission (21–27 Nov)
 
 1. feat: Settings (calling hours, caps, models, retention) API + page — FR-20, FR-26 (settings part), FR-33
 2. feat: Gatekeeper policies (hours, DNC, attempt limit, spend cap, health, campaign approved) — FR-21, FR-23
@@ -41,7 +41,7 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 7. test: 10 real test calls to own phones; pick transcriber + voice — risk mitigation
 8. docs: README, screenshots, demo video; fresh-clone test; tag `v0.3.0`; submit
 
-## Cycle 4 — Booking and operations, v1.0 (24–30 Nov)
+## Cycle 4 — Booking and operations, v1.0 (28 Nov–4 Dec)
 
 1. feat: `CalendarPort` (Google + fake), slot cache, `get-slots` + `book-slot` tool routes — FR-25, FR-26, ADR-0008
 2. feat: Send confirmation button (prefilled WhatsApp link) — FR-27
