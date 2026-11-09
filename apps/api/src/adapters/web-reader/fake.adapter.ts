@@ -3,7 +3,7 @@
  * same rules as the real adapter.
  *
  * Serves: ADR-0007 (DEMO_MODE binds every fake), FR-36, NFR-9; issue #11.
- * Used by: tests, e.g. fake.adapter.spec.ts.
+ * Used by: apps/api/src/bootstrap.ts, through `bindAdapter`, when DEMO_MODE=true; tests.
  */
 import { readFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';

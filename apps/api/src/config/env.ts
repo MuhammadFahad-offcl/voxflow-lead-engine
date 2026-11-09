@@ -3,12 +3,20 @@
  *
  * Serves: docs/architecture.md §12, ADR-0007 (DEMO_MODE), NFR-5 (no secret values in errors), FR-36.
  * Used by: apps/api/src/bootstrap.ts, apps/api/src/db/prisma.provider.ts, apps/api/src/server.ts,
- * apps/api/src/adapters/bind.ts, apps/api/test/test-env.ts.
+ * apps/api/src/adapters/bind.ts, apps/api/test/test-env.ts; apps/api/src/read-website.ts reads only
+ * the LIGHTPANDA_CDP_URL rule.
  */
 import { z } from 'zod';
 
 // Environment values are always strings, so ports have to be coerced.
 const port = (fallback: number) => z.coerce.number().int().min(1).max(65535).default(fallback);
+
+/**
+ * The rule for LIGHTPANDA_CDP_URL, Lightpanda's CDP WebSocket: a URL, by default the local one.
+ *
+ * Exported for `pnpm read-website`, which reads this one variable and not the whole environment.
+ */
+export const LightpandaCdpUrl = z.url().default('ws://127.0.0.1:9222');
 
 const EnvShape = z.object({
   DEMO_MODE: z
@@ -24,7 +32,7 @@ const EnvShape = z.object({
   DATABASE_URL: z.url(),
   // Read by docker compose, not by the app: the app connects with DATABASE_URL.
   POSTGRES_PASSWORD: z.string().optional(),
-  LIGHTPANDA_CDP_URL: z.url().default('ws://127.0.0.1:9222'),
+  LIGHTPANDA_CDP_URL: LightpandaCdpUrl,
   API_HOST: z.string().min(1).default('127.0.0.1'),
   API_PORT: port(4000),
   WEB_PORT: port(3000),

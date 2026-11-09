@@ -8,11 +8,14 @@ import { Container, HazelApp } from '@hazeljs/core';
 import { bindAdapter } from './adapters/bind.js';
 import { ApifyLeadSourceAdapter } from './adapters/lead-source/apify.adapter.js';
 import { FakeLeadSourceAdapter } from './adapters/lead-source/fake.adapter.js';
+import { FakeWebReaderAdapter } from './adapters/web-reader/fake.adapter.js';
+import { HttpWebReaderAdapter } from './adapters/web-reader/http.adapter.js';
 import { AppModule } from './app.module.js';
 import { ENV, InvalidEnvError, loadEnv, type Env } from './config/env.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createLogger, LOGGER } from './logging/logger.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
+import { WEB_READER, type WebReaderPort } from './ports/web-reader.port.js';
 
 /**
  * Validates the environment, or logs the bad variable names and ends the process with exit code 1.
@@ -58,6 +61,10 @@ export async function createApp(env: Env): Promise<HazelApp> {
   bindAdapter<LeadSourcePort>(container, env, LEAD_SOURCE, {
     real: ApifyLeadSourceAdapter,
     fake: FakeLeadSourceAdapter,
+  });
+  bindAdapter<WebReaderPort>(container, env, WEB_READER, {
+    real: HttpWebReaderAdapter,
+    fake: FakeWebReaderAdapter,
   });
   return HazelApp.create(AppModule);
 }

@@ -82,6 +82,7 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm db:seed`                | seed the organization, settings, dental niche and catalog; re-run is safe |
 | `pnpm db:generate`            | write the client to `apps/api/src/generated/`; `db:migrate` also runs it  |
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
+| `pnpm read-website <url>`     | try the real web reader on one live site; prints counts, writes nothing   |
 
 After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` updates the dependencies and, when it installs anything, regenerates the Prisma client; when nothing changed, pnpm skips it. `pnpm db:migrate` applies new migrations and always regenerates the client, because Prisma 7 does not do that on its own. So the pair always leaves the client in step with the schema.
 
