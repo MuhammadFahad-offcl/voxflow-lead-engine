@@ -6,6 +6,7 @@
       "Bash(pnpm lint)",
       "Bash(pnpm lint --fix)",
       "Bash(pnpm knip)",
+      "Bash(pnpm knip *)",
       "Bash(pnpm test)",
       "Bash(pnpm test *)",
       "Bash(pnpm evals)",
@@ -17,7 +18,8 @@
       "Bash(git log *)",
       "Bash(git branch *)",
       "Bash(gh issue view *)",
-      "Bash(gh pr view *)"
+      "Bash(gh pr view *)",
+      "Bash(gh pr checks *)"
     ],
     "ask": [
       "Bash(pnpm add *)",
@@ -45,7 +47,8 @@
       "Bash(git reset --hard*)",
       "Bash(rm -rf *)",
       "Bash(pnpm prisma migrate reset*)",
-      "Bash(pnpm prisma db push*)"
+      "Bash(pnpm prisma db push*)",
+      "Bash(pnpm knip --fix*)"
     ]
   }
 }
