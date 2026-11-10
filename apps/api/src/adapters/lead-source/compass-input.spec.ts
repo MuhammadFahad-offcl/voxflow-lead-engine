@@ -11,6 +11,7 @@ import {
   assertChargeLimit,
   buildCompassInput,
   chargeOfRun,
+  reviewsRunChargeLimitUsd,
   runChargeLimitUsd,
 } from './compass-input.js';
 
@@ -43,6 +44,18 @@ describe('runChargeLimitUsd', () => {
     [100, '0.61'],
   ])('gives %d results a limit of $%s', (maxResults, limit) => {
     expect(runChargeLimitUsd(maxResults).toFixed(2)).toBe(limit);
+  });
+});
+
+// Proves the reviews limit is one cent per place, has no minimum, and never shrinks as places grow.
+describe('reviewsRunChargeLimitUsd', () => {
+  it.each([
+    [0, '0'],
+    [1, '0.01'],
+    [30, '0.3'],
+    [201, '2.01'],
+  ])('puts %i places at $%s', (places, limit) => {
+    expect(reviewsRunChargeLimitUsd(places).toString()).toBe(limit);
   });
 });
 

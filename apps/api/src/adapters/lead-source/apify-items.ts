@@ -109,3 +109,26 @@ export const ScraperlinkReviewsItem = z.object({
   placeId: z.string().min(1),
   reviews: z.array(ScraperlinkReview),
 });
+/** Parsed Scraperlink reviews item. Shares the schema's name so one import gives both. */
+export type ScraperlinkReviewsItem = z.infer<typeof ScraperlinkReviewsItem>;
+
+/**
+ * Validates pass-2 review items from Scraperlink, keeping the valid ones.
+ *
+ * Does not throw on a bad item. Logs its place id only, never author details.
+ * @param items - Raw dataset items.
+ * @param logger - Where to report what was skipped.
+ * @returns The valid review items.
+ */
+export function parseReviewsItems(
+  items: readonly unknown[],
+  logger: Pick<Logger, 'warn'>,
+): ScraperlinkReviewsItem[] {
+  return items.flatMap((item) => {
+    const parsed = ScraperlinkReviewsItem.safeParse(item);
+    if (parsed.success) return [parsed.data];
+    const placeId = WithPlaceId.safeParse(item).data?.placeId ?? 'unknown';
+    logger.warn({ placeId }, 'skipped an invalid Apify review item');
+    return [];
+  });
+}

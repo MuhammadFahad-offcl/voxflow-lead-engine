@@ -3,7 +3,7 @@
  *
  * Serves: FR-33, NFR-4, issue #10 (founder decision on Q6: the Asia/Karachi day).
  * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/db/discovery.repository.ts,
- * apps/api/src/pipeline/spend-cap.spec.ts.
+ * apps/api/src/db/review.repository.ts, apps/api/src/pipeline/spend-cap.spec.ts.
  */
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -19,6 +19,17 @@ const KARACHI_OFFSET_MS = 5 * 60 * 60 * 1000;
 export function karachiDayStart(now: Date): Date {
   const localDays = Math.floor((now.getTime() + KARACHI_OFFSET_MS) / DAY_MS);
   return new Date(localDays * DAY_MS - KARACHI_OFFSET_MS);
+}
+
+/**
+ * Names the advisory lock every Apify reservation of an organization takes, so they run in turns.
+ *
+ * Shared by pass 1 and pass 2: a reservation of either must see the other's.
+ * @param organizationId - Owner of the spend.
+ * @returns The lock's name, hashed by Postgres into its key.
+ */
+export function spendLockName(organizationId: string): string {
+  return `apify-spend:${organizationId}`;
 }
 
 /**

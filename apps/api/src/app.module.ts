@@ -7,6 +7,7 @@
 import { HazelModule } from '@hazeljs/core';
 import { DiscoveryRepository } from './db/discovery.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
+import { ReviewRepository } from './db/review.repository.js';
 import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
 
 /**
@@ -14,5 +15,8 @@ import { CampaignsModule } from './modules/campaigns/campaigns.module.js';
  *
  * Does not declare `GET /health` or `GET /ready`: they are built into `HazelApp`.
  */
-@HazelModule({ imports: [CampaignsModule], providers: [PrismaProvider, DiscoveryRepository] })
+@HazelModule({
+  imports: [CampaignsModule],
+  providers: [PrismaProvider, DiscoveryRepository, ReviewRepository],
+})
 export class AppModule {}
