@@ -154,7 +154,7 @@ const reserve = (forCampaign: string, amountUsd: string, placeCount = 1) =>
   reviewRepo.reserveRun({
     organizationId: SEED_ORGANIZATION_ID,
     campaignId: forCampaign,
-    placeCount,
+    placeIds: Array.from({ length: placeCount }, (_, index) => `fictional-place-${String(index)}`),
     limitFor: (places) => new Prisma.Decimal(amountUsd).times(places),
     dayStart: karachiDayStart(new Date()),
     at: new Date(),
@@ -201,6 +201,12 @@ describe('ReviewRepository.reserveRun', () => {
       expect(reservation.outcome).toBe(outcome);
       if (reservation.outcome === 'RESERVED') {
         expect(reservation.placeCount).toBe(covered);
+        // The note keeps the places the reservation covers, in the order given.
+        const record = await prisma.costRecord.findUniqueOrThrow({
+          where: { id: reservation.recordId },
+        });
+        expect(readReviewsRunNote(record.note)?.placeIds).toHaveLength(covered);
+        expect(readReviewsRunNote(record.note)?.placeIds[0]).toBe('fictional-place-0');
         expect(reservation.amountUsd.toString()).toBe(String(0.2 * covered));
       }
     },
@@ -214,11 +220,13 @@ describe('ReviewRepository.reserveRun', () => {
       outcome: 'EXISTING',
       recordId: first.outcome === 'RESERVED' ? first.recordId : '',
       runId: null,
+      placeIds: ['fictional-place-0'],
     });
     expect(await prisma.costRecord.count({ where: { service: 'APIFY' } })).toBe(1);
     expect(await reviewRepo.openRun(campaignId)).toEqual({
       recordId: first.outcome === 'RESERVED' ? first.recordId : '',
       runId: null,
+      placeIds: ['fictional-place-0'],
     });
   });
 

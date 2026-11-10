@@ -11,18 +11,18 @@ import { readSearchNote, searchNote } from './search-plan.js';
 // Proves discovery ignores pass-2 records, so a reviews run is never taken for a search to resume.
 describe('reviewsRunNote', () => {
   it('is not a search note, so readSearchNote ignores it', () => {
-    expect(readSearchNote(reviewsRunNote({ runId: 'run-1', placeCount: 3 }))).toBeNull();
-    expect(readSearchNote(reviewsRunNote({ runId: null, placeCount: 3 }))).toBeNull();
+    expect(readSearchNote(reviewsRunNote({ runId: 'run-1', placeIds: ['p1', 'p2'] }))).toBeNull();
+    expect(readSearchNote(reviewsRunNote({ runId: null, placeIds: ['p1', 'p2'] }))).toBeNull();
   });
 
-  it('reads back with its run id, an OPEN state and its place count', () => {
-    const note = reviewsRunNote({ runId: null, placeCount: 3 });
+  it('reads back with its run id, an OPEN state and the ordered places it covers', () => {
+    const note = reviewsRunNote({ runId: null, placeIds: ['p1', 'p2'] });
 
     expect(readReviewsRunNote(note)).toEqual({
       kind: 'pass2-reviews',
       runId: null,
       state: 'OPEN',
-      placeCount: 3,
+      placeIds: ['p1', 'p2'],
     });
   });
 
