@@ -13,7 +13,8 @@ import { WebContextError } from '../../ports/web-context.port.js';
 import { PerplexityWebContextAdapter } from './perplexity.adapter.js';
 import { buildSearchQuery } from './search-results.js';
 
-const KEY = 'fictional-key-123';
+// Low-entropy on purpose: a random-looking value trips gitleaks' generic-api-key rule.
+const KEY = 'fake-key-0000';
 const business = {
   name: 'Fictional Bright Smile Dental',
   area: 'DHA Phase 5',
