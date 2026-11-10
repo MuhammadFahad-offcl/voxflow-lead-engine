@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import { Prisma } from '../generated/prisma/client.js';
-import { capPauseReason, karachiDayStart, wouldPassCap } from './spend-cap.js';
+import { capPauseReason, karachiDayStart, spendLockName, wouldPassCap } from './spend-cap.js';
 
 const usd = (amount: string): Prisma.Decimal => new Prisma.Decimal(amount);
 
@@ -48,5 +48,13 @@ describe('capPauseReason', () => {
     expect(capPauseReason(usd('1.83'), usd('0.61'), usd('2.00'))).toBe(
       'Apify daily cap: $1.83 spent today, the next run may charge up to $0.61, the cap is $2.00',
     );
+  });
+});
+
+// Proves pass 1 and pass 2 of one organization share a lock, and two organizations do not.
+describe('spendLockName', () => {
+  it('is one name per organization', () => {
+    expect(spendLockName('org-1')).toBe(spendLockName('org-1'));
+    expect(spendLockName('org-1')).not.toBe(spendLockName('org-2'));
   });
 });
