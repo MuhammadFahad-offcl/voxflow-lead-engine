@@ -54,14 +54,20 @@ describe('loadEnv', () => {
   });
 
   it('reads DEMO_MODE=false as false', () => {
-    const live = { ...minimal, DEMO_MODE: 'false', APIFY_TOKEN: 'fictional-token' };
+    const live = {
+      ...minimal,
+      DEMO_MODE: 'false',
+      APIFY_TOKEN: 'fictional-token',
+      PERPLEXITY_API_KEY: 'fictional-key',
+    };
 
     expect(loadEnv(live).DEMO_MODE).toBe(false);
   });
 
-  it('names APIFY_TOKEN as missing when DEMO_MODE=false', () => {
+  it('names every real adapter key as missing when DEMO_MODE=false', () => {
     expect(errorOf({ ...minimal, DEMO_MODE: 'false' }).variables).toEqual([
       'APIFY_TOKEN (missing)',
+      'PERPLEXITY_API_KEY (missing)',
     ]);
   });
 
