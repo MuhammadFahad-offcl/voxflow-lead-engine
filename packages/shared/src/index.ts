@@ -24,3 +24,4 @@ export { CatalogFile, IdealClient, NicheFile } from './niche.js';
 export { CampaignSummary, CreateCampaignInput } from './campaign.js';
 export { AreaFile, AreaPolygon } from './areas.js';
 export { WebsiteEvidence } from './website-evidence.js';
+export { BusinessContext } from './business-context.js';
