@@ -2,7 +2,8 @@
  * The note of a pass-2 reviews run's `CostRecord`: what lets a restart find its paid run.
  *
  * Serves: FR-11, FR-33, ADR-0015; issue #12. Mirrors the search note of #10 in `search-plan.ts`.
- * Used by: apps/api/src/db/review.repository.ts, apps/api/src/pipeline/reviews-run-note.spec.ts.
+ * Used by: apps/api/src/db/review.repository.ts, apps/api/src/pipeline/enrich-reviews.step.ts,
+ * apps/api/src/pipeline/reviews-run-note.spec.ts.
  */
 import { z } from 'zod';
 
