@@ -4,11 +4,11 @@
  * Serves: FR-5, FR-7, FR-8, FR-11, ADR-0015; issue #9 ("a Zod schema … with a fictional fixture").
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { z } from 'zod';
-import { CompassPlaceItem, ScraperlinkReviewsItem } from './apify-items.js';
+import { CompassPlaceItem, parseReviewsItems, ScraperlinkReviewsItem } from './apify-items.js';
 
 const fixture = (path: string): unknown =>
   JSON.parse(readFileSync(resolve(import.meta.dirname, '../../../../../fixtures', path), 'utf8'));
@@ -117,5 +117,28 @@ describe('ScraperlinkReviewsItem', () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('parseReviewsItems logs placeId only and skips invalid items', () => {
+    const warn = jest.fn();
+    const items = [
+      {
+        placeId: 'good-place',
+        reviews: [review],
+      },
+      {
+        placeId: 'bad-place',
+        reviews: [{ ...review, publishedAtDate: 'invalid-date', author: 'Secret Name' }],
+      },
+    ];
+
+    const parsed = parseReviewsItems(items, { warn });
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.placeId).toBe('good-place');
+    expect(warn).toHaveBeenCalledWith(
+      { placeId: 'bad-place' },
+      'skipped an invalid Apify review item',
+    );
   });
 });

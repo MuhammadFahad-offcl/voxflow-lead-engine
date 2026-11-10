@@ -89,4 +89,21 @@ describe('FakeLeadSourceAdapter', () => {
   it('gives the same charge limit as the real run would have', () => {
     expect(adapter.chargeLimitUsd(30).toFixed(2)).toBe('0.50');
   });
+
+  it('serves reviews for requested placeIds with calculated cost', async () => {
+    const runId = await adapter.startReviews(
+      ['fictional-place-p01', 'fictional-place-p02'],
+      new Prisma.Decimal('0.02'),
+    );
+    const collected = await adapter.collectReviews(runId);
+
+    expect(collected.status).toBe('SUCCEEDED');
+    expect(collected.items).toHaveLength(2);
+    expect(collected.items[0]?.placeId).toBe('fictional-place-p01');
+    expect(collected.costUsd?.isPositive()).toBe(true);
+  });
+
+  it('calculates reviews charge limit based on place count', () => {
+    expect(adapter.chargeLimitReviewsUsd(3).toFixed(3)).toBe('0.024');
+  });
 });

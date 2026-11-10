@@ -19,7 +19,12 @@ import { discoverCampaign, type DiscoverDeps } from '../src/pipeline/discover.st
 import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 import { readSearchNote, searchNote } from '../src/pipeline/search-plan.js';
 import { karachiDayStart } from '../src/pipeline/spend-cap.js';
-import type { CollectedRun, LeadSourcePort, PlaceSearch } from '../src/ports/lead-source.port.js';
+import type {
+  CollectedReviewsRun,
+  CollectedRun,
+  LeadSourcePort,
+  PlaceSearch,
+} from '../src/ports/lead-source.port.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 
@@ -62,6 +67,18 @@ class SpyLeadSource implements LeadSourcePort {
     const run = await this.fake.collect(runId);
     const term = (JSON.parse(runId) as { term: string }).term;
     return { ...run, ...this.hooks.runFor?.(term, run) };
+  }
+
+  chargeLimitReviewsUsd(placeCount: number): Prisma.Decimal {
+    return this.fake.chargeLimitReviewsUsd(placeCount);
+  }
+
+  startReviews(placeIds: readonly string[], chargeLimitUsd: Prisma.Decimal): Promise<string> {
+    return this.fake.startReviews(placeIds, chargeLimitUsd);
+  }
+
+  collectReviews(runId: string): Promise<CollectedReviewsRun> {
+    return this.fake.collectReviews(runId);
   }
 }
 

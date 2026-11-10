@@ -51,6 +51,9 @@ const counting = (leadSource: LeadSourcePort): LeadSourcePort => ({
     return leadSource.start(search);
   },
   collect: (runId) => leadSource.collect(runId),
+  chargeLimitReviewsUsd: (placeCount) => leadSource.chargeLimitReviewsUsd(placeCount),
+  startReviews: (placeIds, limit) => leadSource.startReviews(placeIds, limit),
+  collectReviews: (runId) => leadSource.collectReviews(runId),
 });
 
 const post = async (path: string, body?: unknown) => {
