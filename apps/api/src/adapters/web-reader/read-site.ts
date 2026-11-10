@@ -3,7 +3,7 @@
  * one contact page. Each adapter brings its own way of getting a page.
  *
  * Serves: FR-9, ADR-0004; issue #11.
- * Used by: apps/api/src/adapters/web-reader/fake.adapter.ts.
+ * Used by: apps/api/src/adapters/web-reader/fake.adapter.ts and http.adapter.ts.
  */
 import { load } from 'cheerio';
 import robotsTypes from 'robots-parser';
@@ -28,7 +28,7 @@ export interface SiteTransport {
 }
 
 /** Sent on every request, and the name robots.txt rules are matched against. */
-const USER_AGENT = 'VoxFlowLeadEngine/1.0 (+https://voxflow.agency)';
+export const USER_AGENT = 'VoxFlowLeadEngine/1.0 (+https://voxflow.agency)';
 // ADR-0004: below this much visible text the page probably needs JavaScript.
 const MIN_TEXT_CHARS = 200;
 const CONTACT_LINK = /contact|رابطہ|appointment/i;

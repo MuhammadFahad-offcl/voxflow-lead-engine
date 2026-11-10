@@ -2,7 +2,7 @@
  * Renders one page in Lightpanda over CDP, letting through only requests to allowed addresses.
  *
  * Serves: FR-9, ADR-0004 (tier 2), ADR-0003; issue #11.
- * Used by: only its spec so far, apps/api/src/adapters/web-reader/lightpanda.spec.ts.
+ * Used by: apps/api/src/adapters/web-reader/http.adapter.ts.
  */
 import puppeteer, { type Browser, type ConnectOptions } from 'puppeteer-core';
 import { ReadRefusedError } from './public-address.js';

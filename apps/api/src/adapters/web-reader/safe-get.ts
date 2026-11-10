@@ -3,7 +3,7 @@
  * limit.
  *
  * Serves: FR-9, ADR-0004, ADR-0003 (nothing scraped may reach the laptop's local services); #11.
- * Used by: apps/api/src/adapters/web-reader/read-site.ts, for its response type.
+ * Used by: apps/api/src/adapters/web-reader/http.adapter.ts; read-site.ts uses its response type.
  */
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';
