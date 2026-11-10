@@ -14,17 +14,24 @@ import { DiscoveryRepository, type Reservation } from './discovery.repository.js
 import { PrismaProvider } from './prisma.provider.js';
 
 // An unfinished run is one whose record has no `units` and was not abandoned.
+/** An unfinished reviews run: its record, its run id (null when unknown) and the places it covers. */
+interface OpenRun {
+  recordId: string;
+  runId: string | null;
+  placeIds: string[];
+}
+
 const findOpenRun = async (
   client: Pick<Prisma.TransactionClient, 'costRecord'>,
   campaignId: string,
-): Promise<{ recordId: string; runId: string | null } | null> => {
+): Promise<OpenRun | null> => {
   const unfinished = await client.costRecord.findMany({
     where: { campaignId, service: 'APIFY', units: null, note: { contains: 'pass2-reviews' } },
     select: { id: true, note: true },
   });
   for (const { id, note } of unfinished) {
     const run = readReviewsRunNote(note);
-    if (run?.state === 'OPEN') return { recordId: id, runId: run.runId };
+    if (run?.state === 'OPEN') return { recordId: id, runId: run.runId, placeIds: run.placeIds };
   }
   return null;
 };
@@ -34,7 +41,7 @@ export type ReviewsReservation =
   | Exclude<Reservation, { outcome: 'CLAIM_LOST' | 'RESERVED' }>
   | { outcome: 'RESERVED'; recordId: string; placeCount: number; amountUsd: Prisma.Decimal }
   // A run of this campaign that is not finished: `runId` is null when it may or may not exist.
-  | { outcome: 'EXISTING'; recordId: string; runId: string | null };
+  | ({ outcome: 'EXISTING' } & OpenRun);
 
 /**
  * The `Lead.error` of a lead whose paid reviews run came back without its reviews. A terminal
@@ -70,7 +77,8 @@ export class ReviewRepository {
    * @param reservation - What to reserve and the limits to reserve it under.
    * @param reservation.organizationId - Owner of the spend.
    * @param reservation.campaignId - `Campaign.id`.
-   * @param reservation.placeCount - How many places the caller would like to cover.
+   * @param reservation.placeIds - The places the caller would like to cover, in order; the run
+   * covers the first ones that fit, and its note keeps exactly those.
    * @param reservation.limitFor - The charge limit of a run over n places, in US dollars.
    * @param reservation.dayStart - When the capped day began.
    * @param reservation.at - The record's time, on the caller's clock.
@@ -82,12 +90,12 @@ export class ReviewRepository {
   reserveRun(reservation: {
     organizationId: string;
     campaignId: string;
-    placeCount: number;
+    placeIds: readonly string[];
     limitFor: (placeCount: number) => Prisma.Decimal;
     dayStart: Date;
     at: Date;
   }): Promise<ReviewsReservation> {
-    const { organizationId, campaignId, placeCount, limitFor, dayStart, at } = reservation;
+    const { organizationId, campaignId, placeIds, limitFor, dayStart, at } = reservation;
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${spendLockName(organizationId)}, 0))`;
       const open = await findOpenRun(tx, campaignId);
@@ -98,7 +106,7 @@ export class ReviewRepository {
       });
       const capUsd = new Prisma.Decimal(SpendCaps.parse(spendCaps).apifyDailyUsd);
       const spent = await this.discovery.apifySpentSince(organizationId, dayStart, tx);
-      let fit = placeCount;
+      let fit = placeIds.length;
       while (fit > 0 && wouldPassCap(spent, limitFor(fit), capUsd)) fit -= 1;
       if (fit === 0) return { outcome: 'OVER_CAP', spent, capUsd };
       const amountUsd = limitFor(fit);
@@ -109,7 +117,7 @@ export class ReviewRepository {
           service: 'APIFY',
           amountUsd,
           at,
-          note: reviewsRunNote({ runId: null, placeCount: fit }),
+          note: reviewsRunNote({ runId: null, placeIds: placeIds.slice(0, fit) }),
         },
         select: { id: true },
       });
@@ -120,9 +128,9 @@ export class ReviewRepository {
   /**
    * Finds this campaign's unfinished reviews run without reserving anything.
    * @param campaignId - `Campaign.id`.
-   * @returns Its record id and run id (null when it may or may not exist), or null when none.
+   * @returns Its record id, run id (null when it may or may not exist) and places, or null.
    */
-  openRun(campaignId: string): Promise<{ recordId: string; runId: string | null } | null> {
+  openRun(campaignId: string): Promise<OpenRun | null> {
     return findOpenRun(this.prisma, campaignId);
   }
 
