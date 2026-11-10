@@ -3,7 +3,8 @@
  *
  * Serves: FR-33, NFR-4, issue #10 (founder decision on Q6: the Asia/Karachi day).
  * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/db/discovery.repository.ts,
- * apps/api/src/db/review.repository.ts, apps/api/src/pipeline/spend-cap.spec.ts.
+ * apps/api/src/db/review.repository.ts, apps/api/src/pipeline/enrich-reviews.step.ts,
+ * apps/api/src/pipeline/spend-cap.spec.ts.
  */
 import type { Prisma } from '../generated/prisma/client.js';
 

@@ -2,7 +2,8 @@
  * Database access for pass-2 reviews: the leads that need them, their storage, and the run's money.
  *
  * Serves: FR-11 (store up to 30 most recent Google reviews per business), FR-33, ADR-0015.
- * Used by: apps/api/src/app.module.ts, apps/api/test/review.repository.int.spec.ts.
+ * Used by: apps/api/src/app.module.ts, apps/api/src/pipeline/enrich-reviews.step.ts,
+ * apps/api/test/enrich-reviews.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { SpendCaps } from '@voxflow/shared';
