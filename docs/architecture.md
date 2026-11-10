@@ -147,7 +147,9 @@ enrich (function) → score (function + LLM labelling) → route
 
 One graph run per lead means one lead's failure never touches another (FR-32, NFR-1). The run ID is stored on the lead; the run timeline (FR-35) is read from HazelJS's timeline store.
 
-**Enrich** (FR-9–FR-12): `WebReaderPort.read(url)` tries plain fetch (Cheerio parse); if visible text is under a threshold (default 200 characters) it retries through Lightpanda; on 403, challenge page or error it marks `websiteStatus = UNREADABLE`. Reads homepage + one contact page, respects robots.txt, one in-flight request per domain. Perplexity context runs only for leads that passed the filter.
+**Enrich** (FR-9–FR-12): `WebReaderPort.read(url)` tries plain fetch (Cheerio parse); if visible text is under a threshold (default 200 characters) it retries through Lightpanda; on 403, challenge page or error it marks `websiteStatus = UNREADABLE`. Reads homepage + one contact page, respects robots.txt for each origin it reaches (RFC 9309: a missing file allows everything, a 5xx disallows everything), one in-flight request per domain, 3 retries on network errors only. The enrich step stores `websiteStatus`, emails, `wa.me` and `api.whatsapp.com` links, social profile links, the booking and chat flags (null when unreadable) and the first doctor named as `decisionMakerName`. Perplexity context runs only for leads that passed the filter.
+
+**Website address check** (ADR-0003): the plain GET connects only to public unicast addresses; Lightpanda renders are checked but not pinned (accepted risk, ADR-0004, #94). Robots.txt, homepage, contact page and every redirect hop go through a DNS lookup that refuses the name when any of its addresses is private, loopback, link-local, CGNAT, multicast, reserved or IPv4-mapped; Node connects to the address that lookup returned, so the check cannot be rebound. IP literals and non-http(s) URLs are refused before connecting. Lightpanda loads only the URL the checked fetch ended on. Every request it makes over CDP (redirects, scripts, XHR) is intercepted and its address checked when requested, not pinned; the URL a render ends on is checked again, and a refused one makes the site `UNREADABLE`. Not covered: Lightpanda resolves the name again itself inside Docker after our check, so DNS rebinding against a render can still reach a private address. On Docker Desktop that includes `host.docker.internal`, which reaches the laptop's 127.0.0.1 services such as the API (:4000) and the dashboard (:3000), and Lightpanda's own CDP port on the container's loopback. The interception has been shown only against a stand-in browser in the tests and in one local manual check on real Lightpanda; the `pnpm read-website` instructions say how to repeat that check.
 
 **Score** (FR-13–FR-15): the LLM (via `LlmPort`, task `REVIEW_LABELLING`) returns `{ reviewId, labels[] }[]` validated by Zod. Plain code in `scoring/` turns labels + enrichment facts into `Signal` rows using the niche profile's weights. Score = sum of signal points. Tier thresholds: hot ≥ 70, warm 45–69, cold < 45.
 
@@ -256,6 +258,7 @@ All configuration is read once from environment variables, validated by a Zod sc
 - Secrets only in `.env` (git-ignored); Claude Code is denied reading it (`.claude/settings.json`).
 - No real lead data, recordings or transcripts in Git; fixtures are fictional.
 - CI runs gitleaks on every pull request.
+- The plain GET of the website reader never connects to a private, loopback or link-local address; Lightpanda renders are checked but not pinned (accepted risk, ADR-0004, #94; §5.2, Website address check).
 
 ## 15. Testing strategy
 

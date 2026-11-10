@@ -3,7 +3,7 @@
  * treatments it lists. Each returns its evidence: the matched words.
  *
  * Serves: FR-10, PRD "Lead scoring model" (multiple_doctors_services, decision_maker_name); #11.
- * Used by: only its spec so far, apps/api/src/pipeline/extract/clinic-text.spec.ts.
+ * Used by: apps/api/src/pipeline/enrich.step.ts, apps/api/src/read-website.ts.
  */
 import type { WebPage } from '../../ports/web-reader.port.js';
 

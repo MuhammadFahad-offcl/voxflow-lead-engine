@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev && prisma generate",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "read-website": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/read-website.ts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },

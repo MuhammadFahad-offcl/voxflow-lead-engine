@@ -4,7 +4,7 @@
  *
  * Serves: FR-10, PRD "Lead scoring model" (no_online_booking, whatsapp_link, active_marketing);
  * issue #11.
- * Used by: only its spec so far, apps/api/src/pipeline/extract/site-links.spec.ts.
+ * Used by: apps/api/src/pipeline/enrich.step.ts, apps/api/src/read-website.ts.
  */
 import { load, type CheerioAPI } from 'cheerio';
 import type { WebPage } from '../../ports/web-reader.port.js';

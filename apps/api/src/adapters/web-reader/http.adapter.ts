@@ -3,7 +3,8 @@
  * read at a time per domain.
  *
  * Serves: FR-9, ADR-0004, ADR-0007, ADR-0003; issue #11.
- * Used by: only its spec so far, apps/api/src/adapters/web-reader/http.adapter.spec.ts.
+ * Used by: apps/api/src/bootstrap.ts, through `bindAdapter`, when DEMO_MODE=false;
+ * apps/api/src/read-website.ts.
  */
 import { isIP } from 'node:net';
 import { setTimeout as sleep } from 'node:timers/promises';
