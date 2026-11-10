@@ -3,7 +3,7 @@
  * limit.
  *
  * Serves: FR-9, ADR-0004, ADR-0003 (nothing scraped may reach the laptop's local services); #11.
- * Used by: only its spec so far, apps/api/src/adapters/web-reader/safe-get.spec.ts.
+ * Used by: apps/api/src/adapters/web-reader/read-site.ts, for its response type.
  */
 import { request as httpRequest, type IncomingMessage } from 'node:http';
 import { request as httpsRequest } from 'node:https';

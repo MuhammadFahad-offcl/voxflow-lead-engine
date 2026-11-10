@@ -2,7 +2,7 @@
  * Decides whether the website reader may connect to an address: public unicast only.
  *
  * Serves: FR-9, ADR-0003 (the laptop's local services stay unreachable), ADR-0004; issue #11.
- * Used by: apps/api/src/adapters/web-reader/safe-get.ts.
+ * Used by: apps/api/src/adapters/web-reader/safe-get.ts and read-site.ts.
  */
 import { lookup as dnsLookup } from 'node:dns/promises';
 import { BlockList, isIP, type LookupFunction } from 'node:net';
