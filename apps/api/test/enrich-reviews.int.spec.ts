@@ -19,7 +19,7 @@ import type { HazelApp } from '@hazeljs/core';
 import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { DiscoveryRepository } from '../src/db/discovery.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
-import { ReviewRepository } from '../src/db/review.repository.js';
+import { NO_REVIEWS_ERROR, ReviewRepository } from '../src/db/review.repository.js';
 import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import { Prisma } from '../src/generated/prisma/client.js';
 import type { Logger } from '../src/logging/logger.js';
@@ -103,10 +103,21 @@ afterEach(() => {
 describe('enrichReviewsForCampaign', () => {
   it('stores reviews with author null, under one APIFY record per run', async () => {
     await addLeads(['fictional-place-p01', 'fictional-place-p02']);
+    // A deferral from an earlier call, which a later success must clear.
+    await prisma.lead.updateMany({
+      data: {
+        failedStep: 'ENRICH_REVIEWS',
+        error: 'Apify daily spend cap reached; reviews wait until the cap has room',
+      },
+    });
 
     const result = await run(campaignId);
 
     expect(result).toMatchObject({ placeCount: 2, skippedDueToCap: false, needsCheck: false });
+    const marked = await prisma.lead.count({
+      where: { OR: [{ failedStep: { not: null } }, { error: { not: null } }] },
+    });
+    expect(marked).toBe(0);
     expect(result.storedReviewsCount).toBeGreaterThan(0);
     const stored = await prisma.review.findMany();
     expect(stored).toHaveLength(result.storedReviewsCount);
@@ -126,11 +137,26 @@ describe('enrichReviewsForCampaign under parallel runs', () => {
     const other = await newCampaign();
     await addLeads(['fictional-place-p01', 'fictional-place-p02']);
     await addLeads(['fictional-place-p03', 'fictional-place-p06'], other.id);
-    // Each run may charge 2 x $0.008: the cap holds one of them and not both.
+    // Each run may charge 2 x $0.01: the cap holds one of them and not both.
     await setCap('0.02');
-    const starts = watchStarts();
+    // The run that reserves first waits in its start until the other has been refused. Without the
+    // wait, a slow second run could look after the first finished and gave back its unused reserve,
+    // and would then fit part of its places: legal, but it is not the race this test proves.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const start = leadSource.startReviews.bind(leadSource);
+    const starts = watchStarts().mockImplementation(async (placeIds, chargeLimitUsd) => {
+      await held;
+      return start(placeIds, chargeLimitUsd);
+    });
 
-    const results = await Promise.all([run(), run(other.id)]);
+    const runs = [run(), run(other.id)];
+    // The timer lets a missing lock fail on the assertions below, with two held starts, not by hanging.
+    await Promise.race([...runs, new Promise((resolve) => setTimeout(resolve, 2000))]);
+    release();
+    const results = await Promise.all(runs);
 
     expect(results.filter((result) => result.skippedDueToCap)).toHaveLength(1);
     expect(starts).toHaveBeenCalledTimes(1);
@@ -186,5 +212,173 @@ describe('enrichReviewsForCampaign after a lost start', () => {
     expect(starts).toHaveBeenCalledTimes(2);
     // The abandoned reservation stays on the day's total beside the new record.
     expect(await apifyRecords()).toHaveLength(2);
+  });
+
+  it('collects a saved run id for free instead of starting again', async () => {
+    await addLeads(['fictional-place-p01']);
+    const runId = await leadSource.startReviews(['fictional-place-p01'], new Prisma.Decimal('1'));
+    const record = await reserveWithoutRunId();
+    await reviewRepo.saveRunId(record.id, runId);
+    const starts = watchStarts();
+
+    const result = await run();
+
+    expect(result.storedReviewsCount).toBeGreaterThan(0);
+    expect(starts).not.toHaveBeenCalled();
+    const records = await apifyRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.units).toBe(1);
+  });
+
+  it('finishes a run whose reviews were stored but whose record a crash left open', async () => {
+    await addLeads(['fictional-place-p01']);
+    const runId = await leadSource.startReviews(['fictional-place-p01'], new Prisma.Decimal('1'));
+    const record = await reserveWithoutRunId();
+    await reviewRepo.saveRunId(record.id, runId);
+    const lead = await prisma.lead.findFirstOrThrow();
+    await reviewRepo.saveReviews(lead.id, oneReview('fictional-place-p01').reviews);
+    const starts = watchStarts();
+
+    const result = await run();
+
+    expect(result.placeCount).toBe(0);
+    expect(starts).not.toHaveBeenCalled();
+    expect(await reviewRepo.openRun(campaignId)).toBeNull();
+  });
+
+  it('leaves a stale open record open, and does not throw, when its run is still running', async () => {
+    await addLeads(['fictional-place-p01']);
+    const record = await reserveWithoutRunId();
+    await reviewRepo.saveRunId(record.id, 'fictional-run-still-going');
+    const lead = await prisma.lead.findFirstOrThrow();
+    await reviewRepo.saveReviews(lead.id, oneReview('fictional-place-p01').reviews);
+    jest.spyOn(leadSource, 'collectReviews').mockRejectedValueOnce(new Error('still RUNNING'));
+
+    await expect(run()).resolves.toMatchObject({ placeCount: 0 });
+
+    expect((await reviewRepo.openRun(campaignId))?.recordId).toBe(record.id);
+  });
+
+  it('never touches or collects the open run of another campaign', async () => {
+    const other = await newCampaign();
+    await addLeads(['fictional-place-p01']);
+    const record = await reserveWithoutRunId();
+    await reviewRepo.saveRunId(record.id, 'fictional-run-of-the-first');
+    await addLeads(['fictional-place-p02'], other.id);
+    const reads = jest.spyOn(leadSource, 'collectReviews');
+    const starts = watchStarts();
+
+    await run(other.id);
+
+    expect(starts).toHaveBeenCalledTimes(1);
+    expect(reads).toHaveBeenCalledTimes(1);
+    expect(reads).not.toHaveBeenCalledWith('fictional-run-of-the-first');
+    expect((await reviewRepo.openRun(campaignId))?.recordId).toBe(record.id);
+  });
+});
+
+const oneReview = (placeId: string) => ({
+  placeId,
+  reviews: [
+    {
+      reviewId: `${placeId}-review-1`,
+      text: 'Fictional review text',
+      stars: 3,
+      publishedAtDate: '2026-10-01T00:00:00.000Z',
+      responseFromOwnerText: null,
+      responseFromOwnerDate: null,
+      language: 'en',
+      originalLanguage: 'en',
+    },
+  ],
+});
+
+// Proves a paid run that ended badly is not paid for again without a founder action (Fahad's #10 rule).
+describe('enrichReviewsForCampaign after a paid run that ended badly', () => {
+  it.each([
+    ['an empty run', 'SUCCEEDED' as const, [], 2],
+    [
+      'a FAILED run that returned one place',
+      'FAILED' as const,
+      [oneReview('fictional-place-p01')],
+      1,
+    ],
+  ])('does not pay again after %s', async (_case, status, items, withoutReviews) => {
+    await addLeads(['fictional-place-p01', 'fictional-place-p02']);
+    jest
+      .spyOn(leadSource, 'collectReviews')
+      .mockResolvedValueOnce({ items, costUsd: null, status, skippedCount: 0 });
+    const starts = watchStarts();
+
+    const first = await run();
+    const second = await run();
+
+    expect(first.problem).toContain(status === 'FAILED' ? 'FAILED' : 'no reviews');
+    expect(second).toMatchObject({ placeCount: 0, problem: null });
+    expect(starts).toHaveBeenCalledTimes(1);
+    expect(await apifyRecords()).toHaveLength(1);
+    expect(await prisma.lead.count({ where: { error: NO_REVIEWS_ERROR } })).toBe(withoutReviews);
+  });
+});
+
+// Proves the run size follows the room under the cap, and a deferral says what is true.
+describe('enrichReviewsForCampaign at the edge of the cap', () => {
+  it.each([
+    ['exactly fits the cap', ['p01', 'p02', 'p03'], 0],
+    ['is one place over the cap', ['p01', 'p02', 'p03', 'p06'], 1],
+  ])('when the run %s, defers %i place(s) and runs the rest', async (_case, ids, deferred) => {
+    await addLeads(ids.map((id) => `fictional-place-${id}`));
+    await setCap('0.03');
+
+    const result = await run();
+
+    expect(result.placeCount).toBe(3);
+    expect(result.skippedDueToCap).toBe(deferred > 0);
+    const waiting = await prisma.lead.findMany({ where: { failedStep: 'ENRICH_REVIEWS' } });
+    expect(waiting).toHaveLength(deferred);
+    for (const lead of waiting) expect(lead.error).toContain('wait until the cap has room');
+    expect((await apifyRecords())[0]?.units).toBe(3);
+  });
+
+  it('defers every lead and starts nothing when not even one place fits', async () => {
+    await addLeads(['fictional-place-p03']);
+    await setCap('0.00');
+    const starts = watchStarts();
+
+    const result = await run();
+
+    expect(result).toMatchObject({ placeCount: 0, skippedDueToCap: true });
+    expect(starts).not.toHaveBeenCalled();
+    expect(await apifyRecords()).toHaveLength(0);
+  });
+});
+
+// Proves a resumed run marks the misses of its own leads, and leaves leads added later alone.
+describe('enrichReviewsForCampaign when a paid run is resumed', () => {
+  it.each([
+    ['an empty run', 'SUCCEEDED' as const, [], ['p01', 'p02']],
+    ['a FAILED run', 'FAILED' as const, [oneReview('fictional-place-p01')], ['p02']],
+  ])('does not pay again after resuming %s', async (_case, status, items, marked) => {
+    await addLeads(['fictional-place-p01', 'fictional-place-p02']);
+    const read = jest
+      .spyOn(leadSource, 'collectReviews')
+      .mockRejectedValueOnce(new Error('still RUNNING'));
+    const starts = watchStarts();
+    await expect(run()).rejects.toThrow('still RUNNING');
+    // Added after the reservation, so it is not one of the run's places.
+    await addLeads(['fictional-place-p03']);
+    read.mockResolvedValueOnce({ items, costUsd: null, status, skippedCount: 0 });
+
+    const resumed = await run();
+
+    expect(resumed.placeCount).toBe(2);
+    expect(resumed.problem).toContain(status === 'FAILED' ? 'FAILED' : 'no reviews');
+    expect(starts).toHaveBeenCalledTimes(1);
+    const terminal = await prisma.lead.findMany({ where: { error: NO_REVIEWS_ERROR } });
+    expect(terminal.map((lead) => lead.placeId).sort((a, b) => a.localeCompare(b))).toEqual(
+      marked.map((id) => `fictional-place-${id}`),
+    );
+    const late = await prisma.lead.findFirstOrThrow({ where: { placeId: 'fictional-place-p03' } });
+    expect([late.failedStep, late.error]).toEqual([null, null]);
   });
 });
