@@ -137,11 +137,26 @@ describe('enrichReviewsForCampaign under parallel runs', () => {
     const other = await newCampaign();
     await addLeads(['fictional-place-p01', 'fictional-place-p02']);
     await addLeads(['fictional-place-p03', 'fictional-place-p06'], other.id);
-    // Each run may charge 2 x $0.008: the cap holds one of them and not both.
+    // Each run may charge 2 x $0.01: the cap holds one of them and not both.
     await setCap('0.02');
-    const starts = watchStarts();
+    // The run that reserves first waits in its start until the other has been refused. Without the
+    // wait, a slow second run could look after the first finished and gave back its unused reserve,
+    // and would then fit part of its places: legal, but it is not the race this test proves.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const start = leadSource.startReviews.bind(leadSource);
+    const starts = watchStarts().mockImplementation(async (placeIds, chargeLimitUsd) => {
+      await held;
+      return start(placeIds, chargeLimitUsd);
+    });
 
-    const results = await Promise.all([run(), run(other.id)]);
+    const runs = [run(), run(other.id)];
+    // The timer lets a missing lock fail on the assertions below, with two held starts, not by hanging.
+    await Promise.race([...runs, new Promise((resolve) => setTimeout(resolve, 2000))]);
+    release();
+    const results = await Promise.all(runs);
 
     expect(results.filter((result) => result.skippedDueToCap)).toHaveLength(1);
     expect(starts).toHaveBeenCalledTimes(1);
