@@ -1,15 +1,19 @@
 /**
  * Integration test of the review repository against real Postgres.
  *
- * Serves: FR-11 (store up to 30 most recent Google reviews per business), ADR-0015; issue #12.
+ * Serves: FR-11, FR-33, NFR-4 (reservation under the cap), ADR-0015; issue #12.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
 import { resolve } from 'node:path';
 import type { HazelApp } from '@hazeljs/core';
+import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { NO_REVIEWS_ERROR, ReviewRepository } from '../src/db/review.repository.js';
 import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
+import { Prisma } from '../src/generated/prisma/client.js';
+import { readReviewsRunNote } from '../src/pipeline/reviews-run-note.js';
+import { karachiDayStart, spendLockName } from '../src/pipeline/spend-cap.js';
 import { startServer } from '../src/server.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
@@ -130,5 +134,143 @@ describe('ReviewRepository.saveReviews', () => {
     const lead = await addLead('fictional-place-a');
 
     expect(await reviewRepo.saveReviews(lead.id, [])).toBe(0);
+  });
+});
+
+const newCampaign = async () => {
+  const niche = await prisma.nicheProfile.findFirstOrThrow();
+  return prisma.campaign.create({
+    data: { organizationId: SEED_ORGANIZATION_ID, nicheProfileId: niche.id, city: 'Lahore' },
+  });
+};
+
+const setCap = (apifyDailyUsd: string) =>
+  prisma.settings.update({
+    where: { organizationId: SEED_ORGANIZATION_ID },
+    data: { spendCaps: { ...DEFAULT_SETTINGS.spendCaps, apifyDailyUsd } },
+  });
+
+const reserve = (forCampaign: string, amountUsd: string, placeCount = 1) =>
+  reviewRepo.reserveRun({
+    organizationId: SEED_ORGANIZATION_ID,
+    campaignId: forCampaign,
+    placeCount,
+    limitFor: (places) => new Prisma.Decimal(amountUsd).times(places),
+    dayStart: karachiDayStart(new Date()),
+    at: new Date(),
+  });
+
+// Proves the reservation is the money rule: it counts at once, takes turns, and reads the cap under the lock.
+describe('ReviewRepository.reserveRun', () => {
+  beforeEach(async () => {
+    await prisma.costRecord.deleteMany();
+    await setCap('2.00');
+  });
+
+  it('reserves one record per run and counts it on the day total', async () => {
+    const first = await reserve(campaignId, '0.50');
+
+    expect(first.outcome).toBe('RESERVED');
+    const records = await prisma.costRecord.findMany({ where: { service: 'APIFY' } });
+    expect(records.map((record) => record.amountUsd.toString())).toEqual(['0.5']);
+  });
+
+  it('lets only one of two parallel reservations fit a cap that holds one', async () => {
+    const other = await newCampaign();
+    await setCap('1.00');
+
+    const outcomes = await Promise.all([reserve(campaignId, '0.60'), reserve(other.id, '0.60')]);
+
+    expect(outcomes.map((outcome) => outcome.outcome).sort((a, b) => a.localeCompare(b))).toEqual([
+      'OVER_CAP',
+      'RESERVED',
+    ]);
+    expect(await prisma.costRecord.count({ where: { service: 'APIFY' } })).toBe(1);
+  });
+
+  it.each([
+    ['has room for part', '0.45', 'RESERVED', 2],
+    ['has room for none', '0.15', 'OVER_CAP', 0],
+  ])(
+    'when the cap %s, reserves for as many places as fit',
+    async (_case, cap, outcome, covered) => {
+      await setCap(cap);
+
+      const reservation = await reserve(campaignId, '0.20', 5);
+
+      expect(reservation.outcome).toBe(outcome);
+      if (reservation.outcome === 'RESERVED') {
+        expect(reservation.placeCount).toBe(covered);
+        expect(reservation.amountUsd.toString()).toBe(String(0.2 * covered));
+      }
+    },
+  );
+
+  it('gives back the unfinished run of a campaign instead of reserving a second one', async () => {
+    const first = await reserve(campaignId, '0.10');
+    const second = await reserve(campaignId, '0.10');
+
+    expect(second).toEqual({
+      outcome: 'EXISTING',
+      recordId: first.outcome === 'RESERVED' ? first.recordId : '',
+      runId: null,
+    });
+    expect(await prisma.costRecord.count({ where: { service: 'APIFY' } })).toBe(1);
+    expect(await reviewRepo.openRun(campaignId)).toEqual({
+      recordId: first.outcome === 'RESERVED' ? first.recordId : '',
+      runId: null,
+    });
+  });
+
+  it('reads the cap under the lock, so a cap lowered while it waits holds', async () => {
+    let settled = false;
+    let reservation: ReturnType<typeof reserve> | undefined;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${spendLockName(SEED_ORGANIZATION_ID)}, 0))`;
+      reservation = reserve(campaignId, '0.50').finally(() => {
+        settled = true;
+      });
+      await new Promise((wait) => setTimeout(wait, 500));
+      expect(settled).toBe(false);
+      await tx.settings.update({
+        where: { organizationId: SEED_ORGANIZATION_ID },
+        data: { spendCaps: { ...DEFAULT_SETTINGS.spendCaps, apifyDailyUsd: '0.10' } },
+      });
+    });
+
+    expect((await reservation)?.outcome).toBe('OVER_CAP');
+    expect(await prisma.costRecord.count({ where: { service: 'APIFY' } })).toBe(0);
+  });
+});
+
+// Proves the run id and the true charge land on the same record, and a charge never goes unsaid.
+describe('ReviewRepository.saveRunId and finishRun', () => {
+  beforeEach(async () => {
+    await prisma.costRecord.deleteMany();
+    await setCap('2.00');
+  });
+
+  it('saves the run id in the note, keeps the amount, then sets the true charge', async () => {
+    const reserved = await reserve(campaignId, '0.50');
+    const recordId = reserved.outcome === 'RESERVED' ? reserved.recordId : '';
+
+    await reviewRepo.saveRunId(recordId, 'fictional-run-1');
+    await reviewRepo.finishRun(recordId, 3, new Prisma.Decimal('0.02'));
+
+    const record = await prisma.costRecord.findUniqueOrThrow({ where: { id: recordId } });
+    expect(readReviewsRunNote(record.note)?.runId).toBe('fictional-run-1');
+    expect(record.units).toBe(3);
+    expect(record.amountUsd.toString()).toBe('0.02');
+  });
+
+  it('keeps the reserved amount when the run did not say what it charged', async () => {
+    const reserved = await reserve(campaignId, '0.50');
+    const recordId = reserved.outcome === 'RESERVED' ? reserved.recordId : '';
+
+    await reviewRepo.finishRun(recordId, 3, null);
+
+    const record = await prisma.costRecord.findUniqueOrThrow({ where: { id: recordId } });
+    expect(record.amountUsd.toString()).toBe('0.5');
   });
 });
