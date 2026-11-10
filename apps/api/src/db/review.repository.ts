@@ -1,12 +1,40 @@
 /**
- * Database access for storing business reviews for a lead.
+ * Database access for pass-2 reviews: the leads that need them, their storage, and the run's money.
  *
- * Serves: FR-11 (store up to 30 most recent Google reviews per business), ADR-0015.
+ * Serves: FR-11 (store up to 30 most recent Google reviews per business), FR-33, ADR-0015.
  * Used by: apps/api/src/app.module.ts, apps/api/test/review.repository.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
-import { PrismaProvider } from './prisma.provider.js';
+import { SpendCaps } from '@voxflow/shared';
+import { Prisma } from '../generated/prisma/client.js';
 import { mapReviewsToRows, type RawReviewInput } from '../pipeline/review-mapper.js';
+import { readReviewsRunNote, reviewsRunNote } from '../pipeline/reviews-run-note.js';
+import { spendLockName, wouldPassCap } from '../pipeline/spend-cap.js';
+import { DiscoveryRepository, type Reservation } from './discovery.repository.js';
+import { PrismaProvider } from './prisma.provider.js';
+
+// An unfinished run is one whose record has no `units` and was not abandoned.
+const findOpenRun = async (
+  client: Pick<Prisma.TransactionClient, 'costRecord'>,
+  campaignId: string,
+): Promise<{ recordId: string; runId: string | null } | null> => {
+  const unfinished = await client.costRecord.findMany({
+    where: { campaignId, service: 'APIFY', units: null, note: { contains: 'pass2-reviews' } },
+    select: { id: true, note: true },
+  });
+  for (const { id, note } of unfinished) {
+    const run = readReviewsRunNote(note);
+    if (run?.state === 'OPEN') return { recordId: id, runId: run.runId };
+  }
+  return null;
+};
+
+/** What {@link ReviewRepository.reserveRun} decided. */
+export type ReviewsReservation =
+  | Exclude<Reservation, { outcome: 'CLAIM_LOST' | 'RESERVED' }>
+  | { outcome: 'RESERVED'; recordId: string; placeCount: number; amountUsd: Prisma.Decimal }
+  // A run of this campaign that is not finished: `runId` is null when it may or may not exist.
+  | { outcome: 'EXISTING'; recordId: string; runId: string | null };
 
 /**
  * The `Lead.error` of a lead whose paid reviews run came back without its reviews. A terminal
@@ -21,8 +49,110 @@ export class ReviewRepository {
   /**
    * Wires the repository to the process's database client.
    * @param prisma - The process's Prisma client.
+   * @param discovery - Pass 1's repository, for the day's Apify spend and the run id write.
    */
-  constructor(private readonly prisma: PrismaProvider) {}
+  constructor(
+    private readonly prisma: PrismaProvider,
+    private readonly discovery: DiscoveryRepository,
+  ) {}
+
+  /**
+   * Finds this campaign's unfinished reviews run, or reserves the charge limit of a new one.
+   *
+   * One transaction under the same advisory lock as a pass-1 reservation, so runners of one
+   * organization take turns and each sees the others' reservations. The unfinished run is looked up
+   * under it too, so two passes over one campaign cannot both pay. The cap is read under it, so a
+   * lowered cap holds from the next reservation. The amount is the limit until the true charge is
+   * known, so a crashed run still counts.
+   * Reserves for as many places as fit the room left under the cap, which can be fewer than asked.
+   * Does not start the run, and the lock ends with this call: the caller makes its Apify request
+   * after this returns, never inside the transaction.
+   * @param reservation - What to reserve and the limits to reserve it under.
+   * @param reservation.organizationId - Owner of the spend.
+   * @param reservation.campaignId - `Campaign.id`.
+   * @param reservation.placeCount - How many places the caller would like to cover.
+   * @param reservation.limitFor - The charge limit of a run over n places, in US dollars.
+   * @param reservation.dayStart - When the capped day began.
+   * @param reservation.at - The record's time, on the caller's clock.
+   * @returns The unfinished run; a new record's id with how many places it covers and its limit; or
+   * the day's spend and cap when not even one place fits.
+   * @throws Prisma's not-found error when the organization has no settings; ZodError when its
+   * `spendCaps` are invalid. Nothing is reserved then.
+   */
+  reserveRun(reservation: {
+    organizationId: string;
+    campaignId: string;
+    placeCount: number;
+    limitFor: (placeCount: number) => Prisma.Decimal;
+    dayStart: Date;
+    at: Date;
+  }): Promise<ReviewsReservation> {
+    const { organizationId, campaignId, placeCount, limitFor, dayStart, at } = reservation;
+    return this.prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${spendLockName(organizationId)}, 0))`;
+      const open = await findOpenRun(tx, campaignId);
+      if (open !== null) return { outcome: 'EXISTING', ...open };
+      const { spendCaps } = await tx.settings.findUniqueOrThrow({
+        where: { organizationId },
+        select: { spendCaps: true },
+      });
+      const capUsd = new Prisma.Decimal(SpendCaps.parse(spendCaps).apifyDailyUsd);
+      const spent = await this.discovery.apifySpentSince(organizationId, dayStart, tx);
+      let fit = placeCount;
+      while (fit > 0 && wouldPassCap(spent, limitFor(fit), capUsd)) fit -= 1;
+      if (fit === 0) return { outcome: 'OVER_CAP', spent, capUsd };
+      const amountUsd = limitFor(fit);
+      const { id } = await tx.costRecord.create({
+        data: {
+          organizationId,
+          campaignId,
+          service: 'APIFY',
+          amountUsd,
+          at,
+          note: reviewsRunNote({ runId: null, placeCount: fit }),
+        },
+        select: { id: true },
+      });
+      return { outcome: 'RESERVED', recordId: id, placeCount: fit, amountUsd };
+    });
+  }
+
+  /**
+   * Finds this campaign's unfinished reviews run without reserving anything.
+   * @param campaignId - `Campaign.id`.
+   * @returns Its record id and run id (null when it may or may not exist), or null when none.
+   */
+  openRun(campaignId: string): Promise<{ recordId: string; runId: string | null } | null> {
+    return findOpenRun(this.prisma, campaignId);
+  }
+
+  /**
+   * Marks a reviews run done and sets its true charge on its reservation.
+   *
+   * Does not lower the reserved amount when the run did not say what it charged.
+   * @param recordId - The reservation's `CostRecord.id`.
+   * @param reviewItemCount - How many places' reviews the run returned.
+   * @param costUsd - True charge in US dollars; null keeps the reserved amount.
+   */
+  async finishRun(
+    recordId: string,
+    reviewItemCount: number,
+    costUsd: Prisma.Decimal | null,
+  ): Promise<void> {
+    await this.prisma.costRecord.updateMany({
+      where: { id: recordId, units: null },
+      data: { units: reviewItemCount, ...(costUsd === null ? {} : { amountUsd: costUsd }) },
+    });
+  }
+
+  /**
+   * Writes a started run's id into its reservation, so a restart collects instead of paying again.
+   * @param recordId - The reservation's `CostRecord.id`.
+   * @param runId - The id Apify gave the run.
+   */
+  async saveRunId(recordId: string, runId: string): Promise<void> {
+    await this.discovery.saveRunId(recordId, runId);
+  }
 
   /**
    * Finds leads in a campaign that passed the ideal-client filter and have no reviews yet.

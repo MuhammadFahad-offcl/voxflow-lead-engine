@@ -10,7 +10,7 @@ import { SpendCaps } from '@voxflow/shared';
 import { Prisma, type CostRecord } from '../generated/prisma/client.js';
 import { TEMPORARILY_CLOSED_REASON } from '../pipeline/ideal-client-filter.js';
 import { readSearchNote } from '../pipeline/search-plan.js';
-import { wouldPassCap } from '../pipeline/spend-cap.js';
+import { spendLockName, wouldPassCap } from '../pipeline/spend-cap.js';
 import { PrismaProvider } from './prisma.provider.js';
 
 /** A campaign held by one runner; `claimedAt` is the lease value only that runner knows. */
@@ -334,7 +334,7 @@ export class DiscoveryRepository {
     },
   ): Promise<Reservation> {
     const { organizationId, amountUsd, dayStart, at, note } = reservation;
-    const lockName = `apify-spend:${organizationId}`;
+    const lockName = spendLockName(organizationId);
     return this.prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockName}, 0))`;
       // Writes the same value: this only proves the claim and locks its row.
