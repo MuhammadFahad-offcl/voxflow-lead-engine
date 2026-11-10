@@ -157,6 +157,24 @@ const startRun = async (
   return runId;
 };
 
+// Saves each item's reviews on the lead of its place; returns the leads that got any.
+const storeItems = async (
+  reviewRepo: ReviewRepository,
+  inRun: readonly { id: string; placeId: string }[],
+  items: CollectedReviewsRun['items'],
+): Promise<{ withReviews: Set<string>; storedReviewsCount: number }> => {
+  const leadIdByPlace = new Map(inRun.map((lead) => [lead.placeId, lead.id]));
+  const withReviews = new Set<string>();
+  let storedReviewsCount = 0;
+  for (const item of items) {
+    const leadId = leadIdByPlace.get(item.placeId);
+    const saved = leadId === undefined ? 0 : await reviewRepo.saveReviews(leadId, item.reviews);
+    if (leadId !== undefined && saved > 0) withReviews.add(leadId);
+    storedReviewsCount += saved;
+  }
+  return { withReviews, storedReviewsCount };
+};
+
 /**
  * Runs pass-2 reviews collection for all eligible leads in a campaign, as one paid Apify run.
  *
@@ -173,8 +191,10 @@ const startRun = async (
  * Does not pay again for a run that ended badly: a run that is not SUCCEEDED, or that left some of
  * its leads without reviews, is not repeated, resumed or not. Those leads are marked
  * `NO_REVIEWS_ERROR`, which `leadsNeedingReviews` skips, and `problem` says why. Cap deferrals and
- * the unchecked-run marker stay retryable. That holds for a run resumed from its saved id too: its note names the places it
- * covers, so only those leads are marked, and a lead added since is left for the next call.
+ * the unchecked-run marker stay retryable. That holds for a run resumed from its saved id too: its
+ * note names the places it covers, so only those leads are marked, and a lead added since is left
+ * for the next call. The misses are marked before the record is closed, so a failure between the
+ * two leaves the run open and the next call finishes it for free, never as a second paid run.
  * Does not give the founder a way out of `needsCheck` yet: abandoning the record is PR 2b of #12
  * (`ReviewRepository.abandonRun` and the route that calls it); until then it is
  * `DiscoveryRepository.abandonSearch` by hand.
@@ -247,25 +267,21 @@ export async function enrichReviewsForCampaign(
   const { recordId } = reservation;
   const runId =
     reservation.outcome === 'EXISTING'
-      ? await resumeRun(deps, campaignId, leads, reservation)
+      ? await resumeRun(deps, campaignId, inRun, reservation)
       : await startRun(deps, campaignId, inRun, reservation);
   if (runId === null) return held(true);
 
   const collected = await collectRun(deps, campaignId, runId);
-  const leadIdByPlace = new Map(inRun.map((lead) => [lead.placeId, lead.id]));
-  const withReviews = new Set<string>();
-  let storedReviewsCount = 0;
-  for (const item of collected.items) {
-    const leadId = leadIdByPlace.get(item.placeId);
-    const saved = leadId === undefined ? 0 : await reviewRepo.saveReviews(leadId, item.reviews);
-    if (leadId !== undefined && saved > 0) withReviews.add(leadId);
-    storedReviewsCount += saved;
-  }
-  await reviewRepo.finishRun(recordId, collected.items.length, collected.costUsd);
+  const { withReviews, storedReviewsCount } = await storeItems(reviewRepo, inRun, collected.items);
+  // Before the record closes: a failure in between leaves it open, and the next call settles for
+  // free. The other way round, the misses would be bought again.
   await settleLeads(prisma, inRun, withReviews);
+  await reviewRepo.finishRun(recordId, collected.items.length, collected.costUsd);
 
   const runPlaces = resumed ? reservation.placeIds.length : inRun.length;
-  const problem = reviewsRunProblem(collected, storedReviewsCount, runPlaces);
+  // A resumed run with none of its leads left has nothing to judge.
+  const problem =
+    inRun.length === 0 ? null : reviewsRunProblem(collected, storedReviewsCount, runPlaces);
   logger.info(
     { campaignId, runId, status: collected.status, placeCount: inRun.length, storedReviewsCount },
     'pass-2 reviews stored',
