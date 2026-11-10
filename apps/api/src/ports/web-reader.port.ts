@@ -2,7 +2,7 @@
  * The port the enrich step reads a clinic's website through: homepage plus one contact page.
  *
  * Serves: FR-9, ADR-0004 (fetch, then Lightpanda, else unreadable), ADR-0007; issue #11.
- * Used by: apps/api/src/adapters/web-reader/.
+ * Used by: apps/api/src/adapters/web-reader/, apps/api/src/pipeline/extract/.
  */
 
 /** One page that was read. */
