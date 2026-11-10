@@ -1,0 +1,20 @@
+{
+  "id": "fixture-0001",
+  "results": [
+    {
+      "title": "Fictional Bright Smile Dental - DHA Phase 5, Lahore",
+      "url": "https://directory.example.com/fictional-bright-smile-dental",
+      "snippet": "Fictional Bright Smile Dental is a family dental clinic in DHA Phase 5, Lahore, offering braces, implants and teeth whitening. Open six days a week.",
+      "date": "2025-03-14",
+      "last_updated": "2025-09-01"
+    },
+    {
+      "title": "Bright Smile Dental opens second room",
+      "url": "https://news.example.com/bright-smile-second-room",
+      "snippet": "The clinic added a second treatment room this year and takes appointments by phone and walk-in only.",
+      "date": null,
+      "last_updated": null
+    }
+  ],
+  "server_time": null
+}
