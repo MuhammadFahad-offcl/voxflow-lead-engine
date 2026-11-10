@@ -367,3 +367,90 @@ describe('enrichReviewsForCampaign when a paid run is resumed', () => {
     expect([late.failedStep, late.error]).toEqual([null, null]);
   });
 });
+
+// Proves a failure between the pieces of finishing a run leaves it open, so the next call finishes
+// it for free and never starts a second paid run for the same leads.
+describe('enrichReviewsForCampaign when finishing a run fails once', () => {
+  const failedRunOf = (placeIds: string[]) =>
+    jest.spyOn(leadSource, 'collectReviews').mockResolvedValue({
+      items: placeIds.map(oneReview),
+      costUsd: null,
+      status: 'FAILED',
+      skippedCount: 0,
+    });
+  const boom = new Error('fictional database failure');
+
+  const expectOneRunAndMissesTerminal = async (starts: { mock: { calls: unknown[] } }) => {
+    expect(starts.mock.calls).toHaveLength(1);
+    const records = await apifyRecords();
+    expect(records).toHaveLength(1);
+    expect(records[0]?.units).not.toBeNull();
+    const lead = await prisma.lead.findFirstOrThrow({ where: { placeId: 'fictional-place-p02' } });
+    expect(lead.error).toBe(NO_REVIEWS_ERROR);
+  };
+
+  it('marking the misses throws: the record stays open and the next call settles for free', async () => {
+    await addLeads(['fictional-place-p01', 'fictional-place-p02']);
+    failedRunOf(['fictional-place-p01']);
+    const starts = watchStarts();
+    jest.spyOn(prisma.lead, 'updateMany').mockRejectedValueOnce(boom);
+
+    await expect(run()).rejects.toThrow(boom);
+    await run();
+
+    await expectOneRunAndMissesTerminal(starts);
+  });
+
+  it('closing the record throws: the misses are already terminal and the next call closes it', async () => {
+    await addLeads(['fictional-place-p01', 'fictional-place-p02']);
+    failedRunOf(['fictional-place-p01']);
+    const starts = watchStarts();
+    jest.spyOn(reviewRepo, 'finishRun').mockRejectedValueOnce(boom);
+
+    await expect(run()).rejects.toThrow(boom);
+    await run();
+
+    await expectOneRunAndMissesTerminal(starts);
+  });
+
+  it('storing reviews throws halfway: the next call resumes the same run', async () => {
+    await addLeads(['fictional-place-p01', 'fictional-place-p02', 'fictional-place-p03']);
+    jest.spyOn(leadSource, 'collectReviews').mockResolvedValue({
+      items: ['fictional-place-p01', 'fictional-place-p02'].map(oneReview),
+      costUsd: null,
+      status: 'SUCCEEDED',
+      skippedCount: 0,
+    });
+    const starts = watchStarts();
+    const real = reviewRepo.saveReviews.bind(reviewRepo);
+    jest.spyOn(reviewRepo, 'saveReviews').mockImplementationOnce(real).mockRejectedValueOnce(boom);
+
+    await expect(run()).rejects.toThrow(boom);
+    await run();
+
+    expect(starts).toHaveBeenCalledTimes(1);
+    expect(await apifyRecords()).toHaveLength(1);
+    const missed = await prisma.lead.findFirstOrThrow({
+      where: { placeId: 'fictional-place-p03' },
+    });
+    expect(missed.error).toBe(NO_REVIEWS_ERROR);
+  });
+});
+
+// Proves a resumed run with none of its own leads left reports no problem, because none is known.
+describe('enrichReviewsForCampaign when a resumed run has no lead left', () => {
+  it('returns no problem and leaves the new lead alone', async () => {
+    await addLeads(['fictional-place-p01']);
+    jest.spyOn(leadSource, 'collectReviews').mockRejectedValueOnce(new Error('still RUNNING'));
+    await expect(run()).rejects.toThrow('still RUNNING');
+    const lead = await prisma.lead.findFirstOrThrow();
+    await reviewRepo.saveReviews(lead.id, oneReview('fictional-place-p01').reviews);
+    await addLeads(['fictional-place-p02']);
+
+    const resumed = await run();
+
+    expect(resumed).toMatchObject({ placeCount: 0, problem: null });
+    const added = await prisma.lead.findFirstOrThrow({ where: { placeId: 'fictional-place-p02' } });
+    expect([added.failedStep, added.error]).toEqual([null, null]);
+  });
+});
