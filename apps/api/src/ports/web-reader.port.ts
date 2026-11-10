@@ -18,3 +18,15 @@ export interface WebPage {
 export type WebsiteRead =
   | { status: 'READ_FETCH' | 'READ_LIGHTPANDA'; pages: WebPage[] }
   | { status: 'UNREADABLE'; pages: []; reason: string };
+
+/** Reads websites. Implemented by the fetch-and-Lightpanda adapter and a fixture-backed fake. */
+export interface WebReaderPort {
+  /**
+   * Reads a site's homepage and, when it links one on the same site, its contact page.
+   *
+   * Does not throw for a site that is down, blocked, refused or broken: that is UNREADABLE.
+   * @param url - The homepage, as `normalizeUrl` stored it.
+   * @returns The pages read and the tier that read them, or UNREADABLE with a reason.
+   */
+  read(url: string): Promise<WebsiteRead>;
+}
