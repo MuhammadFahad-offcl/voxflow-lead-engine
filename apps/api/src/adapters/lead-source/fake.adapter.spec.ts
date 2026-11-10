@@ -104,6 +104,6 @@ describe('FakeLeadSourceAdapter', () => {
   });
 
   it('calculates reviews charge limit based on place count', () => {
-    expect(adapter.chargeLimitReviewsUsd(3).toFixed(3)).toBe('0.024');
+    expect(adapter.chargeLimitReviewsUsd(3).toFixed(3)).toBe('0.030');
   });
 });

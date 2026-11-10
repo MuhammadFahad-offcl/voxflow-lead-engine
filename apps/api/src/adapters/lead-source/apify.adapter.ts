@@ -21,13 +21,12 @@ import {
   buildCompassInput,
   chargeOfRun,
   COMPASS_ACTOR_ID,
+  reviewsRunChargeLimitUsd,
   runChargeLimitUsd,
 } from './compass-input.js';
 
 /** Apify Store actor ID for Scraperlink Google Maps reviews scraper. */
 const SCRAPERLINK_ACTOR_ID = 'scraperlink/google-maps-scraper';
-// Worst-case limit per place for 30 reviews (approx $0.0078 in spike #9).
-const REVIEW_LIMIT_PER_PLACE_USD = new Prisma.Decimal('0.01');
 
 // Apify stops the run here. 100 places take about 3 minutes (31 s per 20 in the #9 spike).
 const RUN_TIMEOUT_SECS = 600;
@@ -109,7 +108,7 @@ export class ApifyLeadSourceAdapter implements LeadSourcePort {
 
   /** @inheritDoc */
   chargeLimitReviewsUsd(placeCount: number): Prisma.Decimal {
-    return REVIEW_LIMIT_PER_PLACE_USD.times(placeCount).toDecimalPlaces(2, Prisma.Decimal.ROUND_UP);
+    return reviewsRunChargeLimitUsd(placeCount);
   }
 
   /** @inheritDoc */

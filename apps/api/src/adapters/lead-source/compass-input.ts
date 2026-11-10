@@ -36,6 +36,20 @@ export function runChargeLimitUsd(maxResults: number): Prisma.Decimal {
   );
 }
 
+// Measured in #9: 30 reviews of a place cost about $0.0078; $0.01 leaves headroom.
+const REVIEWS_LIMIT_PER_PLACE_USD = new Prisma.Decimal('0.01');
+
+/**
+ * The charge limit of one pass-2 reviews run over some places, shared by the real and fake adapters.
+ *
+ * Does not say what a run will cost: this is Apify's ceiling, and there is no minimum.
+ * @param placeCount - How many places the run covers.
+ * @returns places × $0.01, rounded up to the cent, in US dollars; $0 for no places.
+ */
+export function reviewsRunChargeLimitUsd(placeCount: number): Prisma.Decimal {
+  return REVIEWS_LIMIT_PER_PLACE_USD.times(placeCount).toDecimalPlaces(2, Prisma.Decimal.ROUND_UP);
+}
+
 /**
  * Refuses a charge limit Compass would refuse, before any request goes out.
  * @param limit - The limit in US dollars.

@@ -17,7 +17,7 @@ import type {
   PlaceSearch,
 } from '../../ports/lead-source.port.js';
 import { parsePlaceItems, parseReviewsItems, ScraperlinkReviewsItem } from './apify-items.js';
-import { assertChargeLimit, runChargeLimitUsd } from './compass-input.js';
+import { assertChargeLimit, reviewsRunChargeLimitUsd, runChargeLimitUsd } from './compass-input.js';
 
 const FIXTURES_DIR = resolve(import.meta.dirname, '../../../../../fixtures/places');
 const REVIEWS_FIXTURES_DIR = resolve(import.meta.dirname, '../../../../../fixtures/reviews');
@@ -29,7 +29,6 @@ const FIXTURE_TERMS = ['dental clinic', 'dentist', 'dental surgeon', 'orthodonti
 // Fictional, so demo campaigns show cost figures of the right size.
 const PLACE_CHARGE_USD = new Prisma.Decimal('0.006');
 const REVIEW_CHARGE_USD = new Prisma.Decimal('0.00026');
-const REVIEW_LIMIT_PER_PLACE_USD = new Prisma.Decimal('0.008');
 
 // The run id holds the whole search, so a restart can collect it like a real run.
 const FakeRun = z.object({ term: z.string(), area: z.string(), maxResults: z.number() });
@@ -77,7 +76,7 @@ export class FakeLeadSourceAdapter implements LeadSourcePort {
 
   /** @inheritDoc */
   chargeLimitReviewsUsd(placeCount: number): Prisma.Decimal {
-    return REVIEW_LIMIT_PER_PLACE_USD.times(placeCount);
+    return reviewsRunChargeLimitUsd(placeCount);
   }
 
   /** @inheritDoc */
