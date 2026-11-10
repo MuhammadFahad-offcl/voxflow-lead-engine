@@ -3,7 +3,7 @@
  * one contact page. Each adapter brings its own way of getting a page.
  *
  * Serves: FR-9, ADR-0004; issue #11.
- * Used by: only its spec so far, apps/api/src/adapters/web-reader/read-site.spec.ts.
+ * Used by: apps/api/src/adapters/web-reader/fake.adapter.ts.
  */
 import { load } from 'cheerio';
 import robotsTypes from 'robots-parser';
