@@ -279,4 +279,65 @@ describe('ApifyLeadSourceAdapter.collect', () => {
     expect(warn).toHaveBeenCalledWith({ placeId: 'fictional-bad' }, expect.any(String));
     expect(JSON.stringify(warn.mock.calls)).not.toContain('+923000000099');
   });
+
+  it('startReviews sends Scraperlink input and returns run id', async () => {
+    const runId = await adapter().startReviews(['place-1', 'place-2'], new Prisma.Decimal('0.02'));
+
+    expect(runId).toBe(RUN_ID);
+    const postReq = requests.find((r) => r.method === 'POST');
+    const input = JSON.parse(postReq?.body ?? '{}') as Record<string, unknown>;
+    expect(input['placeIds']).toEqual(['place-1', 'place-2']);
+    expect(input['reviews']).toBe(true);
+    expect(input['maxReviews']).toBe(30);
+    expect(input['reviewsSort']).toBe('newest');
+  });
+
+  it('collectReviews collects and parses review items', async () => {
+    const reviewData = [
+      {
+        placeId: 'place-1',
+        reviews: [
+          {
+            reviewId: 'r1',
+            text: 'Friendly staff',
+            stars: 5,
+            publishedAtDate: '2026-10-10T00:00:00.000Z',
+            responseFromOwnerText: null,
+            responseFromOwnerDate: null,
+            language: 'en',
+            originalLanguage: 'en',
+          },
+        ],
+      },
+    ];
+    replies.items = [json(200, reviewData)];
+
+    const result = await adapter().collectReviews(RUN_ID);
+
+    expect(result.status).toBe('SUCCEEDED');
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0]?.placeId).toBe('place-1');
+  });
+});
+
+// Proves pass 2 is bounded like pass 1: Apify's own limit goes on the run, and no start is retried.
+describe('ApifyLeadSourceAdapter reviews run money rules', () => {
+  it('sends the reserved charge limit with the request', async () => {
+    await adapter().startReviews(['place-1'], new Prisma.Decimal('0.02'));
+
+    expect(requests[0]?.url).toContain('maxTotalChargeUsd=0.02');
+  });
+
+  it('sends exactly one request after a 503, so a failed start never pays twice', async () => {
+    replies.start = [json(503, { error: { type: 'fictional', message: 'down' } })];
+
+    await expect(adapter().startReviews(['place-1'], new Prisma.Decimal('0.01'))).rejects.toThrow();
+
+    expect(starts()).toBe(1);
+  });
+
+  it('limits one run to $0.01 per place, rounded up to the cent', () => {
+    expect(adapter().chargeLimitReviewsUsd(1).toString()).toBe('0.01');
+    expect(adapter().chargeLimitReviewsUsd(30).toString()).toBe('0.3');
+  });
 });
