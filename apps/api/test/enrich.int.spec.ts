@@ -2,12 +2,13 @@
  * Integration test of the website part of the enrich step on real Postgres, with the web reader
  * that DEMO_MODE binds.
  *
- * Serves: FR-9, FR-10, FR-36, ADR-0007; issue #11 acceptance criteria.
+ * Serves: FR-9, FR-10, FR-14 (stored evidence), FR-36, ADR-0007; issue #11 acceptance criteria.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { resolve } from 'node:path';
 import type { HazelApp } from '@hazeljs/core';
+import { WebsiteEvidence } from '@voxflow/shared';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
 import { LeadWebsiteRepository } from '../src/db/lead-website.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
@@ -23,6 +24,8 @@ let app: HazelApp;
 let prisma: PrismaProvider;
 let deps: EnrichWebsiteDeps;
 let campaignId = '';
+// Each enrich makes a new lead, so a site can be read more than once.
+let places = 0;
 const info = jest.fn();
 
 beforeAll(async () => {
@@ -49,18 +52,20 @@ afterAll(async () => {
 });
 
 const enrich = async (website: string | null) => {
+  places += 1;
   const lead = await prisma.lead.create({
     data: {
       organizationId: SEED_ORGANIZATION_ID,
       campaignId,
-      placeId: `place-${String(website)}`,
+      placeId: `place-${String(places)}`,
       name: 'Fictional Clinic',
       rawPlace: {},
       website,
     },
   });
-  const evidence = await enrichWebsite(deps, lead.id);
-  return { evidence, row: await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } }) };
+  await enrichWebsite(deps, lead.id);
+  const row = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+  return { row, evidence: WebsiteEvidence.parse(row.websiteEvidence) };
 };
 
 // Proves issue #11's acceptance in DEMO_MODE: each fixture site stores its status and fields.
@@ -89,22 +94,57 @@ describe('enrichWebsite', () => {
     expect((await enrich('https://p01.example.com/')).row.socialLinks).toHaveLength(2);
   });
 
-  it('returns the doctors and treatments, which have no column yet', async () => {
+  it('stores the evidence behind the fields: doctors, treatments, booking and chat', async () => {
     const { evidence } = await enrich('https://p06.example.com/');
 
     expect(evidence.doctors).toHaveLength(3);
     expect(evidence.treatments).toHaveLength(5);
+    expect((await enrich('https://p07.example.com/')).evidence).toMatchObject({
+      onlineBooking: [expect.any(String)],
+      chatWidgets: [expect.any(String)],
+    });
   });
 
-  it('marks a lead with no website NONE, and logs only id, domain and status', async () => {
+  it('stores why a site is unreadable, with no evidence', async () => {
+    const { evidence } = await enrich('https://p08.example.com/');
+
+    expect(evidence).toEqual({
+      doctors: [],
+      treatments: [],
+      onlineBooking: [],
+      chatWidgets: [],
+      pagesRead: [],
+      unreadableReason: 'blocked by a bot challenge',
+    });
+  });
+
+  // no_online_booking needs the pages checked as its evidence (PRD, Lead scoring model).
+  it('stores the pages it checked, and none for a lead with no website', async () => {
+    const { evidence } = await enrich('https://p10.example.com/');
+
+    expect(evidence.pagesRead).toEqual([
+      'https://p10.example.com/',
+      'https://p10.example.com/contact-us/',
+    ]);
+    expect((await enrich(null)).evidence.pagesRead).toEqual([]);
+  });
+
+  it('logs only id, domain, status and an unreadable reason', async () => {
     info.mockClear();
     const { row } = await enrich(null);
     await enrich('https://p10.example.com/');
+    await enrich('https://p08.example.com/');
 
     expect(row.websiteStatus).toBe('NONE');
-    expect(info.mock.calls.map(([fields]) => Object.keys(fields as object))).toEqual([
-      ['leadId', 'status'],
-      ['leadId', 'domain', 'status'],
+    expect(info.mock.calls.map(([fields]) => fields)).toEqual([
+      { leadId: expect.any(String), status: 'NONE' },
+      { leadId: expect.any(String), domain: 'p10.example.com', status: 'READ_FETCH' },
+      {
+        leadId: expect.any(String),
+        domain: 'p08.example.com',
+        status: 'UNREADABLE',
+        reason: 'blocked by a bot challenge',
+      },
     ]);
   });
 });

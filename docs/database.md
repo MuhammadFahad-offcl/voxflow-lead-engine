@@ -55,7 +55,7 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 - Money is `Decimal`, never `Float`. `CostRecord.amountUsd` has 5 decimals because a single embedding call costs fractions of a cent.
 - Phones are stored in E.164 (`+923001234567`).
 - Every row belongs to an `Organization`, even though v1 has one. This keeps the later multi-agency version a data change, not a rewrite.
-- JSON columns (`Settings.*`, `NicheProfile.idealClient`, `signalWeights`, `Lead.scoreBreakdown`, `businessContext`) are validated with Zod schemas from `packages/shared` on every write.
+- JSON columns (`Settings.*`, `NicheProfile.idealClient`, `signalWeights`, `Lead.scoreBreakdown`, `websiteEvidence`, `businessContext`) are validated with Zod schemas from `packages/shared` on every write.
 - Deleting a lead cascades to its reviews, signals, solution, script, attempts and meetings. Cost records keep the money history (`SetNull`).
 
 ## Campaign discovery fields
@@ -64,6 +64,12 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 - `Campaign.pauseReason` says why the system paused a campaign, for example a spend cap (FR-33). It is null for an operator pause, and resume clears it.
 - A discovery search has one live `CostRecord` (service `APIFY`), written before its paid run starts. Its `note` is JSON with `term`, `area`, `runId` and `state`. `runId` is null until Apify accepts the start. `state` is `OPEN`, `CHECK_APIFY` (the campaign paused so the founder can look for its run) or `ABANDONED` (he resumed; a new record takes over and this one keeps its amount). `units` stays null until the search is stored; until then `amountUsd` holds the run's charge limit, so an unfinished run counts against the daily cap.
 - `Lead.campaignId` is the campaign that first found a place, with one exception: a place filtered out as temporarily closed moves to the campaign whose search later shows it open. It counts as new there, not as a duplicate. The first campaign keeps its counts.
+
+## Lead website fields
+
+- The enrich step (#11) sets `websiteStatus` (`NONE`, `READ_FETCH`, `READ_LIGHTPANDA` or `UNREADABLE`), `emails`, `whatsappLinks`, `socialLinks`, `hasOnlineBooking`, `hasChatWidget` and `decisionMakerName`, the first doctor found (homepage, then contact page). A second run replaces them.
+- For an `UNREADABLE` site, `hasOnlineBooking` and `hasChatWidget` stay null (unknown), never false, so scoring gives no points for "no online booking".
+- `Lead.websiteEvidence` (Zod `WebsiteEvidence`) holds what the extractors matched, as found: `doctors`, `treatments`, `onlineBooking` and `chatWidgets`; `pagesRead`, the URLs of the pages checked, which are the evidence for "no online booking"; and `unreadableReason`, the reader's fixed words, for an `UNREADABLE` site. Scoring (#14) reads it, so a point can cite its evidence (FR-14). It is null until the website is read; a lead with no website gets empty lists.
 
 ## Retention (NFR-6)
 
