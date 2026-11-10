@@ -231,6 +231,7 @@ model Lead {
   hasOnlineBooking  Boolean?
   hasChatWidget     Boolean?
   decisionMakerName String?
+  websiteEvidence   Json? // what the website read found, for scoring (FR-14, #14); WebsiteEvidence
   businessContext   Json? // Perplexity summary (FR-12)
 
   score          Int?
