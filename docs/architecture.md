@@ -186,15 +186,15 @@ Checked before every `placeCall` (FR-21). Each denial is stored on the attempt a
 
 ## 8. Adapters (ports and adapters, ADR-0007)
 
-| Port             | Real adapter                                                      | Fake adapter (demo + tests)                                          | Used by                |
-| ---------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------- |
-| `LeadSourcePort` | Apify: Compass places (ADR-0015); reviews come in #12             | `fixtures/places/*.json`                                             | discover               |
-| `WebReaderPort`  | fetch + Cheerio, Lightpanda via `puppeteer-core` CDP              | `fixtures/sites/*.html`                                              | enrich                 |
-| `WebContextPort` | Perplexity Search API                                             | `fixtures/context/*.json`                                            | enrich                 |
-| `LlmPort`        | `@hazeljs/ai` → Anthropic (and OpenAI for the Cycle 2 comparison) | recorded responses in `fixtures/llm/`                                | agents                 |
-| `EmbeddingPort`  | Perplexity `pplx-embed-v1-0.6b` (1024 dims)                       | deterministic hash vectors                                           | catalog, solution      |
-| `VoicePort`      | Vapi REST (create call, get call)                                 | simulated call that posts a fixture webhook to the API after a delay | caller, reconciliation |
-| `CalendarPort`   | Google Calendar API (free/busy, insert event with Meet)           | in-memory calendar                                                   | booking                |
+| Port             | Real adapter                                                                 | Fake adapter (demo + tests)                                          | Used by                |
+| ---------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------- |
+| `LeadSourcePort` | Apify: Compass places (ADR-0015); reviews come in #12                        | `fixtures/places/*.json`                                             | discover               |
+| `WebReaderPort`  | fetch + Cheerio, Lightpanda via `puppeteer-core` CDP                         | `fixtures/sites/*.html`                                              | enrich                 |
+| `WebContextPort` | Perplexity Search API                                                        | `fixtures/context/*.json`                                            | enrich                 |
+| `LlmPort`        | `@anthropic-ai/sdk` → Anthropic, thinking off, JSON schema output (ADR-0006) | recorded responses in `fixtures/llm/<task>/<hash>.json`              | agents, labelling      |
+| `EmbeddingPort`  | Perplexity `pplx-embed-v1-0.6b` (1024 dims)                                  | deterministic hash vectors                                           | catalog, solution      |
+| `VoicePort`      | Vapi REST (create call, get call)                                            | simulated call that posts a fixture webhook to the API after a delay | caller, reconciliation |
+| `CalendarPort`   | Google Calendar API (free/busy, insert event with Meet)                      | in-memory calendar                                                   | booking                |
 
 `DEMO_MODE=true` binds every port to its fake. Selection happens once, in the DI module, never with `if (demo)` inside business code.
 

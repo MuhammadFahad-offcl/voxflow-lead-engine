@@ -12,6 +12,7 @@
     "worker": "node --env-file-if-exists=../../.env --enable-source-maps dist/worker.js"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.8.0",
     "@hazeljs/agent": "2.0.13",
     "@hazeljs/core": "2.0.13",
     "@prisma/adapter-pg": "7.10.1",
