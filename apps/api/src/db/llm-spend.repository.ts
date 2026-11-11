@@ -3,7 +3,8 @@
  * so far this month, and one cost record per call.
  *
  * Serves: FR-33, NFR-4 (cost per lead and per call), ADR-0006 (model per task); issue #13.
- * Used by: apps/api/src/llm/llm.service.ts, apps/api/test/llm-gate.int.spec.ts.
+ * Used by: apps/api/src/llm/llm.service.ts, apps/api/src/modules/costs/costs.service.ts,
+ * apps/api/test/llm-gate.int.spec.ts, apps/api/test/costs.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { LlmModels, SpendCaps } from '@voxflow/shared';
@@ -56,19 +57,46 @@ export class LlmSpendRepository {
    * `spendCaps` or `llmModels` are invalid.
    */
   async budget(organizationId: string, task: LlmTask, since: Date): Promise<LlmBudget> {
-    const { spendCaps, llmModels } = await this.prisma.settings.findUniqueOrThrow({
+    // One read of Settings, so the model and the cap come from the same row version.
+    const { llmModels, spendCaps } = await this.prisma.settings.findUniqueOrThrow({
       where: { organizationId },
-      select: { spendCaps: true, llmModels: true },
-    });
-    const { _sum: sum } = await this.prisma.costRecord.aggregate({
-      where: { organizationId, service: 'LLM', at: { gte: since } },
-      _sum: { amountUsd: true },
+      select: { llmModels: true, spendCaps: true },
     });
     return {
       model: LlmModels.parse(llmModels)[task],
       capUsd: new Prisma.Decimal(SpendCaps.parse(spendCaps).llmMonthlyUsd),
-      spentUsd: sum.amountUsd ?? new Prisma.Decimal(0),
+      spentUsd: await this.spentSince(organizationId, since),
     };
+  }
+
+  /**
+   * Reads the monthly LLM cap and the LLM spend recorded since a moment.
+   * @param organizationId - Owner of the spend.
+   * @param since - Start of the capped month (Asia/Karachi), as a UTC instant.
+   * @returns The cap and the spend, in US dollars.
+   * @throws Prisma's not-found error when the organization has no settings; ZodError when its
+   * `spendCaps` are invalid.
+   */
+  async monthToDate(
+    organizationId: string,
+    since: Date,
+  ): Promise<Pick<LlmBudget, 'capUsd' | 'spentUsd'>> {
+    const { spendCaps } = await this.prisma.settings.findUniqueOrThrow({
+      where: { organizationId },
+      select: { spendCaps: true },
+    });
+    return {
+      capUsd: new Prisma.Decimal(SpendCaps.parse(spendCaps).llmMonthlyUsd),
+      spentUsd: await this.spentSince(organizationId, since),
+    };
+  }
+
+  private async spentSince(organizationId: string, since: Date): Promise<Prisma.Decimal> {
+    const { _sum: sum } = await this.prisma.costRecord.aggregate({
+      where: { organizationId, service: 'LLM', at: { gte: since } },
+      _sum: { amountUsd: true },
+    });
+    return sum.amountUsd ?? new Prisma.Decimal(0);
   }
 
   /**
