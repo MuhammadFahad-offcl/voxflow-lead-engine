@@ -1,14 +1,13 @@
 # AI Handoff — VoxFlow Lead Engine
 
-> Last updated: 2026-11-11. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
+> Last updated: 2026-11-12. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
 
 ## Cycle 1 issues remaining
 
-Cycle 1 is due **13 Nov 2026**. Issues #3–#12 are closed. Issues #13–#16 remain.
+Cycle 1 is due **13 Nov 2026**. Issues #3–#13 are closed. Issues #14–#16 remain.
 
 | Issue | Title                                                           | Prompt                                         |
 | ----- | --------------------------------------------------------------- | ---------------------------------------------- |
-| #13   | `LlmPort` with cost recording and monthly cap; review labelling | `docs/prompts/cycle-1-scored-leads.md` → C1-11 |
 | #14   | Scoring rules (pure) + signals + tiers, unit tests ≥ 80%        | `docs/prompts/cycle-1-scored-leads.md` → C1-12 |
 | #15   | Lead `AgentGraph` (enrich → score) with per-lead status, retry  | `docs/prompts/cycle-1-scored-leads.md` → C1-13 |
 | #16   | Dashboard — campaigns list, new campaign form, lead table + CSV | `docs/prompts/cycle-1-scored-leads.md` → C1-14 |
@@ -16,7 +15,7 @@ Cycle 1 is due **13 Nov 2026**. Issues #3–#12 are closed. Issues #13–#16 rem
 ## Keys still needed
 
 - **#12 (Perplexity, done):** `PERPLEXITY_API_KEY` is in `.env`. No real Perplexity call has been made yet; the first one needs Fahad's approval.
-- **#13 (Anthropic):** Fahad added `ANTHROPIC_API_KEY` to `.env` on 2026-11-11. Check the API starts in real mode without reading `.env`. #13 is also the checkpoint: give a summary after #13 and wait for "continue".
+- **#13 (Anthropic, done):** `ANTHROPIC_API_KEY` is in `.env`. The first real calls were the demo recording (`pnpm llm:record`, $0.00204, founder-approved).
 
 ## Decisions made in chat (not yet in a doc)
 
@@ -45,7 +44,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 - Apify: $2.00/day (Asia/Karachi day), stored in `Organization.apifyDailyUsd`.
 - Monthly LLM: $10, stored in `Settings.llmMonthlyBudgetUsd`.
-- Cycle 1 real-service total budget: $5. Spent so far: $1.38 ($0.66 spike in #9 + $0.7208 DHA run in #10; #12 made no real calls). About **$3.62 remaining**.
+- Cycle 1 real-service total budget: $5. Spent so far: about $1.382 ($0.66 spike in #9 + $0.7208 DHA run in #10 + $0.00204 Claude in #13; #12 made no real calls). About **$3.62 remaining**.
 
 ### PR size
 
@@ -57,6 +56,16 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 - UNREADABLE reason is logged (fixed text, not page content) and stored in `websiteEvidence.unreadableReason`.
 - `decisionMakerName` = first doctor found (homepage, then contact page). Fahad accepted this heuristic.
 - Lightpanda DNS-rebinding risk accepted for v1; recorded in ADR-0004; to be fixed after v1 in #94.
+
+### #13 decisions (2026-11-12)
+
+- **LLM library:** `@anthropic-ai/sdk` 1.8.0 behind `LlmPort`, not `@hazeljs/ai` 2.0.13, which cannot turn thinking off or send an output schema for Anthropic. The evidence is in ADR-0006.
+- **Every LLM call goes through `LlmService`** (`apps/api/src/llm/`). It takes the model from Settings, applies the monthly cap (Asia/Karachi month), writes a cost record per attempt and does one retry on a bad answer.
+- **Reviews only:** #13 labels reviews; the "paid ads" check for `active_marketing` is plain code in #14 over the business context.
+- **Star-only reviews** (no text) get `OTHER` in code and are never sent to the model: no words, no evidence.
+- **#14 must count review labels over the same order** the labelling step uses: the 30 newest by `publishedAt` desc, nulls last, then `id`.
+- **Cap banner:** `GET /costs/status` reports `blocked` once less than one cent of the monthly cap is left. The gate stops calls just under the cap, so "spent ≥ cap" would never show. Merged by the founder in #127.
+- **Demo mode:** labelling replays the answers `pnpm llm:record` saved in `fixtures/llm/`. A prompt change needs a new recording.
 
 ## The workflow (every issue)
 
@@ -72,7 +81,6 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 ### Checkpoints
 
-- **After #13:** give a summary (what was built, what is next) and wait for "continue".
 - **After #16:** run the S-8 cycle close but do not tag until Fahad approves.
 
 ## What "stop and ask" means
