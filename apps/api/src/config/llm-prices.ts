@@ -4,7 +4,7 @@
  *
  * Serves: FR-33, NFR-4, ADR-0006 (Haiku 5.5: $0.10 / $0.50 per million tokens, $0.50 / $2.50 for
  * prompts over 100,000 tokens; checked 12 Nov 2026); issue #13.
- * Used by: apps/api/src/config/llm-prices.spec.ts; the LLM gate (#13, next PR).
+ * Used by: apps/api/src/llm/llm.service.ts, apps/api/src/config/llm-prices.spec.ts.
  */
 import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client.js';

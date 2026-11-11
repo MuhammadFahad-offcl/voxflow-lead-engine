@@ -167,7 +167,7 @@ When every lead in a campaign has finished its lead graph, the worker sets `AWAI
 | `caller-agent`   | none               | `placeCall` (Gatekeeper-checked)        | —                                                                                                                                                                                | FR-21–FR-23  |
 | `outcome-agent`  | `OUTCOME`          | none                                    | `{ result, reasonCode?, remarks, callbackAt?, decisionMakerName? }`                                                                                                              | FR-28, FR-29 |
 
-The model for each task key comes from `Settings.llmModels` (default `claude-haiku-5-5` for all; Cycle 2 compares against `gpt-6-luna` for `SCRIPT`, ADR-0006). All LLM calls go through `LlmPort`, which records a `CostRecord` and refuses when the monthly LLM cap would be exceeded (FR-33).
+The model for each task key comes from `Settings.llmModels` (default `claude-haiku-5-5` for all; Cycle 2 compares against `gpt-6-luna` for `SCRIPT`, ADR-0006). All LLM calls go through `LlmService` (`apps/api/src/llm/`), the gate above `LlmPort`: it takes the model from Settings, refuses a call whose worst case could pass the monthly LLM cap (Asia/Karachi month), records a `CostRecord` for every attempt, and validates the answer with the task's Zod schema, retrying once (FR-13, FR-33).
 
 The live call's conversation model is configured in Vapi, not here, and is billed with the call.
 
