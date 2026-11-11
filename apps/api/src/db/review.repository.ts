@@ -188,6 +188,8 @@ export class ReviewRepository {
    *
    * Upserts on `(leadId, externalId)`: re-running does not duplicate reviews.
    * Author names are never stored (CLAUDE.md).
+   * Does not change `labels` on rows that already exist: the update writes only the mapped
+   * columns, so the review-labelling task's work survives a repeat save (#13).
    * @param leadId - `Lead.id`.
    * @param rawReviews - Array of raw reviews from Scraperlink or fixture.
    * @returns The number of reviews stored.

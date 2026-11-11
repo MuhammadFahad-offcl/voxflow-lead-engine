@@ -1,7 +1,8 @@
 /**
  * Integration test of the review repository against real Postgres.
  *
- * Serves: FR-11, FR-33, NFR-4 (reservation under the cap), ADR-0015; issue #12.
+ * Serves: FR-11, FR-13 (labels survive a repeat save), FR-33, NFR-4 (reservation under the cap),
+ * ADR-0015; issues #12 and #13.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from '@jest/globals';
@@ -103,7 +104,8 @@ describe('ReviewRepository.leadsNeedingReviews', () => {
   });
 });
 
-// Proves reviews are stored once, newest 30 only, with the rating, date and reply flag and no author.
+// Proves reviews are stored once, newest 30 only, with the rating, date and reply flag and no author,
+// and that a repeat save never wipes their labels.
 describe('ReviewRepository.saveReviews', () => {
   it('keeps the 30 newest, stores no author, and does not duplicate on a repeat', async () => {
     const lead = await addLead('fictional-place-a');
@@ -120,6 +122,20 @@ describe('ReviewRepository.saveReviews', () => {
     expect(stored[0]?.externalId).toBe('fictional-review-34');
     expect(stored[0]?.rating).toBe(4);
     expect(stored[0]?.publishedAt).not.toBeNull();
+  });
+
+  it('stores a new review unlabelled and keeps its labels when the same review is saved again', async () => {
+    const lead = await addLead('fictional-place-a');
+    await reviewRepo.saveReviews(lead.id, [rawReview(0)]);
+    expect((await reviewsOf(lead.id))[0]?.labels).toEqual([]);
+    await prisma.review.updateMany({
+      where: { leadId: lead.id },
+      data: { labels: ['PHONE_UNANSWERED'] },
+    });
+
+    await reviewRepo.saveReviews(lead.id, [rawReview(0)]);
+
+    expect((await reviewsOf(lead.id))[0]?.labels).toEqual(['PHONE_UNANSWERED']);
   });
 
   it('records an owner reply as a flag, not as text', async () => {
