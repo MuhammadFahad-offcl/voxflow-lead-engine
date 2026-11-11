@@ -24,3 +24,16 @@ Every LLM call goes through `LlmPort` with a task key (`REVIEW_LABELLING`, `SOLU
 - Switching a model is a settings change, not a code change.
 - Two provider SDKs may be present; both behind `LlmPort`.
 - The Vapi in-call model is configured in Vapi and is not counted in the $10 cap.
+
+## Update 2026-11-12: the Anthropic adapter uses `@anthropic-ai/sdk`, not `@hazeljs/ai` (#13)
+
+The C1-11 prompt asked for `@hazeljs/ai` unless it could not do the job. `@hazeljs/ai` 2.0.13 was installed in a scratch folder and its types and Anthropic provider read (12 Nov 2026):
+
+- `AICompletionRequest` has no thinking setting, and the Anthropic provider sends only `model`, `max_tokens`, `temperature`, `system` and `messages`. Thinking cannot be turned off, and Claude Haiku 5.5 thinks by default (effort `medium`). Thinking tokens are billed as output, which breaks the "< $0.001 per lead" target for labelling.
+- `responseFormat` (JSON schema output) is used only by its OpenAI provider; the Anthropic provider ignores it.
+- It wraps every Anthropic error in a plain `Error`, so a 429 (not billed, safe to retry) cannot be told from a timeout (maybe billed). The cap needs that difference (FR-33).
+- It pins `@anthropic-ai/sdk` 0.82 and Zod 3, and pulls in the OpenAI, Cohere and Gemini SDKs.
+
+**Decision:** `AnthropicLlmAdapter` uses `@anthropic-ai/sdk` 1.8.0 (founder approved, #13) behind `LlmPort`. It sends `thinking: {type: "disabled"}` and `output_config.format` with the task's Zod schema, and turns off the SDK's own retries so it can retry only unbilled failures. The fake adapter and the cap are unchanged by this choice. HazelJS stays the framework for DI, modules and `@hazeljs/agent` (ADR-0001).
+
+**Prices** (checked 12 Nov 2026) are in `apps/api/src/config/llm-prices.ts`: Haiku 5.5 is $0.10 / $0.50 per million input/output tokens up to 100,000 prompt tokens, and $0.50 / $2.50 for a call above that. A model with no price there is refused before any call.

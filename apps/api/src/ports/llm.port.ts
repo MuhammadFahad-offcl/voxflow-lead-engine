@@ -4,13 +4,18 @@
  * the same rules as the real one.
  *
  * Serves: FR-13, FR-33, NFR-4, ADR-0006 (model per task), ADR-0007; issue #13.
- * Used by: apps/api/src/adapters/llm/fake.adapter.ts, apps/api/src/config/llm-prices.ts.
+ * Used by: apps/api/src/adapters/llm/, apps/api/src/llm/llm.service.ts,
+ * apps/api/src/db/llm-spend.repository.ts, apps/api/src/config/llm-prices.ts,
+ * apps/api/src/bootstrap.ts.
  */
 import type { LlmModels } from '@voxflow/shared';
 import type { z } from 'zod';
 
+/** DI token of {@link LlmPort}. */
+export const LLM = 'LlmPort';
+
 /** What an LLM call is for; `Settings.llmModels` maps each to a model (ADR-0006). */
-type LlmTask = keyof z.infer<typeof LlmModels>;
+export type LlmTask = keyof z.infer<typeof LlmModels>;
 
 /**
  * A failed call. The message is a fixed phrase, optionally with an HTTP status or a fixture path,

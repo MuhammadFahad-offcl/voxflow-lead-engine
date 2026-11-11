@@ -6,6 +6,8 @@
  */
 import { Container, HazelApp } from '@hazeljs/core';
 import { bindAdapter } from './adapters/bind.js';
+import { AnthropicLlmAdapter } from './adapters/llm/anthropic.adapter.js';
+import { FakeLlmAdapter } from './adapters/llm/fake.adapter.js';
 import { ApifyLeadSourceAdapter } from './adapters/lead-source/apify.adapter.js';
 import { FakeLeadSourceAdapter } from './adapters/lead-source/fake.adapter.js';
 import { FakeWebContextAdapter } from './adapters/web-context/fake.adapter.js';
@@ -17,6 +19,7 @@ import { ENV, InvalidEnvError, loadEnv, type Env } from './config/env.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createLogger, LOGGER } from './logging/logger.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
+import { LLM, type LlmPort } from './ports/llm.port.js';
 import { WEB_CONTEXT, type WebContextPort } from './ports/web-context.port.js';
 import { WEB_READER, type WebReaderPort } from './ports/web-reader.port.js';
 
@@ -73,6 +76,7 @@ export async function createApp(env: Env): Promise<HazelApp> {
     real: PerplexityWebContextAdapter,
     fake: FakeWebContextAdapter,
   });
+  bindAdapter<LlmPort>(container, env, LLM, { real: AnthropicLlmAdapter, fake: FakeLlmAdapter });
   return HazelApp.create(AppModule);
 }
 

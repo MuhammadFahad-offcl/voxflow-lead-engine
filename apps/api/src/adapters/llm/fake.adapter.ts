@@ -4,8 +4,7 @@
  * as a real one.
  *
  * Serves: ADR-0007 (DEMO_MODE binds every fake), FR-13, FR-36, NFR-9; issue #13.
- * Used by: apps/api/src/adapters/llm/fake.adapter.spec.ts; bound in apps/api/src/bootstrap.ts
- * together with the real adapter (#13, next PR).
+ * Used by: apps/api/src/bootstrap.ts, through `bindAdapter`, when DEMO_MODE=true; tests.
  */
 import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';

@@ -59,6 +59,7 @@ describe('loadEnv', () => {
       DEMO_MODE: 'false',
       APIFY_TOKEN: 'fictional-token',
       PERPLEXITY_API_KEY: 'fictional-key',
+      ANTHROPIC_API_KEY: 'fictional-key',
     };
 
     expect(loadEnv(live).DEMO_MODE).toBe(false);
@@ -68,6 +69,7 @@ describe('loadEnv', () => {
     expect(errorOf({ ...minimal, DEMO_MODE: 'false' }).variables).toEqual([
       'APIFY_TOKEN (missing)',
       'PERPLEXITY_API_KEY (missing)',
+      'ANTHROPIC_API_KEY (missing)',
     ]);
   });
 
