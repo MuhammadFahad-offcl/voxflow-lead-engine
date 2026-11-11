@@ -1,13 +1,35 @@
 /**
- * The Perplexity Search API's response shape, and the rule that turns its results into a context.
- * The real adapter and the fake both use it, so fixtures prove the real mapping.
+ * What the Perplexity Search API is asked and answers: the query text, the response shape, the
+ * price of a request, and the rule that turns results into a context. The real adapter and the
+ * fake both use it, so fixtures prove the real mapping.
  *
  * Serves: FR-12, ADR-0007; issue #12. Shape: https://docs.perplexity.ai/api-reference/search-post
- * Used by: apps/api/src/adapters/web-context/fake.adapter.ts, and the real adapter from the next
- * slice.
+ * Used by: apps/api/src/adapters/web-context/fake.adapter.ts and perplexity.adapter.ts.
  */
 import type { BusinessContext } from '@voxflow/shared';
 import { z } from 'zod';
+import { Prisma } from '../../generated/prisma/client.js';
+import type { BusinessQuery } from '../../ports/web-context.port.js';
+
+/**
+ * What one Search API request costs, in US dollars: a flat $5.00 per 1,000 requests for
+ * `search_type: "web"`, billed whatever the number of results, and not billed when the request is
+ * invalid, rate limited or fails upstream. Source: https://docs.perplexity.ai/guides/pricing
+ * (read 2026-11-10; the "fast" type is $1.00 per 1,000 and is not used).
+ */
+export const SEARCH_REQUEST_USD = new Prisma.Decimal('0.005');
+
+/**
+ * Words the search for one business: name, area and city, plus the site's host when it has one so
+ * a chain's other branches rank lower.
+ * @param query - The business to look up.
+ * @returns The `query` string of the request.
+ */
+export function buildSearchQuery(query: BusinessQuery): string {
+  const host = query.website === null ? undefined : URL.parse(query.website)?.hostname;
+  const parts = [query.name, query.area, query.city, host?.replace(/^www\./, '')];
+  return parts.filter((part) => part !== undefined && part !== '').join(' ');
+}
 
 /**
  * A 200 response of `POST /search` with one string query. Not strict: Perplexity may add fields.

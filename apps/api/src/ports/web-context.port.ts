@@ -7,6 +7,30 @@
 import type { BusinessContext } from '@voxflow/shared';
 import type { Prisma } from '../generated/prisma/client.js';
 
+/** DI token of {@link WebContextPort}. */
+export const WEB_CONTEXT = 'WebContextPort';
+
+/**
+ * A failed lookup. The message is a fixed phrase, optionally with an HTTP status, never a response
+ * body, key or query, so it is safe to log.
+ */
+export class WebContextError extends Error {
+  /**
+   * Builds the error.
+   * @param message - A fixed phrase.
+   * @param maybeBilled - False only when the service is known not to have billed the request
+   * (it was never sent, was refused, or was rate limited or failed upstream); true when it may have
+   * been, as after a timeout, a dropped connection or a bad answer to a 200.
+   */
+  constructor(
+    message: string,
+    readonly maybeBilled: boolean,
+  ) {
+    super(message);
+    this.name = 'WebContextError';
+  }
+}
+
 /** The business to look up. */
 export interface BusinessQuery {
   name: string;

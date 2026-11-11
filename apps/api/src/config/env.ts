@@ -82,7 +82,7 @@ const requireInLiveMode =
 
 // List the keys a real adapter needs in the issue that adds it. With DEMO_MODE=true the fakes never
 // read them.
-const EnvSchema = EnvShape.superRefine(requireInLiveMode(['APIFY_TOKEN']));
+const EnvSchema = EnvShape.superRefine(requireInLiveMode(['APIFY_TOKEN', 'PERPLEXITY_API_KEY']));
 
 /** Validated configuration of this process. Read it from DI with the {@link ENV} token. */
 export type Env = z.infer<typeof EnvSchema>;
