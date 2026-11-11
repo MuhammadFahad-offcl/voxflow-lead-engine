@@ -1,0 +1,9 @@
+{
+  "text": "{\"reviews\":[{\"id\":\"r1\",\"labels\":[\"BOOKING_OR_WAIT\"]},{\"id\":\"r2\",\"labels\":[\"BOOKING_OR_WAIT\"]},{\"id\":\"r3\",\"labels\":[\"POSITIVE\",\"STAFF_OR_SERVICE\"]}]}",
+  "usage": {
+    "inputTokens": 1126,
+    "outputTokens": 107
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

@@ -83,6 +83,9 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm db:generate`            | write the client to `apps/api/src/generated/`; `db:migrate` also runs it  |
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 | `pnpm read-website <url>`     | try the real web reader on one live site; prints counts, writes nothing   |
+| `pnpm llm:record`             | **costs money:** record the demo clinics' labelling answers (see below)   |
+
+`pnpm llm:record` calls Claude for each fictional demo clinic and saves the answers in `fixtures/llm/`, which demo mode replays. Run it after changing the labelling prompt. It needs `ANTHROPIC_API_KEY` and a seeded, running database. Every call counts toward this month's LLM cap, like any other. It stops before going past `--max-usd` (default 0.10). `--size-check` also prices one 30-review call without saving it. The first recording cost $0.002.
 
 After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` updates the dependencies and, when it installs anything, regenerates the Prisma client; when nothing changed, pnpm skips it. `pnpm db:migrate` applies new migrations and always regenerates the client, because Prisma 7 does not do that on its own. So the pair always leaves the client in step with the schema.
 
