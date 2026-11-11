@@ -163,6 +163,7 @@ model NicheProfile {
   categoryKeywords String[] // Maps categories that count as a niche match (fit signal)
   idealClient      Json // FR-8 filter rules
   signalWeights    Json // scoring model weights (PRD "Lead scoring model")
+  tiers            Json // FR-15, #14: { hot, warm } score thresholds, e.g. { hot: 70, warm: 45 }
   premiumAreas     String[]
   reviewLabels     String[] @default([]) // FR-13, #13: labels the review-labelling task may give
   scriptTemplate   String   @db.Text

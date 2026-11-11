@@ -91,6 +91,7 @@ describe('database invariants', () => {
         name: 'Fictional niche',
         idealClient: {},
         signalWeights: {},
+        tiers: { hot: 70, warm: 45 },
         scriptTemplate: 'Fictional template',
       },
     });

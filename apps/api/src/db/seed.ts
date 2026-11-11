@@ -1,8 +1,8 @@
 /**
  * Seeds the one organization, its settings, the dental-clinic niche profile and the service catalog.
  *
- * Serves: FR-4 (niche profile), FR-16 (catalog rows; embeddings follow in C2-01), FR-20, FR-26,
- * FR-33 and ADR-0006 (settings defaults).
+ * Serves: FR-4 (niche profile), FR-13 (review labels), FR-15 (score thresholds), FR-16 (catalog
+ * rows; embeddings follow in C2-01), FR-20, FR-26, FR-33 and ADR-0006 (settings defaults).
  * Used by: apps/api/src/seed.ts (`pnpm db:seed`), apps/api/test/seed.int.spec.ts.
  */
 import { readFile } from 'node:fs/promises';
@@ -35,9 +35,8 @@ const readJson = async (path: string): Promise<unknown> =>
  * edited later on the dashboard survive a re-seed. To change a niche, raise its `version` in the
  * file: the new version is added next to the old one, which campaigns may still use.
  * Does not write `Service.embedding`: it stays NULL until C2-01.
- * Does not store the niche's `tiers` or `defaultAreas`: they are validated here, and get their
- * columns in the issues that use them (#14, #16), as decided for #7. `reviewLabels` got its column
- * in #13, which labels reviews.
+ * Does not store the niche's `defaultAreas`: it is validated here, and gets its column in #16,
+ * which uses it, as decided for #7. `reviewLabels` got its column in #13 and `tiers` in #14.
  * @param prisma - Client connected to the database to seed.
  * @param configDir - The repo's `config/` folder.
  * @throws ZodError when a config file or a default does not match its schema; Error when a service
@@ -70,6 +69,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<voi
     categoryKeywords: niche.categoryKeywords,
     idealClient: niche.idealClient,
     signalWeights: niche.signalWeights,
+    tiers: niche.tiers,
     premiumAreas: niche.premiumAreas,
     reviewLabels: niche.reviewLabels,
     scriptTemplate,
@@ -85,6 +85,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<voi
       categoryKeywords: true,
       idealClient: true,
       signalWeights: true,
+      tiers: true,
       premiumAreas: true,
       reviewLabels: true,
       scriptTemplate: true,
