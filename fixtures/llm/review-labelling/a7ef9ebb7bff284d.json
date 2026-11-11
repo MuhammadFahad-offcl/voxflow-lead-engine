@@ -1,0 +1,9 @@
+{
+  "text": "{\"reviews\":[{\"id\":\"r1\",\"labels\":[\"POSITIVE\",\"STAFF_OR_SERVICE\"]},{\"id\":\"r2\",\"labels\":[\"STAFF_OR_SERVICE\",\"POSITIVE\"]}]}",
+  "usage": {
+    "inputTokens": 1078,
+    "outputTokens": 80
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

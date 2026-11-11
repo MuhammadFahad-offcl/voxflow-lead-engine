@@ -1,0 +1,9 @@
+{
+  "text": "{\"reviews\":[{\"id\":\"r1\",\"labels\":[\"POSITIVE\"]}]}",
+  "usage": {
+    "inputTokens": 1036,
+    "outputTokens": 31
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}
