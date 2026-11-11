@@ -5,7 +5,7 @@
  * Serves: FR-4 (niche profile), FR-8 (ideal-client rules), FR-14/FR-15 (signal weights and tiers),
  * FR-16 (catalog), PRD "Lead scoring model".
  * Used by: apps/api/src/db/seed.ts, apps/api/src/pipeline/discover.step.ts,
- * apps/api/src/pipeline/ideal-client-filter.ts.
+ * apps/api/src/pipeline/ideal-client-filter.ts, apps/api/src/db/score.repository.ts.
  */
 import { z } from 'zod';
 
@@ -34,7 +34,8 @@ const signalGroup = <const K extends readonly [string, ...string[]]>(keys: K) =>
     Object.fromEntries(keys.map((key) => [key, Signal])) as Record<K[number], typeof Signal>,
   );
 
-const SignalWeights = z
+/** A niche's points per signal, grouped by dimension, adding up to 100 (`NicheProfile.signalWeights`). */
+export const SignalWeights = z
   .strictObject({
     PAIN: signalGroup(SIGNAL_KEYS.PAIN),
     FIT: signalGroup(SIGNAL_KEYS.FIT),
@@ -48,6 +49,11 @@ const SignalWeights = z
         .reduce((sum, signal) => sum + signal.points, 0) === 100,
     'signal points must add up to 100, so a score is out of 100',
   );
+
+/** A niche's score thresholds (FR-15), as `NicheProfile.tiers` stores them. */
+export const NicheTiers = z
+  .object({ hot: z.number().int().max(100), warm: z.number().int().min(0) })
+  .refine((tiers) => tiers.warm < tiers.hot, 'warm must be below hot');
 
 /** A niche's ideal-client rules (FR-8), as `NicheProfile.idealClient` stores them. */
 export const IdealClient = z.object({
@@ -79,9 +85,7 @@ export const NicheFile = z
       ),
     categoryKeywords: z.array(z.string().min(1)).min(1),
     idealClient: IdealClient,
-    tiers: z
-      .object({ hot: z.number().int().max(100), warm: z.number().int().min(0) })
-      .refine((tiers) => tiers.warm < tiers.hot, 'warm must be below hot'),
+    tiers: NicheTiers,
     signalWeights: SignalWeights,
     reviewLabels: z.array(z.string().regex(/^[A-Z_]+$/)).min(1),
     premiumAreas: z.array(z.string().min(1)),

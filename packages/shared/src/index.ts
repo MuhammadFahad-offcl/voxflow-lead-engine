@@ -21,9 +21,10 @@ export const HealthResponse = z.object({
 export type HealthResponse = z.infer<typeof HealthResponse>;
 
 export { Booking, CallingHours, DEFAULT_SETTINGS, LlmModels, SpendCaps } from './settings.js';
-export { CatalogFile, IdealClient, NicheFile } from './niche.js';
+export { CatalogFile, IdealClient, NicheFile, NicheTiers, SignalWeights } from './niche.js';
 export { CampaignSummary, CreateCampaignInput } from './campaign.js';
 export { AreaFile, AreaPolygon } from './areas.js';
 export { WebsiteEvidence } from './website-evidence.js';
 export { BusinessContext } from './business-context.js';
 export { CostsStatus } from './costs.js';
+export { ScoreBreakdown } from './score.js';

@@ -82,6 +82,12 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 
 - `NicheProfile.tiers` (`{ hot, warm }`) holds the score thresholds of that niche version (FR-15): hot at or above `hot`, warm at or above `warm`, cold below. It is seeded and checked like the other niche fields. The #14 migration backfilled every stored `dental-clinic` version with `{ hot: 70, warm: 45 }`, which its file has always listed.
 
+## Lead score
+
+- The score step (#14) sets `Lead.score` (0–100), `scoreBreakdown` (Zod `ScoreBreakdown`: `pain`, `fit`, `reachability`, `abilityToPay`), `tier` and status `SCORED`. It replaces the lead's `Signal` rows in the same transaction, so the stored score is always the sum of the stored signals' points (FR-14).
+- A `Signal` row exists only for a signal that found evidence (`evidence` never empty), once per key (`@@unique([leadId, key])`). Review signals cite the newest matching review in `reviewId` and quote the two newest. Website signals cite the first page read in `sourceUrl`.
+- The points come from the campaign's niche version (`NicheProfile.signalWeights`) and the tier from its `tiers`, so an old campaign keeps scoring by the rules it was created with.
+
 ## Retention (NFR-6)
 
 The daily retention loop clears `CallAttempt.transcript` and `recordingUrl` after `Settings.retentionDays` (default 90). The result, reason code and remarks stay.
