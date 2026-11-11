@@ -3,7 +3,8 @@
  *
  * Serves: ADR-0001 (one set of Zod schemas), NFR-8 (issue #3, monorepo scaffold).
  * Used by: apps/web/app/page.tsx, apps/api/test/server.int.spec.ts, apps/api/src/db/seed.ts,
- * apps/api/src/modules/campaigns/, apps/api/src/db/lead-website.repository.ts.
+ * apps/api/src/modules/campaigns/, apps/api/src/modules/costs/,
+ * apps/api/src/db/lead-website.repository.ts.
  */
 import { z } from 'zod';
 
@@ -25,3 +26,4 @@ export { CampaignSummary, CreateCampaignInput } from './campaign.js';
 export { AreaFile, AreaPolygon } from './areas.js';
 export { WebsiteEvidence } from './website-evidence.js';
 export { BusinessContext } from './business-context.js';
+export { CostsStatus } from './costs.js';

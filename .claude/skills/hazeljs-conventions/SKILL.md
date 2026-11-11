@@ -15,6 +15,7 @@ Check the installed HazelJS version's docs/types before using an API you have no
 - `scoring/` and `policies/` — pure functions only. No DI, no I/O.
 - `adapters/<port>/{<real>.adapter.ts, fake.adapter.ts}` and `ports/<port>.port.ts` (interface + DI token).
 - `scheduler/` — worker loops; each loop is a function taking its dependencies.
+- `llm/` — the LLM gate (`LlmService`) and one file per LLM task (e.g. `review-labelling.ts`: prompts, answer schema, answer mapping). System prompts live in `agents/prompts/*.md`.
 - `db/` — Prisma client provider and repositories.
 
 ## Rules
@@ -22,7 +23,7 @@ Check the installed HazelJS version's docs/types before using an API you have no
 - Depend on ports, never on SDKs. Only adapters import `apify-client`, `@anthropic-ai/sdk`, Vapi, Google APIs, Perplexity, `puppeteer-core`.
 - Bind real or fake adapters in one place (the adapters module) from `env.DEMO_MODE`.
 - Agents get model ids from `Settings.llmModels[task]`; never hard-code a model name outside `config/`.
-- Every LLM call goes through `LlmPort`, which records a `CostRecord` and enforces the monthly cap before calling.
+- Every LLM call goes through `LlmService` (`llm/llm.service.ts`), the gate above `LlmPort`: it reads the model from Settings, refuses a call whose worst case could pass the monthly cap, and records a `CostRecord` for every attempt that may have been billed. Never call `LlmPort` directly; it only sends a request and returns the raw answer and its usage.
 - LLM output is parsed with a Zod schema; on failure retry once with the validation error, then mark `NEEDS_REVIEW`.
 - Tools that cause real-world effects (`queueCampaignCalls`, `placeCall`) use `requiresApproval` or a Gatekeeper policy. Gatekeeper is default-deny: a new tool needs an explicit allow rule.
 - Durable state lives in Postgres (HazelJS SQL run store). No in-memory state survives a restart except the calendar slot cache (ADR-0008).

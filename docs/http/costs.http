@@ -1,0 +1,8 @@
+# Example request for the spend status API (FR-33, #13), for the VS Code REST Client extension.
+# Start the API with `pnpm dev` and seed the database first (`pnpm db:seed`).
+# The API listens on 127.0.0.1 only (ADR-0003).
+
+@base = http://127.0.0.1:4000
+
+### This Asia/Karachi month's LLM spend against the monthly cap (the dashboard banner reads it)
+GET {{base}}/costs/status
