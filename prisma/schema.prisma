@@ -269,6 +269,7 @@ model Review {
   rating       Int?
   publishedAt  DateTime?
   ownerReplied Boolean   @default(false)
+  labels       String[]  @default([]) // FR-13, #13: niche reviewLabels from REVIEW_LABELLING; empty until labelled
 
   signals Signal[]
 

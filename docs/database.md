@@ -71,6 +71,11 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 - For an `UNREADABLE` site, `hasOnlineBooking` and `hasChatWidget` stay null (unknown), never false, so scoring gives no points for "no online booking".
 - `Lead.websiteEvidence` (Zod `WebsiteEvidence`) holds what the extractors matched, as found: `doctors`, `treatments`, `onlineBooking` and `chatWidgets`; `pagesRead`, the URLs of the pages checked, which are the evidence for "no online booking"; and `unreadableReason`, the reader's fixed words, for an `UNREADABLE` site. Scoring (#14) reads it, so a point can cite its evidence (FR-14). It is null until the website is read; a lead with no website gets empty lists.
 
+## Review labels
+
+- `Review.labels` holds the labels the review-labelling task (#13, FR-13) gave the review, taken from the niche profile's `reviewLabels` (e.g. `PHONE_UNANSWERED`, `BOOKING_OR_WAIT`). The labelling output schema (#13) requires at least one label per review (`OTHER` when nothing else fits), so an empty list means "not labelled yet".
+- Saving the same reviews again (e.g. a restart collecting the same pass-2 run) updates the text, rating, date and reply flag of rows that exist but never their labels, so labels are not wiped. Scoring (#14) counts labels over the 30 newest reviews by `publishedAt`.
+
 ## Retention (NFR-6)
 
 The daily retention loop clears `CallAttempt.transcript` and `recordingUrl` after `Settings.retentionDays` (default 90). The result, reason code and remarks stay.
