@@ -39,7 +39,7 @@ Evidence = the pages checked (homepage + contact page URLs), stored in `Lead.web
 
 ### Review signals (#12 / #14)
 
-Only the 2 most recent of the last 30 reviews per place are labelled by the LLM. The labels become scoring signals.
+All stored reviews of a place (up to the 30 newest) are labelled by the LLM in one call. A review signal needs at least 2 of those 30 reviews with its label (e.g. 2 × `PHONE_UNANSWERED`); the labels become scoring signals in #14.
 
 ### Spend caps
 
