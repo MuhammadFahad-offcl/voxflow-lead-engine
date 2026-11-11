@@ -43,6 +43,7 @@ beforeAll(async () => {
     searchTerms: ['dental clinic', 'dentist', 'dental surgeon', 'orthodontist'],
     idealClient: {},
     signalWeights: {},
+    tiers: { hot: 70, warm: 45 },
     scriptTemplate: 'Fictional template',
   };
   await prisma.nicheProfile.create({ data: { ...niche, version: 1, searchTerms: ['old term'] } });

@@ -98,6 +98,7 @@ beforeAll(async () => {
       searchTerms: ['fictional term'],
       idealClient: {},
       signalWeights: {},
+      tiers: { hot: 70, warm: 45 },
       scriptTemplate: 'Fictional template',
     },
   }));
