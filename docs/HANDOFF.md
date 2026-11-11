@@ -1,14 +1,13 @@
 # AI Handoff — VoxFlow Lead Engine
 
-> Last updated: 2026-11-10. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
+> Last updated: 2026-11-11. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
 
 ## Cycle 1 issues remaining
 
-Cycle 1 is due **13 Nov 2026**. Issues #3–#11 are closed. Issues #12–#16 remain.
+Cycle 1 is due **13 Nov 2026**. Issues #3–#12 are closed. Issues #13–#16 remain.
 
 | Issue | Title                                                           | Prompt                                         |
 | ----- | --------------------------------------------------------------- | ---------------------------------------------- |
-| #12   | Reviews storage + `WebContextPort` (Perplexity + fake)          | `docs/prompts/cycle-1-scored-leads.md` → C1-10 |
 | #13   | `LlmPort` with cost recording and monthly cap; review labelling | `docs/prompts/cycle-1-scored-leads.md` → C1-11 |
 | #14   | Scoring rules (pure) + signals + tiers, unit tests ≥ 80%        | `docs/prompts/cycle-1-scored-leads.md` → C1-12 |
 | #15   | Lead `AgentGraph` (enrich → score) with per-lead status, retry  | `docs/prompts/cycle-1-scored-leads.md` → C1-13 |
@@ -16,15 +15,15 @@ Cycle 1 is due **13 Nov 2026**. Issues #3–#11 are closed. Issues #12–#16 rem
 
 ## Keys still needed
 
-- **#12 (Perplexity):** Fahad adds `PERPLEXITY_API_KEY` to `.env` before starting. Ask him, then check the API starts in real mode (not demo) without reading `.env`.
-- **#13 (Anthropic):** Fahad adds `ANTHROPIC_API_KEY` to `.env` before starting. Ask him after #12. This is also the checkpoint: give a summary after #13 and wait for "continue".
+- **#12 (Perplexity, done):** `PERPLEXITY_API_KEY` is in `.env`. No real Perplexity call has been made yet; the first one needs Fahad's approval.
+- **#13 (Anthropic):** Fahad added `ANTHROPIC_API_KEY` to `.env` on 2026-11-11. Check the API starts in real mode without reading `.env`. #13 is also the checkpoint: give a summary after #13 and wait for "continue".
 
 ## Decisions made in chat (not yet in a doc)
 
 ### Apify two-pass design (ADR-0015)
 
 - **Pass 1 (#10, done):** Compass `compass~crawler-google-places` scrapes place metadata. One polygon per area, `maxTotalChargeUsd` ≥ $0.50, results capped at 30 per search.
-- **Pass 2 (#12):** Scraperlink fetches the 30 newest reviews per place id. Owned by #12.
+- **Pass 2 (#12, done):** Scraperlink fetches the 30 newest reviews per place id (PRs #107–#114).
 
 ### Closed-place filter (#10)
 
@@ -46,7 +45,7 @@ Only the 2 most recent of the last 30 reviews per place are labelled by the LLM.
 
 - Apify: $2.00/day (Asia/Karachi day), stored in `Organization.apifyDailyUsd`.
 - Monthly LLM: $10, stored in `Settings.llmMonthlyBudgetUsd`.
-- Cycle 1 real-service total budget: $5. Spent so far: ~$1.39 ($0.66 spike + $0.7208 DHA run). About **$3.61 remaining**.
+- Cycle 1 real-service total budget: $5. Spent so far: $1.38 ($0.66 spike in #9 + $0.7208 DHA run in #10; #12 made no real calls). About **$3.62 remaining**.
 
 ### PR size
 
@@ -80,7 +79,7 @@ Only the 2 most recent of the last 30 reviews per place are labelled by the LLM.
 
 Stop and ask Fahad (never guess) when:
 
-- An issue needs Docker running (#5), Apify account/token (#9), Perplexity key (#12), or Anthropic key (#13).
+- An issue needs Docker running (#5), Apify account/token (#9), Perplexity key (#12), or Anthropic key (#13), or before the first real call to any paid service.
 - Anything would change the PRD, an ADR, the database schema, or scope beyond the issue's prompt.
 - Real money is involved: each real-service test must stay under $1, the whole cycle under $5.
 
