@@ -164,6 +164,7 @@ model NicheProfile {
   idealClient      Json // FR-8 filter rules
   signalWeights    Json // scoring model weights (PRD "Lead scoring model")
   premiumAreas     String[]
+  reviewLabels     String[] @default([]) // FR-13, #13: labels the review-labelling task may give
   scriptTemplate   String   @db.Text
   createdAt        DateTime @default(now())
 

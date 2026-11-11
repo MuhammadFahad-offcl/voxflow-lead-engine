@@ -75,6 +75,8 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 
 - `Review.labels` holds the labels the review-labelling task (#13, FR-13) gave the review, taken from the niche profile's `reviewLabels` (e.g. `PHONE_UNANSWERED`, `BOOKING_OR_WAIT`). The labelling output schema (#13) requires at least one label per review (`OTHER` when nothing else fits), so an empty list means "not labelled yet".
 - Saving the same reviews again (e.g. a restart collecting the same pass-2 run) updates the text, rating, date and reply flag of rows that exist but never their labels, so labels are not wiped. Scoring (#14) counts labels over the 30 newest reviews by `publishedAt`.
+- `NicheProfile.reviewLabels` is the list a niche version allows, seeded from its file like the other niche fields (so it is part of the "raise the version to change it" check). The #13 migration backfilled every stored `dental-clinic` version with the six labels its file has always listed.
+- The labelling step sends only the unlabelled reviews among the 30 newest, so a repeat run pays for nothing twice, and it never overwrites labels: when two runs race, the first run's labels stay.
 
 ## Retention (NFR-6)
 

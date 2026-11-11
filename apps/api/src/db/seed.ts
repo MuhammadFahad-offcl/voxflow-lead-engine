@@ -35,8 +35,9 @@ const readJson = async (path: string): Promise<unknown> =>
  * edited later on the dashboard survive a re-seed. To change a niche, raise its `version` in the
  * file: the new version is added next to the old one, which campaigns may still use.
  * Does not write `Service.embedding`: it stays NULL until C2-01.
- * Does not store the niche's `tiers`, `reviewLabels` or `defaultAreas`: they are validated here,
- * and get their columns in the issues that use them (#14, #16), as decided for #7.
+ * Does not store the niche's `tiers` or `defaultAreas`: they are validated here, and get their
+ * columns in the issues that use them (#14, #16), as decided for #7. `reviewLabels` got its column
+ * in #13, which labels reviews.
  * @param prisma - Client connected to the database to seed.
  * @param configDir - The repo's `config/` folder.
  * @throws ZodError when a config file or a default does not match its schema; Error when a service
@@ -70,6 +71,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<voi
     idealClient: niche.idealClient,
     signalWeights: niche.signalWeights,
     premiumAreas: niche.premiumAreas,
+    reviewLabels: niche.reviewLabels,
     scriptTemplate,
   };
   // An edit that keeps the version would otherwise be skipped without a word.
@@ -84,6 +86,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<voi
       idealClient: true,
       signalWeights: true,
       premiumAreas: true,
+      reviewLabels: true,
       scriptTemplate: true,
     },
   });

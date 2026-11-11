@@ -65,7 +65,7 @@ describe('seed', () => {
     });
   });
 
-  it('stores the niche search terms, ideal-client rules, weights and the script file as text', async () => {
+  it('stores the niche search terms, ideal-client rules, weights, review labels and the script as text', async () => {
     const niche = await prisma.nicheProfile.findFirstOrThrow({ where: { slug: 'dental-clinic' } });
     const script = await readFile(join(configDir, 'niches/dental-clinic.script.md'), 'utf8');
 
@@ -75,6 +75,15 @@ describe('seed', () => {
       PAIN: { phone_unanswered_reviews: { points: 15 } },
     });
     expect(niche.scriptTemplate).toBe(script);
+    // The labels the review-labelling task may give (#13), as the niche file lists them.
+    expect(niche.reviewLabels).toEqual([
+      'PHONE_UNANSWERED',
+      'BOOKING_OR_WAIT',
+      'STAFF_OR_SERVICE',
+      'PRICE',
+      'POSITIVE',
+      'OTHER',
+    ]);
   });
 
   it('does not overwrite settings changed after the first seed', async () => {
