@@ -19,17 +19,16 @@
       "Bash(git branch *)",
       "Bash(gh issue view *)",
       "Bash(gh pr view *)",
-      "Bash(gh pr checks *)"
-    ],
-    "ask": [
-      "Bash(pnpm add *)",
-      "Bash(pnpm remove *)",
-      "Bash(pnpm prisma migrate *)",
-      "Bash(pnpm db:*)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(gh pr create *)",
-      "Bash(docker *)"
+      "Bash(gh pr checks *)",
+      "Bash(pnpm prisma *)",
+      "Bash(gh pr *)",
+      "Bash(python -)",
+      "Bash(pnpm db:generate)",
+      "Bash(rm apps/api/test/zz-runstore-probe.int.spec.ts)",
+      "Bash(grep -v \"^\\\\s*$\")",
+      "Bash(grep -v \"^remote:\\\\s*$\")",
+      "Bash(git checkout *)",
+      "Bash(git merge *)"
     ],
     "deny": [
       "Read(**/.env)",
@@ -49,6 +48,16 @@
       "Bash(pnpm prisma migrate reset*)",
       "Bash(pnpm prisma db push*)",
       "Bash(pnpm knip --fix*)"
+    ],
+    "ask": [
+      "Bash(pnpm add *)",
+      "Bash(pnpm remove *)",
+      "Bash(pnpm prisma migrate *)",
+      "Bash(pnpm db:*)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(gh pr create *)",
+      "Bash(docker *)"
     ]
   }
 }
