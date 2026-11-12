@@ -1,11 +1,12 @@
 /**
- * `/campaigns/:id/leads` routes for the dashboard's lead table. Bound to
+ * `/campaigns/:id/leads` routes for the dashboard's lead table and its CSV export. Bound to
  * 127.0.0.1 like every non-Vapi route (ADR-0003).
  *
- * Serves: FR-30 (lead table: filter, sort, paging), US-14; issue #16.
+ * Serves: FR-30 (lead table: filter, sort, paging, CSV), US-14; issue #16.
  * Used by: apps/api/src/modules/leads/leads.module.ts; docs/http/leads.http.
  */
-import { Controller, Get, Param, Query, ValidationError } from '@hazeljs/core';
+import { Controller, Get, Param, Query, Res, ValidationError } from '@hazeljs/core';
+import type { HazelResponse } from '@hazeljs/core';
 import { LeadListQuery, type LeadPage } from '@voxflow/shared';
 import { z } from 'zod';
 import { LeadTableService } from './lead-table.service.js';
@@ -69,5 +70,28 @@ export class LeadTableController {
   page(@Param('id') id: string, @Query() query: unknown): Promise<LeadPage> {
     const request = parse(id, query);
     return this.table.page(request.campaignId, request.query);
+  }
+
+  /**
+   * Every lead matching the same filters, in the same order, as a CSV download (FR-30).
+   * @param id - Campaign id from the path.
+   * @param query - The table's filters and sort; `page` is ignored.
+   * @param res - The response, written directly: HazelJS would JSON-encode a returned string.
+   * @throws ValidationError (400) for a bad id or filter; NotFoundError (404) for an unknown
+   * campaign; Prisma errors (500) when the database cannot be read.
+   */
+  @Get('/:id/leads.csv')
+  async csv(
+    @Param('id') id: string,
+    @Query() query: unknown,
+    @Res() res: HazelResponse,
+  ): Promise<void> {
+    const request = parse(id, query);
+    const file = await this.table.csv(request.campaignId, request.query);
+    // The id passed the lowercase-letters-and-digits rule, so it is safe inside the header.
+    res.setHeader('Content-Disposition', `attachment; filename="leads-${request.campaignId}.csv"`);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.write(file);
+    res.end();
   }
 }

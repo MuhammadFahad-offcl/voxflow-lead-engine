@@ -1,5 +1,5 @@
 /**
- * Use cases behind the lead table: a page of a campaign's leads.
+ * Use cases behind the lead table: a page of a campaign's leads, and the CSV of all filtered rows.
  *
  * Serves: FR-30 (lead table: filter, sort), FR-14 (evidence), FR-32 (status and error), US-14;
  * issue #16.
@@ -13,6 +13,7 @@ import {
   type LeadPage,
   type LeadRow,
 } from '@voxflow/shared';
+import { toLeadCsv } from './lead-csv.js';
 import { LeadTableRepository, type LeadTableRow } from './lead-table.repository.js';
 
 /**
@@ -52,6 +53,19 @@ export class LeadTableService {
     await this.mustExist(campaignId);
     const { rows, total } = await this.leads.page(campaignId, query, LEAD_PAGE_SIZE);
     return { leads: rows.map(toRow), total, page: query.page, pageSize: LEAD_PAGE_SIZE };
+  }
+
+  /**
+   * Builds the CSV of every lead matching the filters, in the table's order.
+   * @param campaignId - `Campaign.id`.
+   * @param query - Validated filters and sort; the page is ignored.
+   * @returns The file's text.
+   * @throws NotFoundError when the campaign does not exist; Prisma errors when the database cannot
+   * be read.
+   */
+  async csv(campaignId: string, query: LeadListQuery): Promise<string> {
+    await this.mustExist(campaignId);
+    return toLeadCsv((await this.leads.all(campaignId, query)).map(toRow));
   }
 
   // 404 for an unknown campaign, rather than an empty table that looks like "no leads yet".
