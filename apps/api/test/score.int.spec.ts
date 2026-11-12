@@ -104,6 +104,8 @@ describe('scoreStoredLead', () => {
       'no_online_booking',
       'phone_unanswered_reviews',
       'premium_area',
+      // A 0-point note: the lead stores fewer than the 10 reviews this signal needs.
+      'reviews_unreplied',
       'working_website',
     ]);
     expect(signals.reduce((sum, signal) => sum + signal.points, 0)).toBe(62);

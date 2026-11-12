@@ -128,17 +128,19 @@ describe('demo pipeline: discover → enrich → reviews → labels → score', 
         outcome.status === 'SCORED' ? `${String(outcome.score)} ${outcome.tier}` : 'skipped';
     }
 
-    // Listed with their top evidence lines in the #14 score-step PR. p04 and p05 are filtered out.
+    // Listed with their top evidence lines in the #14 score-step PR, then lowered by 7 for every
+    // clinic that had reviews_unreplied: the demo clinics store fewer than the 10 reviews it needs.
+    // p04 and p05 are filtered out.
     expect(scores).toEqual({
-      'fictional-place-p01': '74 HOT',
-      'fictional-place-p02': '42 COLD',
+      'fictional-place-p01': '67 WARM',
+      'fictional-place-p02': '35 COLD',
       'fictional-place-p03': '47 WARM',
-      'fictional-place-p06': '76 HOT',
-      'fictional-place-p07': '66 WARM',
-      'fictional-place-p08': '39 COLD',
+      'fictional-place-p06': '69 WARM',
+      'fictional-place-p07': '59 WARM',
+      'fictional-place-p08': '32 COLD',
       'fictional-place-p09': '42 COLD',
-      'fictional-place-p10': '52 WARM',
-      'fictional-place-p11': '59 WARM',
+      'fictional-place-p10': '45 WARM',
+      'fictional-place-p11': '52 WARM',
     });
     // Every point of every stored score is a stored signal (FR-14).
     const stored = await prisma.lead.findMany({
@@ -149,5 +151,11 @@ describe('demo pipeline: discover → enrich → reviews → labels → score', 
       const points = lead.signals.reduce((sum, signal) => sum + signal.points, 0);
       expect({ place: lead.placeId, points }).toEqual({ place: lead.placeId, points: lead.score });
     }
+    // p08 stores one review: the signal is kept with 0 points and says why (founder, after #14).
+    const p08 = stored.find((lead) => lead.placeId === 'fictional-place-p08');
+    expect(p08?.signals.find((signal) => signal.key === 'reviews_unreplied')).toMatchObject({
+      points: 0,
+      evidence: 'Only 1 review stored, fewer than the 10 needed',
+    });
   });
 });
