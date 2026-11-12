@@ -4,7 +4,7 @@
  * the API stays bound to localhost with no CORS (ADR-0003).
  *
  * Serves: FR-30 (dashboard pages), NFR-3 (2-second timeout); issue #16.
- * Used by: apps/web/app/**, apps/web/lib/api.spec.ts.
+ * Used by: apps/web/app/** (apiDownload by the CSV export route), apps/web/lib/api.spec.ts.
  */
 import { z } from 'zod';
 
@@ -107,4 +107,26 @@ export function apiPost(path: string, body: unknown): Promise<{ status: number; 
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     POST_TIMEOUT_MS,
   );
+}
+
+/**
+ * Fetches a file from the API and hands it on unchanged, for a download route.
+ *
+ * Does not apply the 2-second timeout: an export of thousands of rows may take longer.
+ * @param path - Path and query, e.g. "/campaigns/abc/leads.csv?tier=HOT".
+ * @returns A response with the API's status, body, content type and file name; 502 when the API
+ * cannot be reached.
+ */
+export async function apiDownload(path: string): Promise<Response> {
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, { cache: 'no-store' });
+    const headers = new Headers();
+    for (const name of ['content-type', 'content-disposition']) {
+      const value = response.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
+    return new Response(response.body, { status: response.status, headers });
+  } catch {
+    return new Response('The API is not reachable', { status: 502 });
+  }
 }
