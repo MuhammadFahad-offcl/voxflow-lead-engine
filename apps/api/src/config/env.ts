@@ -36,6 +36,9 @@ const EnvShape = z.object({
   API_HOST: z.string().min(1).default('127.0.0.1'),
   API_PORT: port(4000),
   WEB_PORT: port(3000),
+  // How many leads the worker's lead runner runs at once (FR-32, #15). Kept small: each lead's web
+  // context and LLM calls check their spend caps before calling, and parallel calls can each fit.
+  LEAD_RUNNER_CONCURRENCY: z.coerce.number().int().min(1).max(10).default(3),
 
   APIFY_TOKEN: z.string().optional(),
   PERPLEXITY_API_KEY: z.string().optional(),

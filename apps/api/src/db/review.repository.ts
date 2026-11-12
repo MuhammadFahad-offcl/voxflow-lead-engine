@@ -155,6 +155,22 @@ export class ReviewRepository {
   }
 
   /**
+   * Abandons an unfinished reviews run whose id was never saved, so the next reservation for the
+   * campaign may start a new run (the founder checked the Apify console; ADR-0015).
+   *
+   * Does not touch the amount: a run may exist, so the reservation stays on that day's total.
+   * Does nothing to a run whose id is known: that one is collected, for free.
+   * @param recordId - The run's `CostRecord.id`.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async abandonRun(recordId: string): Promise<void> {
+    // One statement, like the run id's save, so it cannot overwrite a run id saved meanwhile.
+    await this.prisma.$executeRaw`UPDATE "CostRecord"
+      SET note = jsonb_set(note::jsonb, '{state}', '"ABANDONED"')::text
+      WHERE id = ${recordId} AND units IS NULL AND note::jsonb -> 'runId' = 'null'::jsonb`;
+  }
+
+  /**
    * Writes a started run's id into its reservation, so a restart collects instead of paying again.
    * @param recordId - The reservation's `CostRecord.id`.
    * @param runId - The id Apify gave the run.

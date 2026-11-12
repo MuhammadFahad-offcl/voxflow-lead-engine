@@ -3,7 +3,8 @@
  * stored, all through the fake adapters. Its leads are ready for the lead graph.
  *
  * Serves: FR-36 (demo mode); issue #15 tests.
- * Used by: apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts.
+ * Used by: apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts,
+ * apps/api/test/lead-runner.int.spec.ts.
  */
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
 import { DiscoveryRepository } from '../src/db/discovery.repository.js';
@@ -17,11 +18,13 @@ import { enrichReviewsForCampaign } from '../src/pipeline/enrich-reviews.step.js
 import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 
 /**
- * Creates a DHA campaign on the seeded niche, discovers it and stores its reviews.
+ * Creates a DHA campaign on the seeded niche, discovers it and, unless told not to, stores its
+ * reviews.
  *
  * Does not seed: call `seed` first. Does not enrich, label or score.
  * @param prisma - A client on a seeded test database.
  * @param logger - A silent logger.
+ * @param withReviews - False leaves the reviews to the lead runner's reviews step.
  * @returns `Campaign.id`; the campaign is ENRICHING.
  * @throws Prisma's not-found error when the database is not seeded; what discover or the reviews
  * pass throw.
@@ -29,6 +32,7 @@ import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 export async function discoverDemoCampaign(
   prisma: PrismaProvider,
   logger: Logger,
+  withReviews = true,
 ): Promise<string> {
   const niche = await prisma.nicheProfile.findFirstOrThrow();
   const claimedAt = new Date();
@@ -55,9 +59,11 @@ export async function discoverDemoCampaign(
     },
     { id, claimedAt },
   );
-  await enrichReviewsForCampaign(
-    { prisma, reviewRepo: new ReviewRepository(prisma, discovery), leadSource, logger },
-    id,
-  );
+  if (withReviews) {
+    await enrichReviewsForCampaign(
+      { prisma, reviewRepo: new ReviewRepository(prisma, discovery), leadSource, logger },
+      id,
+    );
+  }
   return id;
 }

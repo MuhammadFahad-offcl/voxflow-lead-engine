@@ -29,7 +29,17 @@ describe('loadEnv', () => {
       API_HOST: '127.0.0.1',
       API_PORT: 4000,
       LOG_LEVEL: 'info',
+      LEAD_RUNNER_CONCURRENCY: 3,
     });
+  });
+
+  it('reads LEAD_RUNNER_CONCURRENCY as a number and refuses 0, more than 10 or a word', () => {
+    expect(loadEnv({ ...minimal, LEAD_RUNNER_CONCURRENCY: '5' }).LEAD_RUNNER_CONCURRENCY).toBe(5);
+    for (const value of ['0', '11', 'three']) {
+      expect(errorOf({ ...minimal, LEAD_RUNNER_CONCURRENCY: value }).variables).toEqual([
+        'LEAD_RUNNER_CONCURRENCY (invalid)',
+      ]);
+    }
   });
 
   it('treats an empty value, as .env.example leaves keys, as unset', () => {

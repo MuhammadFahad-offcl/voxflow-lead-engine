@@ -5,7 +5,8 @@
  *
  * Serves: FR-13 (JSON validated by Zod, invalid output rejected), FR-33 and NFR-4 (the $10
  * monthly hard cap, cost per lead and per call), ADR-0006 (model per task); issue #13.
- * Used by: apps/api/test/llm-gate.int.spec.ts; the review-labelling step (#13, next PR).
+ * Used by: apps/api/src/pipeline/label-reviews.step.ts, apps/api/src/scheduler/lead-runner.ts,
+ * apps/api/test/llm-gate.int.spec.ts.
  */
 import { Inject, Injectable } from '@hazeljs/core';
 import { z } from 'zod';
