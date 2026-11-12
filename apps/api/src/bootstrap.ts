@@ -80,8 +80,10 @@ export async function createApp(env: Env): Promise<HazelApp> {
     fake: FakeWebContextAdapter,
   });
   bindAdapter<LlmPort>(container, env, LLM, { real: AnthropicLlmAdapter, fake: FakeLlmAdapter });
-  // Every body this API takes is a few kilobytes (a campaign is under 3 KB); HazelJS's default is
-  // 1 MiB. A larger body is answered 413 before it is parsed (NFR-5, T-1 audit).
+  // Every body this API takes today is a few kilobytes (a campaign is under 3 KB); HazelJS's
+  // default is 1 MiB. A larger body is answered 413 before it is parsed (NFR-5, T-1 audit).
+  // /webhooks/vapi (#28) will need more: an end-of-call report carries the transcript and often
+  // passes 64 KiB, and a 413 there would silently drop the call's result.
   return HazelApp.create(AppModule, { bodyLimit: BODY_LIMIT_BYTES });
 }
 
