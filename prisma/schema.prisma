@@ -244,6 +244,7 @@ model Lead {
   failedStep     String?
   error          String?
   graphRunId     String? // HazelJS run id for the lead graph (FR-35)
+  graphClaimedAt DateTime? // expiring lease of the lead runner (#15); null when unclaimed
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
 
