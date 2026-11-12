@@ -1,14 +1,14 @@
 /**
  * The web context part of the enrich step: one Perplexity search for a lead that passed the
  * filter, stored with its sources and its cost. FR-12 is "should", so a failed search never fails
- * the lead. Not wired into a runner or graph yet: #15 does that.
+ * the lead. The lead graph runs it (#15).
  *
  * CAP_REACHED is only returned and logged. Nothing is persisted for it: the cap is re-derived
  * from the CostRecord rows on every call, so it clears by itself when the Asia/Karachi day turns
- * or the cap is raised. The pause or banner comes with #15 and #16.
+ * or the cap is raised. The lead graph pauses the lead on it (#15); the banner comes with #16.
  *
  * Serves: FR-12, FR-33, NFR-4, ADR-0007; issue #12.
- * Used by: apps/api/test/enrich-context.int.spec.ts only, until #15 calls it from the lead graph.
+ * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/test/enrich-context.int.spec.ts.
  */
 import type { LeadContextRepository } from '../db/lead-context.repository.js';
 import { errorFields, type Logger } from '../logging/logger.js';

@@ -1,10 +1,10 @@
 /**
  * The score step: reads a lead's facts and its niche version's rules, scores it with the pure
- * rules in `scoring/`, and stores the score, breakdown, tier and signals. Not wired into a runner or
- * graph yet: #15 runs it after review labelling.
+ * rules in `scoring/`, and stores the score, breakdown, tier and signals. The lead graph runs it
+ * after review labelling (#15).
  *
  * Serves: FR-14, FR-15; issue #14.
- * Used by: the score integration tests, until #15 calls it from the lead graph.
+ * Used by: apps/api/src/pipeline/lead.graph.ts, the score integration tests.
  */
 import type { ScoreRepository } from '../db/score.repository.js';
 import type { Logger } from '../logging/logger.js';

@@ -1,14 +1,14 @@
 /**
  * The review-labelling part of the score step: one LLM call labels a lead's unlabelled reviews
  * (among the 30 newest) with its niche's labels, through the LLM gate, and stores the labels.
- * Not wired into a runner or graph yet: #15 does that.
+ * The lead graph runs it (#15).
  *
  * CAP_REACHED is only returned and logged, like the Perplexity step (#12): the cap is re-read from
  * the CostRecord rows on every call, so it clears by itself when the Karachi month turns or the cap
- * is raised. The pause and banner come with #15 and #16 (`GET /costs/status` reports the cap).
+ * is raised. The lead graph pauses the lead on it (#15); `GET /costs/status` reports the cap.
  *
  * Serves: FR-13, FR-33, NFR-4; issue #13.
- * Used by: apps/api/test/label-reviews.int.spec.ts only, until #15 calls it from the lead graph.
+ * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/test/label-reviews.int.spec.ts.
  */
 import type { ReviewLabelRepository } from '../db/review-label.repository.js';
 import {

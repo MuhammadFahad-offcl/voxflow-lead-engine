@@ -13,7 +13,7 @@
  *
  * Serves: FR-9–FR-15 (runs the steps), FR-32 (per-lead status, error, never stops the campaign),
  * FR-33 (a spend cap pauses the step), NFR-1, NFR-2, ADR-0001; issue #15.
- * Used by: apps/api/test/lead-graph.int.spec.ts; the lead runner (#15, next PR).
+ * Used by: apps/api/src/scheduler/lead-runner.ts, apps/api/test/lead-graph.int.spec.ts.
  */
 import { randomUUID } from 'node:crypto';
 import {

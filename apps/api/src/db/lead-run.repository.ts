@@ -1,11 +1,13 @@
 /**
- * Database access for the lead graph: the lead runner's claim on a lead, and the status changes
- * a graph run makes to it (ENRICHED, FAILED, the run id). The run itself and its checkpoints live
+ * Database access for the lead runner and the lead graph: the claim on a lead, the status changes
+ * a graph run makes to it (ENRICHED, FAILED, the run id), and the campaign changes the runner
+ * makes (ENRICHING → SCORING, a pause for an Apify check). The run itself and its checkpoints live
  * in HazelJS's SQL durable run store, not here.
  *
- * Serves: FR-32 (per-lead status and error), NFR-1, NFR-2, ADR-0001, ADR-0002; issue #15.
- * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/test/lead-run.int.spec.ts,
- * apps/api/test/lead-graph.int.spec.ts.
+ * Serves: FR-3, FR-32 (per-lead status and error), NFR-1, NFR-2, ADR-0001, ADR-0002; issue #15.
+ * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/src/scheduler/lead-runner.ts,
+ * apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts,
+ * apps/api/test/lead-runner.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import type { Prisma, WebsiteStatus } from '../generated/prisma/client.js';
@@ -117,6 +119,19 @@ export class LeadRunRepository {
   }
 
   /**
+   * Tells whether a campaign is still ENRICHING, read just before a paid reviews step.
+   * @param campaignId - `Campaign.id`.
+   * @returns False when it left ENRICHING (e.g. the founder paused it) or does not exist.
+   * @throws Prisma errors when the database cannot be read.
+   */
+  async isEnriching(campaignId: string): Promise<boolean> {
+    const count = await this.prisma.campaign.count({
+      where: { id: campaignId, status: 'ENRICHING' },
+    });
+    return count === 1;
+  }
+
+  /**
    * Moves every ENRICHING campaign with no lead left to run (none DISCOVERED or ENRICHED) to
    * SCORING. One UPDATE, so a lead added meanwhile keeps its campaign ENRICHING.
    *
@@ -137,6 +152,8 @@ export class LeadRunRepository {
   /**
    * Pauses an ENRICHING campaign with a reason for the dashboard (FR-3, FR-33); resuming returns it
    * to ENRICHING.
+   *
+   * Does nothing when the campaign has left ENRICHING (e.g. the founder paused it already).
    * @param campaignId - `Campaign.id`.
    * @param reason - A fixed sentence for the founder.
    * @throws Prisma errors when the database cannot be written.
