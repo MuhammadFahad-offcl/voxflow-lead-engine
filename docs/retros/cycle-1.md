@@ -24,15 +24,25 @@ Cycle 1, "Scored leads", was planned to end on 9 Nov. It moved to 13 Nov (PRD 0.
 
 ## Went well
 
-- _(founder)_
+- The whole pipeline works end to end in demo mode: discover → reviews → website → context → labels → score. Each lead is one HazelJS `AgentGraph` run with durable checkpoints. The dashboard loads 5,000 leads in 0.69 s.
+- Decisions were written down before code (PRD, ADRs, prompts), and scope never left v1.
+- The `reviewer` agent and the T-1 audit caught real bugs before production: 9 in the audit, including 3 P1 security and concurrency bugs. Line coverage ended at 98%.
+- We found and reported 2 HazelJS bugs; both were fixed upstream within 3 days.
+- Spend stayed low: about $1.38 of $5.
 
 ## Went badly
 
-- _(founder)_
+- The cycle slipped 4 days (due 9 Nov, done 12 Nov): 14 issues were too many for one week.
+- #10 became 27 PRs, several PRs went far over 400 lines, and stacked PRs caused merge confusion.
+- Claude's usage limits ran out, and switching to Antigravity mid-issue lost work (the PR 2b stash).
+- My laptop kept drifting from main: a stale Prisma client, a stale shared build, a missed `db:seed`.
+- I haven't read most of the code yet.
 
 ## Change next cycle (max 3, each an action)
 
-- _(founder)_
+1. Plan Cycle 2 at about 8 issues, with 1–3 PRs per issue, each under 400 lines. No stacked PRs unless needed.
+2. After every merge, run the full pull routine: pull, install, `db:migrate`, `db:seed`, test.
+3. Use Sonnet by default and save Opus for the 2 hardest issues. One issue per chat. Read each PR before merging it.
 
 ## Metrics
 
