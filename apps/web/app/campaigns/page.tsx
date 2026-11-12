@@ -17,6 +17,8 @@ import { StatusBadge } from './status-badge';
  *
  * Does not cache: statuses change while a campaign runs.
  * @returns The page.
+ * @throws ApiError when the API is down; ZodError for an answer of the wrong shape. Next.js shows
+ * app/error.tsx.
  */
 export default async function CampaignsPage() {
   await connection();
