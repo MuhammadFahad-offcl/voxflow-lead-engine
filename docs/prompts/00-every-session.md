@@ -129,3 +129,34 @@ Stop. Check that against CLAUDE.md "Do not build" and the PRD. If it is not requ
 in this issue, remove it from the plan. If you think it is truly needed, write it as a one-paragraph
 proposal for PRD → Future versions or a new ADR, and do not implement it.
 ```
+
+---
+
+## S-10 — Break-it audit (T-1; after S-8, before tagging)
+
+```text
+Break-it audit for Cycle <N>. Trace: NFR-1 (reliability), NFR-5 (security), NFR-9 (testability).
+Your job is to find what would fail in production, not to make things look green. Parts A and B are read-only.
+
+PART A: Inventory (print only, no edits)
+1. Every tracked file outside docs/ and pnpm-lock.yaml: path | lines | what it does in one line |
+   FR/NFR/ADR it serves | its test file (or "NO TEST").
+2. Compare with docs/backlog.md and docs/prompts/cycle-<N>-*.md: list what this cycle promised that does not exist yet.
+3. Coverage per file: flag every file at 0% and anything below the gates.
+
+PART B: Attack plan (print, then WAIT for my "go")
+For every file, list how it can break in production, ranked by impact. Cover at least:
+- inputs: missing, empty, wrong type, huge, Urdu/Unicode text, malformed JSON, out-of-range numbers
+- outside services: down, slow (timeout), HTTP 500, wrong response shape, partial data
+- time: UTC vs Asia/Karachi, midnight, month change
+- restarts and concurrency: crash mid-step, the same job run twice, two workers (idempotency)
+- security: 127.0.0.1-only binding, secrets or full phone numbers in logs, unvalidated input, .env exposure
+- build and run: fresh clone, pnpm install --frozen-lockfile, pnpm build, ports already in use
+Table: file | attack | expected behaviour (quote the PRD/ADR) | unit or integration | priority.
+
+PART C (only after my "go"), branch chore/cycle-<N>-audit: write the tests; a real bug → fix if under 30 lines
+and in scope, else open an issue with the failing test in its body (don't commit failing or skipped tests);
+never weaken tests or gates; pnpm audit --prod, pnpm build, fresh-clone check.
+PART D: docs/testing/cycle-<N>-audit.md (inventory, coverage before → after, attacks, bugs, risks, the 5 files
+I should read first), then ship. Do not merge.
+```
