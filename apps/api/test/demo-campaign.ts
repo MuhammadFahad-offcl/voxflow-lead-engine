@@ -3,7 +3,7 @@
  * stored, all through the fake adapters. Its leads are ready for the lead graph.
  *
  * Serves: FR-36 (demo mode); issue #15 tests.
- * Used by: apps/api/test/lead-run.int.spec.ts.
+ * Used by: apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts.
  */
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
 import { DiscoveryRepository } from '../src/db/discovery.repository.js';

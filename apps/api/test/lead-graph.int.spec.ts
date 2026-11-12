@@ -1,7 +1,8 @@
 /**
  * Integration tests of the lead graph on the fictional DHA demo clinics, with every fake adapter:
  * one HazelJS AgentGraph run per lead stored in the SQL durable run store, a failing step, a
- * resumed run that pays nothing twice, and a spend cap that pauses.
+ * failed web search that does not fail the lead, a resumed run that pays nothing twice, a lost
+ * claim, and the LLM and Perplexity spend caps that pause.
  *
  * Serves: FR-32, FR-33, NFR-1, NFR-2, ADR-0001; issue #15 acceptance (each lead goes through
  * enrich → score; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
@@ -13,6 +14,7 @@ import { resolve } from 'node:path';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
+import { Prisma } from '../src/generated/prisma/client.js';
 import { LeadContextRepository } from '../src/db/lead-context.repository.js';
 import { LeadRunRepository, type ClaimedLead } from '../src/db/lead-run.repository.js';
 import { LeadWebsiteRepository } from '../src/db/lead-website.repository.js';
@@ -28,8 +30,10 @@ import {
   LEAD_STEP,
   runLeadGraph,
   type LeadGraphDeps,
+  type LeadRunOutcome,
 } from '../src/pipeline/lead.graph.js';
-import type { WebContextPort } from '../src/ports/web-context.port.js';
+import { LlmError, type LlmPort } from '../src/ports/llm.port.js';
+import { WebContextError, type WebContextPort } from '../src/ports/web-context.port.js';
 import type { WebReaderPort } from '../src/ports/web-reader.port.js';
 import { discoverDemoCampaign } from './demo-campaign.js';
 import { createTestDatabase } from './test-database.js';
@@ -90,6 +94,7 @@ beforeAll(async () => {
     },
     score: { leads: new ScoreRepository(prisma), logger },
     logger,
+    now: () => new Date(),
   };
 }, 120_000);
 
@@ -107,6 +112,35 @@ const claimOne = async (leadId: string): Promise<ClaimedLead> => {
     data: { graphClaimedAt: null },
   });
   return lead;
+};
+
+// Puts a scored lead back before its web context, as if never searched.
+const backToDiscovered = (leadId: string) =>
+  prisma.lead.update({
+    where: { id: leadId },
+    data: { status: 'DISCOVERED', businessContext: Prisma.DbNull, graphClaimedAt: null },
+  });
+
+// Runs `test` with one spend cap changed, and always puts the default caps back.
+const withCap = async (
+  cap: Partial<typeof DEFAULT_SETTINGS.spendCaps>,
+  test: () => Promise<void>,
+) => {
+  const where = { organizationId: SEED_ORGANIZATION_ID };
+  await prisma.settings.update({
+    where,
+    data: { spendCaps: { ...DEFAULT_SETTINGS.spendCaps, ...cap } },
+  });
+  try {
+    await test();
+  } finally {
+    await prisma.settings.update({ where, data: { spendCaps: DEFAULT_SETTINGS.spendCaps } });
+  }
+};
+
+const runOf = (outcome: LeadRunOutcome) => {
+  if (!('runId' in outcome)) throw new Error(`Run ended ${outcome.status}, with no run`);
+  return prisma.agentRun.findUniqueOrThrow({ where: { id: outcome.runId } });
 };
 
 // Proves one graph run per lead, stored through HazelJS's run store, and that one failing lead
@@ -129,9 +163,14 @@ describe('runLeadGraph on the demo campaign', () => {
       where: { id: { in: claimed.map((lead) => lead.id) } },
     });
     for (const lead of leads) {
+      // The library's own message is not stored: it could quote page data.
       const expected =
         lead.id === broken.id
-          ? { status: 'FAILED', failedStep: LEAD_STEP.WEBSITE, error: 'Fictional reader crash' }
+          ? {
+              status: 'FAILED',
+              failedStep: LEAD_STEP.WEBSITE,
+              error: 'Unexpected Error in this step',
+            }
           : { status: 'SCORED', failedStep: null };
       expect({ place: lead.placeId, ...lead }).toMatchObject({ place: lead.placeId, ...expected });
       expect(lead.graphClaimedAt).toBeNull();
@@ -159,7 +198,10 @@ describe('runLeadGraph on the demo campaign', () => {
 
     expect(done).toMatchObject({ agentName: 'lead-graph', status: 'completed' });
     expect(checkpoints.map((checkpoint) => checkpoint.step)).toEqual([1, 2, 3, 4]);
-    expect(broke).toMatchObject({ status: 'failed', error: { message: 'Fictional reader crash' } });
+    expect(broke).toMatchObject({
+      status: 'failed',
+      error: { message: 'Unexpected Error in this step' },
+    });
   });
 });
 
@@ -195,34 +237,140 @@ describe('runLeadGraph resuming a lead', () => {
   });
 });
 
-// Proves FR-33: a spend cap pauses the step; the lead keeps its status and is not FAILED.
-describe('runLeadGraph at the LLM spend cap', () => {
-  it('suspends the run and leaves the lead ENRICHED, unclaimed, without an error', async () => {
+// Proves FR-12 stays "should" (#12): a failed web search leaves the lead without context, and the
+// lead is still labelled and scored.
+describe('runLeadGraph when the web search fails', () => {
+  it('scores the lead without context instead of failing it', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({ where: { campaignId, status: 'SCORED' } });
+    await backToDiscovered(lead.id);
+    searches.mockRejectedValueOnce(new WebContextError('Fictional search outage', false));
+    const claimed = await claimOne(lead.id);
+
+    const outcome = await runLeadGraph(deps, claimed);
+
+    expect(outcome.status).toBe('COMPLETED');
+    expect(await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+      status: 'SCORED',
+      businessContext: null,
+      error: null,
+    });
+  });
+});
+
+// Proves a labelling failure fails the lead with a fixed sentence, at its step (FR-32).
+describe('runLeadGraph when review labelling fails', () => {
+  it('marks the lead FAILED at LABEL_REVIEWS with "Review labelling failed"', async () => {
     const lead = await prisma.lead.findFirstOrThrow({
       where: { campaignId, status: 'SCORED', reviews: { some: { text: { not: '' } } } },
     });
     await prisma.review.updateMany({ where: { leadId: lead.id }, data: { labels: [] } });
     await prisma.lead.update({ where: { id: lead.id }, data: { status: 'ENRICHED' } });
-    await prisma.settings.update({
-      where: { organizationId: SEED_ORGANIZATION_ID },
-      data: { spendCaps: { ...DEFAULT_SETTINGS.spendCaps, llmMonthlyUsd: '0.00' } },
-    });
+    const brokenModel: LlmPort = {
+      complete: () => Promise.reject(new LlmError('Fictional model outage', false)),
+    };
+    const llm = new LlmService(new LlmSpendRepository(prisma), brokenModel, logger);
     const claimed = await claimOne(lead.id);
+
+    const outcome = await runLeadGraph({ ...deps, label: { ...deps.label, llm } }, claimed);
+
+    expect(outcome).toMatchObject({ status: 'FAILED', step: LEAD_STEP.LABEL });
+    expect(await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+      status: 'FAILED',
+      failedStep: LEAD_STEP.LABEL,
+      error: 'Review labelling failed',
+      graphClaimedAt: null,
+    });
+  });
+});
+
+// Proves a run never works on a lead whose claim another pass now holds.
+describe('runLeadGraph after losing its claim', () => {
+  it('starts no run when the claim was taken before it began', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({ where: { campaignId, status: 'SCORED' } });
+    await backToDiscovered(lead.id);
+    const claimed = await claimOne(lead.id);
+    // Another pass took the lead after this claim's lease ran out.
+    await prisma.lead.update({ where: { id: lead.id }, data: { graphClaimedAt: new Date() } });
 
     const outcome = await runLeadGraph(deps, claimed);
 
-    expect(outcome).toMatchObject({ status: 'PAUSED', step: LEAD_STEP.LABEL });
+    expect(outcome).toEqual({ status: 'CLAIM_LOST' });
     expect(await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
-      status: 'ENRICHED',
-      failedStep: null,
-      error: null,
-      graphClaimedAt: null,
+      status: 'DISCOVERED',
+      graphRunId: lead.graphRunId,
     });
-    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: outcome.runId } });
-    expect(run.status).toBe('suspended');
-    await prisma.settings.update({
-      where: { organizationId: SEED_ORGANIZATION_ID },
-      data: { spendCaps: DEFAULT_SETTINGS.spendCaps },
+  });
+
+  it('cancels the run before its first step when the claim cannot be renewed', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({
+      where: { campaignId, status: 'DISCOVERED', graphClaimedAt: { not: null } },
+    });
+    await prisma.lead.update({ where: { id: lead.id }, data: { graphClaimedAt: null } });
+    const claimed = await claimOne(lead.id);
+    const real = runs();
+    const losing: LeadGraphDeps['runs'] = {
+      startRun: (claim, runId) => real.startRun(claim, runId),
+      renew: () => Promise.resolve(false),
+      markEnriched: (leadId) => real.markEnriched(leadId),
+      release: (claim) => real.release(claim),
+      fail: (claim, step, error) => real.fail(claim, step, error),
+    };
+    searches.mockClear();
+
+    const outcome = await runLeadGraph({ ...deps, runs: losing }, claimed);
+
+    expect(outcome).toEqual({ status: 'CLAIM_LOST' });
+    expect(searches).not.toHaveBeenCalled();
+    const stored = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    expect(stored.status).toBe('DISCOVERED');
+    const run = await prisma.agentRun.findUniqueOrThrow({ where: { id: stored.graphRunId ?? '' } });
+    expect(run.status).toBe('cancelled');
+    await prisma.lead.update({ where: { id: lead.id }, data: { graphClaimedAt: null } });
+  });
+});
+
+// Proves FR-33: a spend cap pauses the step. The lead keeps its status, is not FAILED, and stays
+// claimed so the lease spaces out the next try.
+describe('runLeadGraph at a spend cap', () => {
+  it('suspends the run at the LLM cap and leaves the lead ENRICHED and claimed', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({
+      where: { campaignId, status: 'SCORED', reviews: { some: { text: { not: '' } } } },
+    });
+    await prisma.review.updateMany({ where: { leadId: lead.id }, data: { labels: [] } });
+    await prisma.lead.update({ where: { id: lead.id }, data: { status: 'ENRICHED' } });
+
+    await withCap({ llmMonthlyUsd: '0.00' }, async () => {
+      const claimed = await claimOne(lead.id);
+
+      const outcome = await runLeadGraph(deps, claimed);
+
+      expect(outcome).toMatchObject({ status: 'PAUSED', step: LEAD_STEP.LABEL });
+      const stored = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+      expect(stored).toMatchObject({ status: 'ENRICHED', failedStep: null, error: null });
+      expect(stored.graphClaimedAt).not.toBeNull();
+      expect((await runOf(outcome)).status).toBe('suspended');
+    });
+  });
+
+  it('suspends the run at the Perplexity cap without searching', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({
+      where: { campaignId, status: 'SCORED', websiteStatus: { not: 'PENDING' } },
+    });
+    await backToDiscovered(lead.id);
+    searches.mockClear();
+
+    await withCap({ perplexityDailyUsd: '0.00' }, async () => {
+      const claimed = await claimOne(lead.id);
+
+      const outcome = await runLeadGraph(deps, claimed);
+
+      expect(outcome).toMatchObject({ status: 'PAUSED', step: LEAD_STEP.CONTEXT });
+      expect(searches).not.toHaveBeenCalled();
+      expect(await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+        status: 'DISCOVERED',
+        error: null,
+      });
+      expect((await runOf(outcome)).status).toBe('suspended');
     });
   });
 });
