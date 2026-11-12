@@ -45,6 +45,8 @@ const unclaimAll = () =>
 
 // Proves the runner's claim: atomic, leased, and only for leads whose reviews are settled.
 describe('LeadRunRepository.claimNext', () => {
+  // Two passes on two connections; Postgres may still run them one after the other, so this pins
+  // "never the same lead twice", not the row-lock re-check itself.
   it('gives two passes at the same moment different leads', async () => {
     const now = new Date();
     const [first, second] = await Promise.all([
@@ -92,6 +94,25 @@ describe('LeadRunRepository.claimNext', () => {
     await prisma.lead.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
   });
 
+  it('claims nothing from a paused or still-discovering campaign', async () => {
+    for (const status of ['PAUSED', 'DISCOVERING'] as const) {
+      const pausedFrom = status === 'PAUSED' ? 'ENRICHING' : null;
+      await prisma.campaign.update({ where: { id: campaignId }, data: { status, pausedFrom } });
+
+      expect({ status, claimed: await runs().claimNext(new Date(), LEASE_MS, 100) }).toEqual({
+        status,
+        claimed: [],
+      });
+    }
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'ENRICHING', pausedFrom: null },
+    });
+  });
+});
+
+// Proves the reviews pass never buys a lead's reviews again once its graph started (#15).
+describe('ReviewRepository.leadsNeedingReviews after the lead graph', () => {
   it('never sends a lead that started its graph back to the paid reviews run', async () => {
     const { id } = await prisma.lead.create({
       data: {
@@ -113,18 +134,5 @@ describe('LeadRunRepository.claimNext', () => {
     });
     expect(await needing()).not.toContain(id);
     await prisma.lead.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
-  });
-
-  it('claims nothing from a paused campaign', async () => {
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: 'PAUSED', pausedFrom: 'ENRICHING' },
-    });
-
-    expect(await runs().claimNext(new Date(), LEASE_MS, 100)).toEqual([]);
-    await prisma.campaign.update({
-      where: { id: campaignId },
-      data: { status: 'ENRICHING', pausedFrom: null },
-    });
   });
 });

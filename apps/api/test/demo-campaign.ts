@@ -3,7 +3,7 @@
  * stored, all through the fake adapters. Its leads are ready for the lead graph.
  *
  * Serves: FR-36 (demo mode); issue #15 tests.
- * Used by: apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts.
+ * Used by: apps/api/test/lead-run.int.spec.ts.
  */
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
 import { DiscoveryRepository } from '../src/db/discovery.repository.js';
@@ -23,6 +23,8 @@ import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
  * @param prisma - A client on a seeded test database.
  * @param logger - A silent logger.
  * @returns `Campaign.id`; the campaign is ENRICHING.
+ * @throws Prisma's not-found error when the database is not seeded; what discover or the reviews
+ * pass throw.
  */
 export async function discoverDemoCampaign(
   prisma: PrismaProvider,
