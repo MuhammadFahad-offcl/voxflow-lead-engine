@@ -28,6 +28,14 @@ const CATALOG_FILE = 'catalog/services.json';
 const readJson = async (path: string): Promise<unknown> =>
   JSON.parse(await readFile(path, 'utf8')) as unknown;
 
+/** The niche version a seed run found in the niche file. */
+export interface SeededNiche {
+  slug: string;
+  version: number;
+  /** False when that version was already stored, so this run left it alone. */
+  added: boolean;
+}
+
 /**
  * Reads and validates the config files, then creates whatever seed rows are missing.
  *
@@ -39,12 +47,14 @@ const readJson = async (path: string): Promise<unknown> =>
  * which uses it, as decided for #7. `reviewLabels` got its column in #13 and `tiers` in #14.
  * @param prisma - Client connected to the database to seed.
  * @param configDir - The repo's `config/` folder.
+ * @returns The niche version the file holds, and whether this run added it (false when it was
+ * already stored), for the seed's log line.
  * @throws ZodError when a config file or a default does not match its schema; Error when a service
  * names a signal the niche does not have, or when the niche file changed but kept its `version`;
  * SyntaxError when a file is not valid JSON; ENOENT when a file is missing; Prisma errors from the
  * database. Nothing is written in any of these cases.
  */
-export async function seed(prisma: PrismaClient, configDir: string): Promise<void> {
+export async function seed(prisma: PrismaClient, configDir: string): Promise<SeededNiche> {
   const niche = NicheFile.parse(await readJson(join(configDir, NICHE_FILE)));
   const scriptTemplate = await readFile(
     join(configDir, 'niches', niche.scriptTemplateFile),
@@ -132,4 +142,5 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<voi
       }),
     ),
   ]);
+  return { slug: niche.slug, version: niche.version, added: stored === null };
 }

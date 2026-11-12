@@ -16,8 +16,13 @@ const logger = createLogger(env.LOG_LEVEL);
 
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) });
 try {
-  await seed(prisma, resolve(import.meta.dirname, '../../../config'));
-  logger.info('seed done: organization, settings, dental-clinic niche v1, service catalog');
+  const niche = await seed(prisma, resolve(import.meta.dirname, '../../../config'));
+  // The version comes from the niche file, so the line says which rules new campaigns get.
+  const state = niche.added ? 'added' : 'already stored';
+  logger.info(
+    { niche: niche.slug, version: niche.version, state },
+    `seed done: organization, settings, ${niche.slug} niche v${String(niche.version)} (${state}), service catalog`,
+  );
 } finally {
   await prisma.$disconnect();
 }
