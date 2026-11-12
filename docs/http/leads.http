@@ -1,0 +1,15 @@
+# Example requests for the leads API (FR-32), for the VS Code REST Client extension.
+# Start the API with `pnpm dev`. The API listens on 127.0.0.1 only (ADR-0003).
+# Copy a FAILED lead's id from Prisma Studio (`pnpm db:studio`) until the dashboard (#16) shows it.
+
+@base = http://127.0.0.1:4000
+@leadId = paste-a-failed-lead-id-here
+
+### Retry a FAILED lead from its failed step: 200 with the status it starts again from
+POST {{base}}/leads/{{leadId}}/retry
+
+### 409: the same lead again (it is no longer FAILED)
+POST {{base}}/leads/{{leadId}}/retry
+
+### 404: unknown lead
+POST {{base}}/leads/no-such-lead/retry
