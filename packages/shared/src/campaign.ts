@@ -80,6 +80,8 @@ export const CampaignSummary = z.object({
   // duplicateCount / foundCount, 0–1 with 2 decimals; null until discovery has found anything.
   duplicateRate: z.number().min(0).max(1).nullable(),
   filteredCount: z.number().int().nonnegative(),
+  // Leads that passed the ideal-client filter: every lead of the campaign but FILTERED_OUT (#16).
+  qualifiedCount: z.number().int().nonnegative(),
   createdAt: z.iso.datetime(),
 });
 /** Parsed campaign summary. Shares the schema's name so one import gives both. */

@@ -20,7 +20,7 @@ let prisma: PrismaClient;
 const counts = async () => ({
   organizations: await prisma.organization.count(),
   settings: await prisma.settings.count(),
-  niches: await prisma.nicheProfile.count({ where: { slug: 'dental-clinic', version: 4 } }),
+  niches: await prisma.nicheProfile.count({ where: { slug: 'dental-clinic', version: 5 } }),
   services: await prisma.service.count(),
 });
 
@@ -46,8 +46,8 @@ describe('seed', () => {
     const second = await seed(prisma, configDir);
 
     // The niche file's version, not a fixed one: the seed's log line prints this.
-    expect(first).toEqual({ slug: 'dental-clinic', version: 4, added: true });
-    expect(second).toEqual({ slug: 'dental-clinic', version: 4, added: false });
+    expect(first).toEqual({ slug: 'dental-clinic', version: 5, added: true });
+    expect(second).toEqual({ slug: 'dental-clinic', version: 5, added: false });
     expect(await counts()).toEqual({ organizations: 1, settings: 1, niches: 1, services: 10 });
     // updatedAt would move if the second run had written the row.
     expect(
@@ -88,6 +88,14 @@ describe('seed', () => {
       'PRICE',
       'POSITIVE',
       'OTHER',
+    ]);
+    // The new-campaign form's quick picks (#16, niche v5).
+    expect(niche.defaultAreas).toEqual([
+      'DHA',
+      'Gulberg',
+      'Model Town',
+      'Johar Town',
+      'Bahria Town',
     ]);
   });
 

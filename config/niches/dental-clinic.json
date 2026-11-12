@@ -8,7 +8,7 @@
     "sourceOfTruth": "docs/prd.md → Lead scoring model, Call design"
   },
   "slug": "dental-clinic",
-  "version": 4,
+  "version": 5,
   "name": "Dental clinics",
   "searchTerms": ["dental clinic", "dentist", "dental surgeon", "orthodontist"],
   "categoryKeywords": [

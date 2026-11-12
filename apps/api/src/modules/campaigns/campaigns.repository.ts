@@ -8,10 +8,14 @@ import { Injectable } from '@hazeljs/core';
 import { PrismaProvider } from '../../db/prisma.provider.js';
 import type { CampaignStatus, Prisma } from '../../generated/prisma/client.js';
 
-// What every campaign read returns: the row plus the niche fields the summary needs.
-const WITH_NICHE = { nicheProfile: { select: { slug: true, searchTerms: true } } } as const;
+// What every campaign read returns: the row, the niche fields the summary needs, and how many
+// of its leads passed the ideal-client filter.
+const WITH_NICHE = {
+  nicheProfile: { select: { slug: true, searchTerms: true } },
+  _count: { select: { leads: { where: { status: { not: 'FILTERED_OUT' } } } } },
+} as const;
 
-/** A campaign row with its niche's slug and search terms. */
+/** A campaign row with its niche's slug and search terms, and its qualified-lead count. */
 export type CampaignWithNiche = Prisma.CampaignGetPayload<{ include: typeof WITH_NICHE }>;
 
 /** What `create` needs: owner, niche version, city, areas and the precomputed search count. */
