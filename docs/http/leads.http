@@ -13,3 +13,16 @@ POST {{base}}/leads/{{leadId}}/retry
 
 ### 404: unknown lead
 POST {{base}}/leads/no-such-lead/retry
+
+### A campaign's lead table: 50 per page, highest score first (FR-30)
+@campaignId = paste-a-campaign-id-here
+GET {{base}}/campaigns/{{campaignId}}/leads
+
+### Filtered and sorted: HOT leads in DHA scoring 70–100, by review count
+GET {{base}}/campaigns/{{campaignId}}/leads?tier=HOT&area=DHA&minScore=70&maxScore=100&sort=reviews&dir=desc
+
+### Page 2
+GET {{base}}/campaigns/{{campaignId}}/leads?page=2
+
+### 400: an unknown filter is refused, not ignored
+GET {{base}}/campaigns/{{campaignId}}/leads?colour=red

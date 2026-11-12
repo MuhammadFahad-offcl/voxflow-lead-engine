@@ -35,3 +35,4 @@ export { WebsiteEvidence } from './website-evidence.js';
 export { BusinessContext } from './business-context.js';
 export { CostsStatus } from './costs.js';
 export { ScoreBreakdown } from './score.js';
+export { LEAD_PAGE_SIZE, LeadListQuery, LeadPage, LeadRow } from './leads.js';
