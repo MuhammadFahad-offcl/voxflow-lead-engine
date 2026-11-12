@@ -59,10 +59,11 @@ export function tierFor(total: number, tiers: NicheRules['tiers']): Tier {
  * Scores one lead against its niche version's rules.
  *
  * No evidence, no points: a signal whose rule finds nothing, or only blank evidence, is left out.
- * A finding marked `noPoints` is kept with 0 points. Each signal counts once. Does not read or write anything.
+ * A finding marked `noPoints` is kept with 0 points. Each signal counts once.
+ * Does not read or write anything.
  * @param facts - What is known about the lead.
  * @param niche - The niche version's weights, thresholds, category keywords and premium areas.
- * @returns The signals with points, the total, the breakdown and the tier.
+ * @returns The signals with evidence (0-point notes included), the total, the breakdown and the tier.
  * @throws Error when the weights name a signal that has no rule (a niche file and code out of step).
  */
 export function scoreLead(facts: LeadFacts, niche: NicheRules): ScoreResult {

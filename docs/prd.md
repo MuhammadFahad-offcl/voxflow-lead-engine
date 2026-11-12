@@ -7,7 +7,7 @@ Nov 3, 2026 · Muhammad Fahad
 | Field               | Value                                                                                                                                              |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Product             | VoxFlow Lead Engine                                                                                                                                |
-| Document version    | 0.5 (Cycle 1 slipped 4 days; later cycles shifted)                                                                                                 |
+| Document version    | 0.6 (reviews_unreplied needs 10 stored reviews)                                                                                                    |
 | Status              | Draft, awaiting owner review                                                                                                                       |
 | Owner               | Muhammad Fahad, Founder, VoxFlow AI Solutions                                                                                                      |
 | Technical reviewer  | Claude                                                                                                                                             |
@@ -524,10 +524,11 @@ What comes after v1 is decided in early January 2027 from the December data, not
 
 ### Changelog
 
-| Date       | Version | Change                                                                                                |
-| ---------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| 9 Nov 2026 | 0.5     | Cycle 1 slipped 4 days; HazelJS has no fixed deadline (Q9)                                            |
-| 5 Nov 2026 | 0.4     | FR-8: closed places, keyword plurals, government or school names. FR-7: reopened places re-checked    |
-| 4 Nov 2026 | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)             |
-| 3 Nov 2026 | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting |
-| 3 Nov 2026 | 0.1     | First draft for owner review                                                                          |
+| Date        | Version | Change                                                                                                         |
+| ----------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| 12 Nov 2026 | 0.6     | Lead scoring: reviews_unreplied needs at least 10 stored reviews; fewer gives a 0-point signal with the reason |
+| 9 Nov 2026  | 0.5     | Cycle 1 slipped 4 days; HazelJS has no fixed deadline (Q9)                                                     |
+| 5 Nov 2026  | 0.4     | FR-8: closed places, keyword plurals, government or school names. FR-7: reopened places re-checked             |
+| 4 Nov 2026  | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)                      |
+| 3 Nov 2026  | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting          |
+| 3 Nov 2026  | 0.1     | First draft for owner review                                                                                   |

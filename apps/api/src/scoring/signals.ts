@@ -1,6 +1,7 @@
 /**
- * The 13 scoring signals of the PRD "Lead scoring model", one pure function each. A signal either
- * finds evidence and returns it, or returns null: no evidence, no points. Points come from the niche
+ * The 13 scoring signals of the PRD "Lead scoring model", one pure function each. A signal finds
+ * evidence and returns it, or returns null: no evidence, no points. A third outcome, a `noPoints`
+ * note, is evidence of why it earns nothing (too few reviews), stored with 0 points. Points come from the niche
  * profile's weights in `scoreLead`, never from here.
  *
  * Fixed numbers here (2 of the last 30, more than half, 2+ doctors, 3+ treatments, 100+ reviews,

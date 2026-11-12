@@ -19,7 +19,8 @@ const dental = config('niches/dental-clinic.json') as {
 };
 const catalog = config('catalog/services.json') as { services: Record<string, unknown>[] };
 
-// Proves a niche file must have the 13 PRD signals with points adding up to exactly 100.
+// Proves a niche file must have the 13 PRD signals with points adding up to exactly 100, and that
+// only reviews_unreplied may set a minimum of stored reviews (1 to 30), with no typo dropped silently.
 describe('NicheFile', () => {
   it('accepts config/niches/dental-clinic.json', () => {
     expect(NicheFile.safeParse(dental).success).toBe(true);
@@ -57,7 +58,29 @@ describe('NicheFile', () => {
     const zero = structuredClone(dental);
     zero.signalWeights.PAIN['reviews_unreplied'] = { points: 7, rule: 'r', minReviews: 0 } as never;
 
-    expect(NicheFile.safeParse(zero).success).toBe(false);
+    expect(NicheFile.safeParse(zero).error?.issues.map((issue) => issue.path.join('.'))).toEqual([
+      'signalWeights.PAIN.reviews_unreplied.minReviews',
+    ]);
+  });
+
+  it('rejects a misspelt minimum, so the founder minimum cannot switch off silently', () => {
+    const typo = structuredClone(dental);
+    typo.signalWeights.PAIN['reviews_unreplied'] = { points: 7, rule: 'r', minReview: 10 } as never;
+
+    expect(NicheFile.safeParse(typo).error?.issues.map((issue) => issue.code)).toEqual([
+      'unrecognized_keys',
+    ]);
+  });
+
+  it('rejects a minimum on any other signal', () => {
+    const elsewhere = structuredClone(dental);
+    elsewhere.signalWeights.PAIN['booking_wait_reviews'] = {
+      points: 10,
+      rule: 'r',
+      minReviews: 10,
+    } as never;
+
+    expect(NicheFile.safeParse(elsewhere).success).toBe(false);
   });
 
   it('rejects an unknown signal key, so a typo cannot score silently', () => {
