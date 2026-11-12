@@ -157,5 +157,6 @@ describe('demo pipeline: discover → enrich → reviews → labels → score', 
       points: 0,
       evidence: 'Only 1 review stored, fewer than the 10 needed',
     });
-  });
+    // The whole pipeline for nine clinics: Jest's 5-second default is too short under full-suite load.
+  }, 60_000);
 });

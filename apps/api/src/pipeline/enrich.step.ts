@@ -92,16 +92,20 @@ function websiteFacts(read: WebsiteRead): LeadWebsiteFacts {
  * Does not change the lead's status: enrichment is finished when reviews and context are in too.
  * @param deps - Its dependencies.
  * @param leadId - `Lead.id` of the lead to enrich.
+ * @returns The website status stored: NONE, READ_FETCH, READ_LIGHTPANDA or UNREADABLE.
  * @throws Prisma errors, e.g. when there is no such lead; ZodError when the evidence does not
  * match WebsiteEvidence, and then nothing is stored. The reader and the extractors do not throw,
  * not even for a malformed link on the page.
  */
-export async function enrichWebsite(deps: EnrichWebsiteDeps, leadId: string): Promise<void> {
+export async function enrichWebsite(
+  deps: EnrichWebsiteDeps,
+  leadId: string,
+): Promise<LeadWebsiteFacts['websiteStatus']> {
   const website = await deps.leads.websiteOf(leadId);
   if (website === null) {
     await deps.leads.saveWebsite(leadId, NO_WEBSITE);
     deps.logger.info({ leadId, status: 'NONE' }, 'lead has no website');
-    return;
+    return NO_WEBSITE.websiteStatus;
   }
   const read = await deps.webReader.read(website);
   await deps.leads.saveWebsite(leadId, websiteFacts(read));
@@ -109,4 +113,5 @@ export async function enrichWebsite(deps: EnrichWebsiteDeps, leadId: string): Pr
   // The reason is one of the reader's fixed phrases, never text taken from the page.
   const reason = read.status === 'UNREADABLE' ? { reason: read.reason } : {};
   deps.logger.info({ leadId, domain, status: read.status, ...reason }, 'website read');
+  return read.status;
 }

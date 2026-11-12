@@ -1,10 +1,11 @@
 /**
- * Database access for the lead graph: the lead runner's claim on a lead. The status changes a
- * graph run makes come with the graph (#15, next PR); the run itself and its checkpoints live in
- * HazelJS's SQL durable run store, not here.
+ * Database access for the lead graph: the lead runner's claim on a lead, and the status changes
+ * a graph run makes to it (ENRICHED, FAILED, the run id). The run itself and its checkpoints live
+ * in HazelJS's SQL durable run store, not here.
  *
  * Serves: FR-32 (per-lead status and error), NFR-1, NFR-2, ADR-0001, ADR-0002; issue #15.
- * Used by: apps/api/test/lead-run.int.spec.ts; the lead graph and runner (#15, next PRs).
+ * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/test/lead-run.int.spec.ts,
+ * apps/api/test/lead-graph.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import type { Prisma, WebsiteStatus } from '../generated/prisma/client.js';
@@ -99,5 +100,86 @@ export class LeadRunRepository {
       if (!isRunnable(status)) throw new Error(`Claimed lead ${lead.id} is ${status}`);
       return { ...lead, status, claimedAt: now };
     });
+  }
+
+  /**
+   * Records the HazelJS run id of the lead's new graph run.
+   * @param lead - The claimed lead.
+   * @param runId - The `AgentRun` id the run will be stored under.
+   * @returns False when the claim was lost (its lease ran out and another pass took the lead).
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async startRun(lead: Pick<ClaimedLead, 'id' | 'claimedAt'>, runId: string): Promise<boolean> {
+    const { count } = await this.prisma.lead.updateMany({
+      where: { id: lead.id, graphClaimedAt: lead.claimedAt },
+      data: { graphRunId: runId },
+    });
+    return count === 1;
+  }
+
+  /**
+   * Renews a claim before the next graph node, so a node never starts without holding the lead.
+   * @param lead - The claimed lead, with the lease value this pass holds.
+   * @param now - The new lease value.
+   * @returns False when the claim was lost; the caller must stop before paying for anything.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async renew(lead: Pick<ClaimedLead, 'id' | 'claimedAt'>, now: Date): Promise<boolean> {
+    const { count } = await this.prisma.lead.updateMany({
+      where: { id: lead.id, graphClaimedAt: lead.claimedAt },
+      data: { graphClaimedAt: now },
+    });
+    return count === 1;
+  }
+
+  /**
+   * Marks a lead ENRICHED once its website and web context are in.
+   *
+   * Does not move a lead that is not DISCOVERED: a repeat leaves ENRICHED as it is.
+   * @param leadId - `Lead.id`.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async markEnriched(leadId: string): Promise<void> {
+    await this.prisma.lead.updateMany({
+      where: { id: leadId, status: 'DISCOVERED' },
+      data: { status: 'ENRICHED' },
+    });
+  }
+
+  /**
+   * Ends the claim after a run finished or stopped between nodes; the lead keeps the status its
+   * steps gave it.
+   *
+   * Does nothing when the claim was lost: the other pass owns the lead now.
+   * @param lead - The claimed lead.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async release(lead: Pick<ClaimedLead, 'id' | 'claimedAt'>): Promise<void> {
+    await this.prisma.lead.updateMany({
+      where: { id: lead.id, graphClaimedAt: lead.claimedAt },
+      data: { graphClaimedAt: null },
+    });
+  }
+
+  /**
+   * Marks a lead FAILED at a step with a stored error sentence, and ends the claim (FR-32).
+   *
+   * Does not mark a lead the score step already moved past enrichment and labelling: that one only
+   * loses the claim. Does nothing when the claim was lost.
+   * @param lead - The claimed lead.
+   * @param step - The graph node that failed, e.g. "ENRICH_WEBSITE".
+   * @param error - The sentence shown on the dashboard; never raw error text from a library.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async fail(
+    lead: Pick<ClaimedLead, 'id' | 'claimedAt'>,
+    step: string,
+    error: string,
+  ): Promise<void> {
+    const { count } = await this.prisma.lead.updateMany({
+      where: { id: lead.id, graphClaimedAt: lead.claimedAt, status: { in: [...RUNNABLE] } },
+      data: { status: 'FAILED', failedStep: step, error, graphClaimedAt: null },
+    });
+    if (count === 0) await this.release(lead);
   }
 }
