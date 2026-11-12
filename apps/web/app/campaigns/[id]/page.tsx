@@ -32,6 +32,8 @@ async function readCampaign(id: string): Promise<CampaignSummary> {
  * @param props - Next.js page props.
  * @param props.params - The route's `id`.
  * @returns The page.
+ * @throws ApiError when the API is down; ZodError for an answer of the wrong shape. Next.js shows
+ * app/error.tsx.
  */
 export default async function CampaignPage({
   params,

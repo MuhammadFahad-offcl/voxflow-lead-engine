@@ -8,7 +8,7 @@
  */
 import { describe, expect, it } from '@jest/globals';
 import { CreateCampaignInput } from '@voxflow/shared';
-import { gridSize, parseAreas, toFieldErrors, toggleArea } from './campaign-form';
+import { gridSize, parseAreas, submitResult, toFieldErrors, toggleArea } from './campaign-form';
 
 // Proves the areas field reads commas and lines, and quick picks add and remove an area.
 describe('parseAreas and toggleArea', () => {
@@ -60,5 +60,55 @@ describe('toFieldErrors', () => {
 
   it('returns nothing for a body that is not a validation answer', () => {
     expect(toFieldErrors({ message: 'Internal error' })).toEqual({});
+  });
+});
+
+// Proves a submit never invites a duplicate campaign, and every refusal shows a message.
+describe('submitResult', () => {
+  it('opens the new campaign on 201', () => {
+    expect(submitResult(201, { id: 'cmfictional0001' })).toEqual({ id: 'cmfictional0001' });
+  });
+
+  it('says it was created, not "try again", when a 201 answer is unreadable', () => {
+    expect(submitResult(201, { nope: true })).toEqual({
+      errors: { form: [expect.stringContaining('was created')] },
+    });
+  });
+
+  it('warns that the campaign may exist when the API did not answer', () => {
+    expect(submitResult(0, null)).toEqual({
+      errors: { form: [expect.stringContaining('may already exist')] },
+    });
+  });
+
+  it('shows field messages for a 400, and a form message when the 400 names no field', () => {
+    expect(
+      submitResult(400, { errors: [{ field: 'city', messages: ['city is required'] }] }),
+    ).toEqual({
+      errors: { city: ['city is required'] },
+    });
+    expect(submitResult(400, { message: 'Bad Request' })).toEqual({
+      errors: { form: ['The API refused the campaign (400).'] },
+    });
+  });
+
+  it('puts a 404 under the niche, and any other status in a form message', () => {
+    expect(submitResult(404, null)).toEqual({
+      errors: { nicheSlug: ['That niche no longer exists'] },
+    });
+    expect(submitResult(503, null)).toEqual({
+      errors: { form: ['The API refused the campaign (503).'] },
+    });
+  });
+
+  it('shows a repeated message once', () => {
+    const body = {
+      errors: [
+        { field: 'areas.1', messages: ['an area cannot be empty'] },
+        { field: 'areas.3', messages: ['an area cannot be empty'] },
+      ],
+    };
+
+    expect(toFieldErrors(body)).toEqual({ areas: ['an area cannot be empty'] });
   });
 });

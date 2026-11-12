@@ -18,6 +18,8 @@ const env = ApiAddressEnv.parse(process.env);
 const API_BASE_URL = `http://${env.API_HOST}:${String(env.API_PORT)}`;
 // A hung API must show as an error, not stall the page past NFR-3's 2 seconds.
 const TIMEOUT_MS = 2000;
+// A write gets longer: cutting it off would not stop the API from committing it.
+const POST_TIMEOUT_MS = 10_000;
 
 /** The API answered with an error status, could not be reached, or sent something unreadable. */
 export class ApiError extends Error {
@@ -44,18 +46,23 @@ export class ApiError extends Error {
  * Sends one request to the API and reads its JSON body.
  * @param path - Path and query, e.g. "/campaigns".
  * @param init - Method and body.
+ * @param timeoutMs - How long to wait for the whole answer, in milliseconds.
  * @returns The status and the parsed body (null when there was none).
  * @throws ApiError: status 0 when the API is down or slower than 2 seconds (body included); the
  * answer's status when its body is not JSON.
  */
-async function send(path: string, init: RequestInit): Promise<{ status: number; body: unknown }> {
+async function send(
+  path: string,
+  init: RequestInit,
+  timeoutMs = TIMEOUT_MS,
+): Promise<{ status: number; body: unknown }> {
   let response: Response;
   let text: string;
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
       cache: 'no-store',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     text = await response.text();
   } catch (error) {
@@ -86,16 +93,18 @@ export async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> 
 
 /**
  * Sends a JSON body and returns the answer as it is, so the caller can show a 400's messages.
+ *
+ * Waits up to 10 seconds: a write the API is still committing must not look like a failure.
  * @param path - Path, e.g. "/campaigns".
- * @param body - The JSON body; none for an action such as a retry.
+ * @param body - The JSON body.
  * @returns The status and parsed body.
- * @throws ApiError (status 0) when the API is down.
+ * @throws ApiError: status 0 when the API is down or did not answer in 10 seconds (it may still
+ * have done the write); the answer's status when its body is not JSON.
  */
-export function apiPost(path: string, body?: unknown): Promise<{ status: number; body: unknown }> {
-  return send(path, {
-    method: 'POST',
-    ...(body === undefined
-      ? {}
-      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
-  });
+export function apiPost(path: string, body: unknown): Promise<{ status: number; body: unknown }> {
+  return send(
+    path,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    POST_TIMEOUT_MS,
+  );
 }

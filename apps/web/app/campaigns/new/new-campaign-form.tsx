@@ -21,7 +21,7 @@ import { createCampaign, type CreateCampaignState } from './actions';
 function FieldErrorList({ messages }: Readonly<{ messages: string[] | undefined }>) {
   if (messages === undefined || messages.length === 0) return null;
   return (
-    <ul className="mt-1 text-sm text-red-700">
+    <ul role="alert" className="mt-1 text-sm text-red-700">
       {messages.map((message) => (
         <li key={message}>{message}</li>
       ))}
@@ -45,15 +45,19 @@ export function NewCampaignForm({ niches }: Readonly<{ niches: NicheSummary[] }>
   const [areas, setAreas] = useState(state.values.areas);
   const niche = niches.find((item) => item.slug === nicheSlug);
   const searches = gridSize(niche?.searchTermCount ?? 0, parseAreas(areas));
+  const picks = new Set(parseAreas(areas).map((area) => area.toLowerCase()));
   const input = 'mt-1 w-full rounded border border-slate-300 bg-white px-3 py-2';
 
   return (
     <form action={submit} className="max-w-xl space-y-5">
       <label className="block">
         <span className="font-medium">Niche</span>
+        {/* Uncontrolled: React resets a form after its action, and a controlled select would fall
+            back to its first option while this component's state kept the founder's choice. */}
         <select
           name="nicheSlug"
-          value={nicheSlug}
+          defaultValue={state.values.nicheSlug}
+          aria-invalid={state.errors.nicheSlug !== undefined}
           onChange={(event) => {
             setNicheSlug(event.target.value);
           }}
@@ -70,7 +74,12 @@ export function NewCampaignForm({ niches }: Readonly<{ niches: NicheSummary[] }>
 
       <label className="block">
         <span className="font-medium">City</span>
-        <input name="city" defaultValue={state.values.city} className={input} />
+        <input
+          name="city"
+          defaultValue={state.values.city}
+          aria-invalid={state.errors.city !== undefined}
+          className={input}
+        />
         <FieldErrorList messages={state.errors.city} />
       </label>
 
@@ -85,29 +94,34 @@ export function NewCampaignForm({ niches }: Readonly<{ niches: NicheSummary[] }>
             }}
             rows={2}
             placeholder="DHA, Gulberg"
+            aria-invalid={state.errors.areas !== undefined}
             className={input}
           />
         </label>
         <div className="mt-2 flex flex-wrap gap-2">
-          {niche?.defaultAreas.map((area) => (
-            <button
-              key={area}
-              type="button"
-              onClick={() => {
-                setAreas((current) => toggleArea(current, area));
-              }}
-              className="rounded-full border border-slate-300 px-3 py-1 text-sm hover:bg-slate-100"
-            >
-              {area}
-            </button>
-          ))}
+          {niche?.defaultAreas.map((area) => {
+            const picked = picks.has(area.toLowerCase());
+            return (
+              <button
+                key={area}
+                type="button"
+                aria-pressed={picked}
+                onClick={() => {
+                  setAreas((current) => toggleArea(current, area));
+                }}
+                className={`rounded-full border px-3 py-1 text-sm ${picked ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-300 hover:bg-slate-100'}`}
+              >
+                {area}
+              </button>
+            );
+          })}
         </div>
         <FieldErrorList messages={state.errors.areas} />
       </div>
 
       <p className="text-sm text-slate-600">
         {niche?.searchTermCount ?? 0} search terms × {parseAreas(areas).length} areas ={' '}
-        <strong>{searches} searches</strong>, up to 100 results each.
+        <strong>{searches} searches</strong>.
       </p>
       <FieldErrorList messages={state.errors.form} />
 

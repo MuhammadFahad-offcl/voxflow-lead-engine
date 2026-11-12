@@ -15,6 +15,8 @@ import { NewCampaignForm } from './new-campaign-form';
  *
  * Does not cache: niches are read on every request, so a new niche version shows at once.
  * @returns The page.
+ * @throws ApiError when the API is down; ZodError for an answer of the wrong shape. Next.js shows
+ * app/error.tsx.
  */
 export default async function NewCampaignPage() {
   await connection();
@@ -23,7 +25,9 @@ export default async function NewCampaignPage() {
     <main className="mx-auto max-w-6xl px-6 py-8">
       <h1 className="mb-6 text-2xl font-semibold">New campaign</h1>
       {niches.length === 0 ? (
-        <p>No niche is set up yet: run `pnpm db:seed`.</p>
+        <p>
+          No niche is set up yet: run <code>pnpm db:seed</code>.
+        </p>
       ) : (
         <NewCampaignForm niches={niches} />
       )}

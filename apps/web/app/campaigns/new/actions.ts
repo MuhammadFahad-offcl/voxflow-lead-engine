@@ -6,10 +6,15 @@
  * Serves: FR-1 (create a campaign), FR-2; issue #16.
  * Used by: apps/web/app/campaigns/new/new-campaign-form.tsx.
  */
-import { CampaignSummary, CreateCampaignInput } from '@voxflow/shared';
+import { CreateCampaignInput } from '@voxflow/shared';
 import { redirect } from 'next/navigation';
-import { parseAreas, toFieldErrors, type FieldErrors } from '../../../lib/campaign-form';
-import { apiPost } from '../../../lib/api';
+import { ApiError, apiPost } from '../../../lib/api';
+import {
+  parseAreas,
+  submitResult,
+  toFieldErrors,
+  type FieldErrors,
+} from '../../../lib/campaign-form';
 
 /** What the form shows after a failed submit: the messages, and what was typed. */
 export interface CreateCampaignState {
@@ -27,7 +32,8 @@ const text = (form: FormData, name: string): string => {
  * @param _previous - The form's previous state (React's `useActionState` passes it; unused).
  * @param form - The submitted fields: `nicheSlug`, `city`, `areas`.
  * @returns The messages to show when the campaign was not created.
- * @throws Next.js's redirect signal to `/campaigns/<id>` once it is created.
+ * @throws Next.js's redirect signal to `/campaigns/<id>` once it is created; any error that is not
+ * an ApiError (a bug), which Next.js shows as its error page.
  */
 export async function createCampaign(
   _previous: CreateCampaignState,
@@ -45,16 +51,16 @@ export async function createCampaign(
   });
   if (!input.success) return { errors: toFieldErrors(input.error), values };
 
-  let created: CampaignSummary;
+  let answer: { status: number; body: unknown };
   try {
-    const { status, body } = await apiPost('/campaigns', input.data);
-    if (status === 400) return { errors: toFieldErrors(body), values };
-    if (status === 404) return { errors: { nicheSlug: ['That niche no longer exists'] }, values };
-    if (status !== 201) return { errors: { form: [`The API answered ${String(status)}`] }, values };
-    created = CampaignSummary.parse(body);
-  } catch {
-    return { errors: { form: ['The API is not reachable: is `pnpm dev` running?'] }, values };
+    answer = await apiPost('/campaigns', input.data);
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error;
+    // Status 0 (no answer) or an unreadable error page: submitResult words both safely.
+    answer = { status: error.status, body: error.body };
   }
-  // Outside the try: redirect() works by throwing, and the catch above would swallow it.
-  redirect(`/campaigns/${created.id}`);
+  const result = submitResult(answer.status, answer.body);
+  if ('errors' in result) return { errors: result.errors, values };
+  // Outside any try: redirect() works by throwing.
+  redirect(`/campaigns/${result.id}`);
 }
