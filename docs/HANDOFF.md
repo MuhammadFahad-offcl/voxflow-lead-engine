@@ -2,13 +2,13 @@
 
 > Last updated: 2026-11-12. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
 
-## Cycle 1 issues remaining
+## Cycle 1 status
 
-Cycle 1 is due **13 Nov 2026**. Issues #3–#15 are closed. Issue #16 remains.
+Cycle 1 (due **13 Nov 2026**): all 14 planned issues (#3–#16) are closed. The S-8 cycle close is in progress: the retro draft is `docs/retros/cycle-1.md`, and **`v0.1.0` is not tagged until Fahad approves**.
 
-| Issue | Title                                                           | Prompt                                         |
-| ----- | --------------------------------------------------------------- | ---------------------------------------------- |
-| #16   | Dashboard — campaigns list, new campaign form, lead table + CSV | `docs/prompts/cycle-1-scored-leads.md` → C1-14 |
+Still open in the milestone: **#125** (flaky DB tests / knip crash on the first run after an install). Moving it to a later milestone is Fahad's call.
+
+Next is Cycle 2 (`docs/prompts/cycle-2-solutions-scripts.md`).
 
 ## Keys still needed
 
@@ -84,6 +84,16 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 - **`pnpm dev` starts the worker too, and its first pass runs within a second.** To send an API request without the worker (e.g. to pause a campaign), start only the API: `pnpm --filter @voxflow/shared build && pnpm --filter api build && pnpm --filter api dev:start`.
 - Fahad's real DHA campaign `cmw3kqq6n0000vgva01vcfdef` (#10, niche v3) is **PAUSED** in his dev DB. Do not resume it without his go: in live mode the worker would buy reviews and make Perplexity and Claude calls for its 56 leads.
 
+### #16 decisions (2026-11-12)
+
+- **No call-result filter** until Cycle 3, because there are no calls before then. The lead table filters by tier, status, area and score range.
+- **`NicheProfile.defaultAreas`** is a column with no backfill. `pnpm db:seed` stores it with **dental-clinic v5**, the same scoring as v4. New campaigns use v5.
+- **The dashboard reads the API server-side only** (Server Components and Server Actions in `apps/web/lib/api.ts`). The browser never calls the API (ADR-0003). The CSV goes through `/campaigns/[id]/export`, because `.gitignore` ignores `*.csv`, so a `leads.csv` folder would never be committed.
+- **Component tests** use `react-dom/server` in the `web` Jest project, with no new dependencies.
+- **`pnpm seed:perf`** adds 5,000 fictional, finished leads to time NFR-3: the campaign page loads in a warm median of 689 ms.
+- **The demo has no HOT lead under v4/v5:** the clinics store 1–3 reviews, below `reviews_unreplied`'s minimum of 10. Use WARM in demos.
+- **Stacked PRs and squash merges:** a child PR merged before its parent lands on the parent's branch, not main. For example, #146 reached main inside #145's squash. Merge main into each child before merging it.
+
 ## The workflow (every issue)
 
 1. Read the issue prompt in `docs/prompts/cycle-1-scored-leads.md` and the FRs it names in `docs/prd.md`.
@@ -98,7 +108,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 ### Checkpoints
 
-- **After #16:** run the S-8 cycle close but do not tag until Fahad approves.
+- **Cycle 1 close (S-8):** run on 2026-11-12. Tag `v0.1.0` only after Fahad approves the retro.
 
 ## What "stop and ask" means
 
