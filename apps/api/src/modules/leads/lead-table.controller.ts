@@ -11,14 +11,21 @@ import { z } from 'zod';
 import { LeadTableService } from './lead-table.service.js';
 
 // cuid ids are 25 characters; the limit only keeps junk out of logs and queries.
-const CampaignId = z.string().trim().min(1, 'id is required').max(64, 'id is too long');
+const CampaignId = z
+  .string()
+  .trim()
+  .min(1, 'id is required')
+  .max(64, 'id is too long')
+  // cuids are lowercase letters and digits; nothing else may reach a query or a header.
+  .regex(/^[a-z0-9]+$/, 'id must be lowercase letters and digits');
 
 /**
  * Validates the path id and the query string.
  * @param id - Campaign id from the path.
  * @param query - The raw query string values.
  * @returns Both, parsed.
- * @throws ValidationError (400) naming each bad field, never echoing its value.
+ * @throws ValidationError (400) naming each bad field. Values are never echoed; an unknown key's
+ * name is (Zod's "Unrecognized key" message), as in the campaigns controller.
  */
 function parse(id: string, query: unknown): { campaignId: string; query: LeadListQuery } {
   const campaignId = CampaignId.safeParse(id);
@@ -55,7 +62,8 @@ export class LeadTableController {
    * @param query - `tier`, `status`, `area`, `minScore`, `maxScore`, `sort` (score, name or
    * reviews), `dir` (asc or desc) and `page`.
    * @returns 200 with the page and the total across pages.
-   * @throws ValidationError (400) for a bad id or filter; NotFoundError (404) for an unknown campaign.
+   * @throws ValidationError (400) for a bad id or filter; NotFoundError (404) for an unknown
+   * campaign; Prisma errors (500) when the database cannot be read.
    */
   @Get('/:id/leads')
   page(@Param('id') id: string, @Query() query: unknown): Promise<LeadPage> {

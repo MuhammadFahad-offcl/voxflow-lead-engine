@@ -18,8 +18,8 @@ import { LeadTableRepository, type LeadTableRow } from './lead-table.repository.
 /**
  * Shapes a stored lead for the API.
  * @param row - The lead as the repository read it.
- * @returns The table row.
- * @throws ZodError when the stored breakdown does not match its schema.
+ * @returns The table row; the breakdown is null when the stored one does not match its schema, so
+ * one bad row cannot fail the whole page (writes check the same schema, so it should not happen).
  */
 function toRow(row: LeadTableRow): LeadRow {
   const { scoreBreakdown, rating, ...lead } = row;
@@ -27,7 +27,7 @@ function toRow(row: LeadTableRow): LeadRow {
     ...lead,
     // Decimal(2,1) in the database; a plain number on the wire, e.g. 4.6.
     rating: rating === null ? null : rating.toNumber(),
-    breakdown: scoreBreakdown === null ? null : ScoreBreakdown.parse(scoreBreakdown),
+    breakdown: ScoreBreakdown.safeParse(scoreBreakdown).data ?? null,
   };
 }
 
@@ -45,7 +45,8 @@ export class LeadTableService {
    * @param campaignId - `Campaign.id`.
    * @param query - Validated filters, sort and page.
    * @returns The page, with the total across pages.
-   * @throws NotFoundError when the campaign does not exist.
+   * @throws NotFoundError when the campaign does not exist; Prisma errors when the database cannot
+   * be read.
    */
   async page(campaignId: string, query: LeadListQuery): Promise<LeadPage> {
     await this.mustExist(campaignId);

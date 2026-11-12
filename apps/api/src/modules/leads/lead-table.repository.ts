@@ -2,7 +2,8 @@
  * Database access for the lead table: one campaign's leads, filtered, sorted and paged, with their
  * signals.
  *
- * Serves: FR-30 (lead table), FR-14 (evidence), US-14, NFR-3 (indexed reads); issue #16.
+ * Serves: FR-30 (lead table), FR-14 (evidence), US-14, NFR-3 (reads by the campaignId index, signals
+ * in one query); issue #16.
  * Used by: apps/api/src/modules/leads/lead-table.service.ts, apps/api/src/modules/leads/leads.module.ts.
  */
 import { Injectable } from '@hazeljs/core';

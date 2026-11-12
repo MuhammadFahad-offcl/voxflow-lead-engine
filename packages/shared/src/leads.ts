@@ -27,7 +27,14 @@ const LeadStatus = z.enum([
   'FAILED',
 ]);
 const Tier = z.enum(['HOT', 'WARM', 'COLD']);
-const Score = z.coerce.number().int().min(0).max(100);
+// An empty field (`?minScore=`, as a GET form sends it) means "no bound", not 0.
+const Score = z.preprocess(
+  (value) => (value === '' ? undefined : value),
+  z.coerce.number().int().min(0).max(100).optional(),
+);
+// Letters (any script), digits, spaces, `.`, `'` and `-`: every real area name, e.g. "DHA Phase 5".
+// No `%` or `_`, which the database's case-insensitive match would read as wildcards.
+const AREA = /^[\p{L}\p{N} .'-]+$/u;
 
 /**
  * The lead table's query string. Values arrive as text, so numbers are coerced; anything unknown
@@ -38,9 +45,15 @@ export const LeadListQuery = z
     tier: Tier.optional(),
     status: LeadStatus.optional(),
     // Matched whole and case-insensitively against `Lead.area`, e.g. "DHA".
-    area: z.string().trim().min(1).max(100).optional(),
-    minScore: Score.optional(),
-    maxScore: Score.optional(),
+    area: z
+      .string()
+      .trim()
+      .min(1)
+      .max(100)
+      .regex(AREA, 'area may hold letters, digits, spaces, dots, apostrophes and hyphens')
+      .optional(),
+    minScore: Score,
+    maxScore: Score,
     sort: z.enum(['score', 'name', 'reviews']).default('score'),
     // Left out: highest first for score and reviews, A to Z for name.
     dir: z.enum(['asc', 'desc']).optional(),

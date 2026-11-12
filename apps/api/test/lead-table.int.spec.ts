@@ -148,8 +148,10 @@ beforeAll(async () => {
   pagedCampaignId = await newCampaign();
   await prisma.lead.createMany({
     data: Array.from({ length: 55 }, (_, n) =>
+      // Equal scores and names: only the id tie-break keeps the two pages apart.
       lead(pagedCampaignId, `fictional-page-${String(n).padStart(2, '0')}`, {
-        score: n % 101,
+        name: 'Fictional Same Name',
+        score: 50,
         status: 'SCORED',
       }),
     ),
@@ -199,6 +201,11 @@ describe('GET /campaigns/:id/leads', () => {
     ['?area=dha', ['Alpha Dental, DHA', 'Charlie Dental', 'Delta Dental', 'Echo Dental']],
     ['?minScore=30&maxScore=80', ['Alpha Dental, DHA', 'Bravo Clinic']],
     ['?maxScore=20', ['Charlie Dental']],
+    // Empty fields, as a GET form sends them, mean "no bound": unscored leads stay.
+    [
+      '?minScore=&maxScore=',
+      ['Alpha Dental, DHA', 'Bravo Clinic', 'Charlie Dental', 'Delta Dental', 'Echo Dental'],
+    ],
     [
       '?sort=name&dir=desc',
       ['Echo Dental', 'Delta Dental', 'Charlie Dental', 'Bravo Clinic', 'Alpha Dental, DHA'],
@@ -234,6 +241,8 @@ describe('GET /campaigns/:id/leads', () => {
 
   it('answers 400 for a bad filter, without echoing it, and 404 for an unknown campaign', async () => {
     for (const query of [
+      '?area=D_A',
+      '?area=%25',
       '?minScore=abc',
       '?minScore=80&maxScore=30',
       '?tier=LUKEWARM',
@@ -243,6 +252,6 @@ describe('GET /campaigns/:id/leads', () => {
       expect({ query, status: response.status }).toEqual({ query, status: 400 });
       expect(await response.text()).not.toContain('LUKEWARM');
     }
-    expect((await get('/campaigns/no-such-campaign/leads')).status).toBe(404);
+    expect((await get('/campaigns/fictionalmissingcampaign0/leads')).status).toBe(404);
   });
 });
