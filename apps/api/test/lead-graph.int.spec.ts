@@ -377,3 +377,71 @@ describe('runLeadGraph at a spend cap', () => {
     });
   });
 });
+
+// Proves the two endings a node's own code cannot cause (T-1 audit): HazelJS's timeout between
+// nodes resumes the lead later instead of failing it, and a checkpoint that cannot be saved fails
+// the lead like any other step error (FR-32).
+describe('runLeadGraph when HazelJS stops the run', () => {
+  // Read inside each test: deps is built in beforeAll.
+  const checkpoints = () => deps.store.checkpointService;
+
+  it('times the run out between nodes, keeps the finished step and frees the lead', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({
+      where: { campaignId, status: 'SCORED', websiteStatus: { not: 'PENDING' } },
+    });
+    await backToDiscovered(lead.id);
+    const claimed = await claimOne(lead.id);
+    // A 300 ms graph timeout, and a first checkpoint that takes a second: the deadline passes
+    // while the context node is finishing, so HazelJS stops before the label node.
+    const runtime: LeadGraphDeps['runtime'] = {
+      createGraph: (id) => {
+        const graph = deps.runtime.createGraph(id);
+        const compile = graph.compile.bind(graph);
+        graph.compile = () => {
+          const compiled = compile();
+          const execute = compiled.execute.bind(compiled);
+          compiled.execute = (input) => execute(input, { timeout: 300 });
+          return compiled;
+        };
+        return graph;
+      },
+    };
+    const save = checkpoints().save.bind(checkpoints());
+    const slow = jest.spyOn(checkpoints(), 'save').mockImplementationOnce(async (...args) => {
+      await new Promise((done) => setTimeout(done, 1_000));
+      return save(...args);
+    });
+
+    const outcome = await runLeadGraph({ ...deps, runtime }, claimed);
+    slow.mockRestore();
+
+    expect(outcome).toMatchObject({ status: 'STOPPED' });
+    expect((await runOf(outcome)).status).toBe('timed_out');
+    const stored = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
+    // ENRICHED: the context step's own write, so the next run starts at labelling.
+    expect(stored).toMatchObject({ status: 'ENRICHED', failedStep: null, graphClaimedAt: null });
+    expect(stored.businessContext).not.toBeNull();
+  });
+
+  it('fails the lead at the step whose checkpoint could not be saved', async () => {
+    const lead = await prisma.lead.findFirstOrThrow({
+      where: { campaignId, status: 'SCORED', websiteStatus: { not: 'PENDING' } },
+    });
+    await backToDiscovered(lead.id);
+    const claimed = await claimOne(lead.id);
+    const broken = jest
+      .spyOn(checkpoints(), 'save')
+      .mockRejectedValueOnce(new Error('fictional connection lost'));
+
+    const outcome = await runLeadGraph(deps, claimed);
+    broken.mockRestore();
+
+    expect(outcome).toMatchObject({ status: 'FAILED', step: LEAD_STEP.CONTEXT });
+    expect((await runOf(outcome)).status).toBe('failed');
+    expect(await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } })).toMatchObject({
+      status: 'FAILED',
+      failedStep: LEAD_STEP.CONTEXT,
+      error: 'Unexpected Error in this step',
+    });
+  });
+});

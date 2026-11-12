@@ -60,6 +60,31 @@ const send = (url: URL, options: SafeGetOptions, signal: AbortSignal): Promise<I
     request.end();
   });
 
+// A charset label in a Content-Type header or in a page's <meta> (charset=... in either form).
+const CHARSET = /charset=["']?([\w-]+)/i;
+// Pages declare their charset near the top; the HTML spec has browsers look at the first 1024 bytes.
+const META_SCAN_BYTES = 1024;
+
+/**
+ * Decodes a page in the charset its header names, else the one its own <meta> names, else UTF-8.
+ * Older Urdu and Arabic sites often use windows-1256; read as UTF-8 their text would be garbled.
+ * @param body - The raw bytes.
+ * @param contentType - The response's Content-Type header, if any.
+ * @returns The text; UTF-8 when the label is missing or unknown.
+ */
+const decode = (body: Buffer, contentType: string | undefined): string => {
+  const label =
+    CHARSET.exec(contentType ?? '')?.[1] ??
+    CHARSET.exec(body.subarray(0, META_SCAN_BYTES).toString('latin1'))?.[1] ??
+    'utf-8';
+  try {
+    return new TextDecoder(label).decode(body);
+  } catch {
+    // An unknown label: TextDecoder refuses it, and UTF-8 is the web's default.
+    return body.toString('utf8');
+  }
+};
+
 const readBody = async (
   response: IncomingMessage,
   maxBytes: number,
@@ -86,7 +111,7 @@ const readBody = async (
     if (signal.aborted) throw new DOMException('the site timed out', 'AbortError');
     throw error;
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return decode(Buffer.concat(chunks), response.headers['content-type']);
 };
 
 /**

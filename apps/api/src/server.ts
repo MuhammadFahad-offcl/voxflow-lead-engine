@@ -16,7 +16,7 @@ import { PrismaProvider } from './db/prisma.provider.js';
  * Does not validate the environment: the caller passes an already parsed `Env`, because HazelJS
  * would swallow a validation error thrown inside it (see the next lines).
  * Does not reject when the port is taken: HazelJS 2.0.13 has no `error` listener on its server, so
- * EADDRINUSE is an uncaught exception that ends the process.
+ * EADDRINUSE is an uncaught exception that ends the process; main.ts checks the port first.
  * Does not stop on a throwing `onModuleInit` or synchronous provider factory: HazelJS swallows the
  * error and the server still starts.
  * Does not reject when an async provider factory rejects and no class provider depends on it: the

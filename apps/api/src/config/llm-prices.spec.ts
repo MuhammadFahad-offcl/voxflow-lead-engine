@@ -71,3 +71,23 @@ describe('llmMaxCostUsd', () => {
     );
   });
 });
+
+// Proves FR-33 for the reviews a Lahore clinic really gets (T-1 audit): 30 long Urdu reviews are
+// counted at 2 or more bytes a letter, never less than their tokens, so the cap errs on the safe side.
+describe('llmMaxCostUsd with long Urdu reviews', () => {
+  it('counts each Urdu letter as at least two tokens', () => {
+    const review = 'فون کوئی نہیں اٹھاتا، اپوائنٹمنٹ کے لیے کئی دن انتظار کرنا پڑا۔ '.repeat(40);
+    const user = Array.from({ length: 30 }, (_, n) => `${String(n)}: ${review}`).join(' / ');
+    const request = { model: HAIKU, system: '', user, schema: z.object({}), maxTokens: 2_000 };
+
+    // Spaces and digits are one byte; every Urdu letter is two.
+    const letters = user.match(/\p{Script=Arabic}/gu)?.length ?? 0;
+
+    const counted = llmMaxCostUsd(request);
+
+    expect(letters).toBeGreaterThan(30 * 40 * 40);
+    expect(counted.toNumber()).toBeGreaterThanOrEqual(
+      llmCostUsd(HAIKU, { inputTokens: letters * 2, outputTokens: 2_000 }).toNumber(),
+    );
+  });
+});

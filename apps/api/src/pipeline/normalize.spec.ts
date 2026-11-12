@@ -169,3 +169,28 @@ describe('normalizeUrl: junk', () => {
     expect(normalizeUrl(raw)).toBeNull();
   });
 });
+
+// Proves FR-6 on inputs a Pakistani listing really carries (T-1 audit): Urdu or Eastern Arabic
+// digits, the "(0)" trunk prefix, and Unicode domains. A number is E.164 or nothing, never wrong.
+describe('normalizePhone and normalizeUrl with local and Unicode input', () => {
+  it.each([
+    ['۰۳۰۰۱۲۳۴۵۶۷', '+923001234567'],
+    ['٠٣٠٠١٢٣٤٥٦٧', '+923001234567'],
+    ['+92 (0)300 1234567', '+923001234567'],
+    ['0092 300 1234567', '+923001234567'],
+  ])('reads %j as %s, a mobile', (raw, e164) => {
+    expect(normalizePhone(raw)).toEqual({ e164, type: 'MOBILE' });
+  });
+
+  it('gives no number for text that holds none', () => {
+    expect(normalizePhone('call us')).toEqual(normalizePhone(''));
+  });
+
+  it('keeps a Unicode domain as its punycode form, and refuses a non-http scheme', () => {
+    expect(normalizeUrl('https://ڈینٹل.pk/clinic')).toBe(
+      `https://${new URL('https://ڈینٹل.pk').hostname}/clinic`,
+    );
+    expect(new URL('https://ڈینٹل.pk').hostname.startsWith('xn--')).toBe(true);
+    expect(normalizeUrl('javascript:alert(1)')).toBeNull();
+  });
+});
