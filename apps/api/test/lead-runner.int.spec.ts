@@ -1,38 +1,35 @@
 /**
- * Integration tests of the lead-runner loop on the fictional DHA demo clinics, with every fake
- * adapter: reviews once per campaign, then each lead through its graph, at most
- * LEAD_RUNNER_CONCURRENCY at a time, and the campaign to SCORING. Also a worker that stops in the
- * middle of a pass: a restarted worker finishes every lead without doing a finished step twice.
+ * Integration tests of the lead-runner loop on the fictional DHA demo clinics, through the same
+ * wiring as the worker (`buildLeadRunnerDeps`) on fake adapters: reviews once per campaign, each
+ * lead through its graph at most LEAD_RUNNER_CONCURRENCY at a time, the campaign to SCORING; a
+ * worker stopped mid-pass; a reviews run that needs an Apify check; a spend cap.
  *
- * Serves: FR-11, FR-32, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED, FILTERED_OUT or
- * FAILED with one failing site, the campaign not FAILED; restart test; DEMO_MODE=true).
+ * Serves: FR-11, FR-32, FR-33, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED, FILTERED_OUT
+ * or FAILED with one failing site, the campaign not FAILED; restart test; DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, describe, expect, it, jest } from '@jest/globals';
+import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { resolve } from 'node:path';
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
-import { DiscoveryRepository } from '../src/db/discovery.repository.js';
-import { LeadContextRepository } from '../src/db/lead-context.repository.js';
-import { LeadRunRepository } from '../src/db/lead-run.repository.js';
-import { LeadWebsiteRepository } from '../src/db/lead-website.repository.js';
-import { LlmSpendRepository } from '../src/db/llm-spend.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
-import { ReviewLabelRepository } from '../src/db/review-label.repository.js';
-import { ReviewRepository } from '../src/db/review.repository.js';
-import { ScoreRepository } from '../src/db/score.repository.js';
-import { seed } from '../src/db/seed.js';
-import { LlmService } from '../src/llm/llm.service.js';
+import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
-import { createLeadGraphRuntime } from '../src/pipeline/lead.graph.js';
+import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
+import { readReviewsRunNote } from '../src/pipeline/reviews-run-note.js';
+import type { LlmPort } from '../src/ports/llm.port.js';
 import type { WebContextPort } from '../src/ports/web-context.port.js';
 import type { WebReaderPort } from '../src/ports/web-reader.port.js';
 import {
+  buildLeadRunnerDeps,
   LEAD_LEASE_MS,
   runLeadRunnerOnce,
   type LeadRunnerDeps,
+  type LeadRunnerParts,
+  type LeadRunnerState,
 } from '../src/scheduler/lead-runner.js';
 import { discoverDemoCampaign } from './demo-campaign.js';
 import { createTestDatabase } from './test-database.js';
@@ -66,62 +63,28 @@ const demoDatabase = async (name: string) => {
   return { prisma, campaignId: await discoverDemoCampaign(prisma, logger, false) };
 };
 
-/** The adapters a pass may swap for counted or broken ones. */
-interface Adapters {
-  leadSource: FakeLeadSourceAdapter;
-  webReader: WebReaderPort;
-  webContext: WebContextPort;
-}
+const fakeReader = new FakeWebReaderAdapter();
+const fakeContext = new FakeWebContextAdapter();
 
 /**
- * Builds a runner pass's dependencies on the fakes, the way worker.ts wires the real ones.
+ * Builds a pass's dependencies the way worker.ts does, on fakes unless a test swaps one.
  * @param prisma - The test database's client.
- * @param adapters - The adapters to use.
- * @param now - The pass's clock.
+ * @param swap - Adapters or settings to replace.
  * @returns The dependencies.
  */
-const runnerDeps = (
-  prisma: PrismaProvider,
-  adapters: Adapters,
-  now: () => Date = () => new Date(),
-): LeadRunnerDeps => {
-  const { runtime, store } = createLeadGraphRuntime(prisma);
-  const leads = new LeadRunRepository(prisma);
-  const discovery = new DiscoveryRepository(prisma);
-  return {
-    leads,
-    reviews: {
-      prisma,
-      reviewRepo: new ReviewRepository(prisma, discovery),
-      leadSource: adapters.leadSource,
-      logger,
-      now,
-    },
-    graph: {
-      runtime,
-      store,
-      runs: leads,
-      website: { leads: new LeadWebsiteRepository(prisma), webReader: adapters.webReader, logger },
-      context: {
-        leads: new LeadContextRepository(prisma),
-        webContext: adapters.webContext,
-        logger,
-        now,
-      },
-      label: {
-        reviews: new ReviewLabelRepository(prisma),
-        llm: new LlmService(new LlmSpendRepository(prisma), new FakeLlmAdapter(), logger),
-        logger,
-      },
-      score: { leads: new ScoreRepository(prisma), logger },
-      logger,
-      now,
-    },
+const runnerDeps = (prisma: PrismaProvider, swap: Partial<LeadRunnerParts> = {}): LeadRunnerDeps =>
+  buildLeadRunnerDeps({
+    prisma,
+    leadSource: new FakeLeadSourceAdapter(logger),
+    webReader: fakeReader,
+    webContext: fakeContext,
+    llm: new FakeLlmAdapter(),
     logger,
-    now,
+    now: () => new Date(),
     concurrency: CONCURRENCY,
-  };
-};
+    startGate: new PaidStartGate(),
+    ...swap,
+  });
 
 /**
  * Runs passes until one claims no lead.
@@ -138,8 +101,8 @@ const runUntilIdle = async (deps: LeadRunnerDeps): Promise<number[]> => {
   throw new Error('The runner never went idle');
 };
 
-const fakeReader = new FakeWebReaderAdapter();
-const fakeContext = new FakeWebContextAdapter();
+const campaignStatus = async (prisma: PrismaProvider, id: string) =>
+  (await prisma.campaign.findUniqueOrThrow({ where: { id } })).status;
 
 // Proves the runner takes a demo campaign from ENRICHING to SCORING with one failing lead (FR-32).
 describe('lead runner on a demo campaign', () => {
@@ -157,12 +120,14 @@ describe('lead runner on a demo campaign', () => {
           ? Promise.reject(new Error('Fictional reader crash'))
           : fakeReader.read(url),
     };
+    const deps = runnerDeps(prisma, { leadSource, webReader });
 
-    const sizes = await runUntilIdle(
-      runnerDeps(prisma, { leadSource, webReader, webContext: fakeContext }),
-    );
+    const first = await runLeadRunnerOnce(deps);
+    // Leads are still waiting after one batch: the campaign is not done yet.
+    expect(first.leads).toBe(CONCURRENCY);
+    expect(await campaignStatus(prisma, campaignId)).toBe('ENRICHING');
+    await runUntilIdle(deps);
 
-    expect(Math.max(...sizes)).toBe(CONCURRENCY);
     expect(startReviews).toHaveBeenCalledTimes(1);
     const leads = await prisma.lead.findMany({ where: { campaignId } });
     const byStatus = (status: string) => leads.filter((lead) => lead.status === status);
@@ -171,75 +136,133 @@ describe('lead runner on a demo campaign', () => {
     ]);
     expect(byStatus('SCORED').length + byStatus('FILTERED_OUT').length).toBe(leads.length - 1);
     expect(byStatus('SCORED').length).toBeGreaterThan(0);
-    const campaign = await prisma.campaign.findUniqueOrThrow({ where: { id: campaignId } });
-    expect(campaign.status).toBe('SCORING');
+    expect(await campaignStatus(prisma, campaignId)).toBe('SCORING');
   });
 });
 
-// Proves NFR-2: a worker stopped mid-pass leaves its leads to a restarted worker, which finishes
-// them without reading a website, searching or labelling a second time.
+// Proves NFR-2: a worker stopped inside an LLM call leaves its leads to a restarted worker, which
+// finishes them without buying reviews, reading a website or searching a second time.
 describe('lead runner after the worker stopped mid-pass', () => {
   it('resumes every lead at its next step once the claims expire', async () => {
     const { prisma, campaignId } = await demoDatabase('voxflow_lead_runner_restart_test');
     const leadSource = new FakeLeadSourceAdapter(logger);
+    const startReviews = jest.spyOn(leadSource, 'startReviews');
     const reads = jest.fn((url: string) => fakeReader.read(url));
-    const webReader: WebReaderPort = { read: reads };
-    // The first worker stops inside the web search: the call never returns.
-    const stuck = jest.fn(() => new Promise<never>(() => undefined));
-    const stuckContext: WebContextPort = {
-      maxCostUsd: () => fakeContext.maxCostUsd(),
-      getContext: stuck,
-    };
-    void runLeadRunnerOnce(runnerDeps(prisma, { leadSource, webReader, webContext: stuckContext }));
-    for (let wait = 0; stuck.mock.calls.length < CONCURRENCY && wait < 300; wait += 1) {
-      await new Promise((done) => setTimeout(done, 100));
-    }
-    expect(stuck).toHaveBeenCalledTimes(CONCURRENCY);
-    const interrupted = await prisma.lead.findMany({
-      where: { campaignId, graphClaimedAt: { not: null } },
-    });
-
-    // The restarted worker: same fakes, but its clock is past the first worker's leases.
     const searches = jest.fn((query: Parameters<WebContextPort['getContext']>[0]) =>
       fakeContext.getContext(query),
     );
-    const later = () => new Date(Date.now() + LEAD_LEASE_MS + 1000);
-    await runUntilIdle(
-      runnerDeps(
-        prisma,
-        {
-          leadSource,
-          webReader,
-          webContext: { maxCostUsd: () => fakeContext.maxCostUsd(), getContext: searches },
-        },
-        later,
-      ),
-    );
+    const counted = {
+      leadSource,
+      webReader: { read: reads },
+      webContext: { maxCostUsd: () => fakeContext.maxCostUsd(), getContext: searches },
+    };
+    // The first worker stops inside review labelling: the LLM call never returns.
+    const stuck = jest.fn(() => new Promise<never>(() => undefined));
+    const stuckModel: LlmPort = { complete: stuck };
+    void runLeadRunnerOnce(runnerDeps(prisma, { ...counted, llm: stuckModel }));
+    // Each claimed lead either hangs in the LLM call or, with nothing to label, finishes.
+    const settled = async () =>
+      stuck.mock.calls.length +
+      (await prisma.lead.count({ where: { campaignId, status: 'SCORED' } }));
+    for (let wait = 0; (await settled()) < CONCURRENCY && wait < 300; wait += 1) {
+      await new Promise((done) => setTimeout(done, 100));
+    }
+    expect(stuck.mock.calls.length).toBeGreaterThan(0);
+    const interrupted = await prisma.lead.findMany({
+      where: { campaignId, graphClaimedAt: { not: null } },
+    });
+    expect(interrupted.map((lead) => lead.status)).toEqual(interrupted.map(() => 'ENRICHED'));
 
+    // The restarted worker: same counted adapters, a clock past the first worker's leases.
+    const later = () => new Date(Date.now() + LEAD_LEASE_MS + 1000);
+    await runUntilIdle(runnerDeps(prisma, { ...counted, now: later }));
+
+    expect(startReviews).toHaveBeenCalledTimes(1);
+    const urls = reads.mock.calls.map(([url]) => url);
+    expect(new Set(urls).size).toBe(urls.length);
     const leads = await prisma.lead.findMany({
       where: { campaignId, status: { not: 'FILTERED_OUT' } },
       include: { costRecords: true },
     });
     expect(leads.map((lead) => lead.status)).toEqual(leads.map(() => 'SCORED'));
-    // No site read twice; no lead searched twice by the restarted worker.
-    const urls = reads.mock.calls.map(([url]) => url);
-    expect(new Set(urls).size).toBe(urls.length);
-    const searched = searches.mock.calls.map(([query]) => query.name);
-    expect(new Set(searched).size).toBe(searched.length);
     for (const lead of leads) {
-      const llmCosts = lead.costRecords.filter((record) => record.service === 'LLM');
-      expect({ lead: lead.placeId, llmCosts: llmCosts.length }).toEqual({
+      const paid = (service: string) =>
+        lead.costRecords.filter((record) => record.service === service).length;
+      // One web search each, ever; at most one labelling call (none when nothing has text).
+      expect({ lead: lead.placeId, searches: paid('PERPLEXITY_SEARCH') }).toEqual({
         lead: lead.placeId,
-        llmCosts: llmCosts.length > 0 ? 1 : 0,
+        searches: 1,
       });
+      expect(paid('LLM')).toBeLessThanOrEqual(1);
     }
     // The interrupted runs are closed in the HazelJS run store, not left running.
     const oldRuns = await prisma.agentRun.findMany({
       where: { id: { in: interrupted.flatMap((lead) => lead.graphRunId ?? []) } },
     });
-    expect(oldRuns.map((run) => run.status)).toEqual(oldRuns.map(() => 'cancelled'));
-    expect(oldRuns).toHaveLength(CONCURRENCY);
-    const campaign = await prisma.campaign.findUniqueOrThrow({ where: { id: campaignId } });
-    expect(campaign.status).toBe('SCORING');
+    expect(oldRuns.map((run) => run.status)).toEqual(interrupted.map(() => 'cancelled'));
+    expect(await campaignStatus(prisma, campaignId)).toBe('SCORING');
+  });
+});
+
+// Proves a reviews run that may exist without a saved id pauses the campaign with a reason, runs no
+// lead, and that the founder's resume starts a new run (ADR-0015, as discover does).
+describe('lead runner when a reviews run needs an Apify check', () => {
+  it('pauses the campaign, then pays for a new run only after the resume', async () => {
+    const { prisma, campaignId } = await demoDatabase('voxflow_lead_runner_check_test');
+    const leadSource = new FakeLeadSourceAdapter(logger);
+    const startReviews = jest
+      .spyOn(leadSource, 'startReviews')
+      .mockRejectedValueOnce(new Error('Fictional dropped connection'));
+    const deps = runnerDeps(prisma, { leadSource });
+
+    const first = await runLeadRunnerOnce(deps);
+
+    expect(first.leads).toBe(0);
+    const paused = await prisma.campaign.findUniqueOrThrow({ where: { id: campaignId } });
+    expect(paused).toMatchObject({ status: 'PAUSED', pausedFrom: 'ENRICHING' });
+    expect(paused.pauseReason).toContain('Check the Apify console');
+    const records = await prisma.costRecord.findMany({
+      where: { campaignId, note: { contains: 'pass2-reviews' } },
+    });
+    expect(records.map((record) => readReviewsRunNote(record.note)?.state)).toEqual(['ABANDONED']);
+    // Paused: another pass pays for nothing.
+    await runLeadRunnerOnce(deps);
+    expect(startReviews).toHaveBeenCalledTimes(1);
+
+    // The founder checked the console and resumed.
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'ENRICHING', pausedFrom: null, pauseReason: null },
+    });
+    await runUntilIdle(deps);
+
+    expect(startReviews).toHaveBeenCalledTimes(2);
+    expect(await campaignStatus(prisma, campaignId)).toBe('SCORING');
+  });
+});
+
+// Proves FR-33 without churn: after a spend cap pauses leads, the runner claims no new lead for one
+// lease, and the campaign stays ENRICHING while leads wait.
+describe('lead runner at the LLM spend cap', () => {
+  it('stops claiming for one lease after a pass paused leads', async () => {
+    const { prisma, campaignId } = await demoDatabase('voxflow_lead_runner_cap_test');
+    await prisma.settings.update({
+      where: { organizationId: SEED_ORGANIZATION_ID },
+      data: { spendCaps: { ...DEFAULT_SETTINGS.spendCaps, llmMonthlyUsd: '0.00' } },
+    });
+    const deps = runnerDeps(prisma);
+    const state: LeadRunnerState = { claimsHeldUntil: null };
+
+    let first = await runLeadRunnerOnce(deps, state);
+    // A batch of leads with nothing to label finishes without the LLM; the next batch meets the cap.
+    for (let pass = 0; first.paused === 0 && first.leads > 0 && pass < 5; pass += 1) {
+      first = await runLeadRunnerOnce(deps, state);
+    }
+    const second = await runLeadRunnerOnce(deps, state);
+
+    expect(first.paused).toBeGreaterThan(0);
+    expect(state.claimsHeldUntil).not.toBeNull();
+    expect(second.leads).toBe(0);
+    expect(await campaignStatus(prisma, campaignId)).toBe('ENRICHING');
   });
 });

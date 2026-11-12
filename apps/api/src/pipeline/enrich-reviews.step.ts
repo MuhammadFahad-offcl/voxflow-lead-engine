@@ -2,7 +2,8 @@
  * The pass-2 reviews enrichment step: fetches Google reviews via Scraperlink for eligible leads.
  *
  * Serves: FR-11 (store up to 30 most recent Google reviews per business), FR-33, NFR-4, ADR-0015.
- * Used by: apps/api/test/enrich-reviews.int.spec.ts. The enrich step calls it in PR 2b of #12.
+ * Used by: apps/api/src/scheduler/lead-runner.ts (once per ENRICHING campaign, before its leads'
+ * graphs, #15), apps/api/test/enrich-reviews.int.spec.ts.
  */
 import type { Prisma } from '../generated/prisma/client.js';
 import type { PrismaProvider } from '../db/prisma.provider.js';

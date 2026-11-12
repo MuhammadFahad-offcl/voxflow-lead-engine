@@ -9,25 +9,20 @@
  */
 import { createApp, loadEnvOrExit, registerPrismaShutdown } from './bootstrap.js';
 import { DiscoveryRepository } from './db/discovery.repository.js';
-import { LeadContextRepository } from './db/lead-context.repository.js';
-import { LeadRunRepository } from './db/lead-run.repository.js';
-import { LeadWebsiteRepository } from './db/lead-website.repository.js';
-import { LlmSpendRepository } from './db/llm-spend.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
-import { ReviewLabelRepository } from './db/review-label.repository.js';
-import { ReviewRepository } from './db/review.repository.js';
-import { ScoreRepository } from './db/score.repository.js';
-import { LlmService } from './llm/llm.service.js';
 import { LOGGER, type Logger } from './logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from './pipeline/area-polygons.js';
-import { createLeadGraphRuntime } from './pipeline/lead.graph.js';
 import { PaidStartGate } from './pipeline/paid-start-gate.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
 import { LLM, type LlmPort } from './ports/llm.port.js';
 import { WEB_CONTEXT, type WebContextPort } from './ports/web-context.port.js';
 import { WEB_READER, type WebReaderPort } from './ports/web-reader.port.js';
 import { registerRunnerShutdown, startCampaignRunner } from './scheduler/campaign-runner.js';
-import { registerLeadRunnerShutdown, startLeadRunner } from './scheduler/lead-runner.js';
+import {
+  buildLeadRunnerDeps,
+  registerLeadRunnerShutdown,
+  startLeadRunner,
+} from './scheduler/lead-runner.js';
 
 const env = loadEnvOrExit(process.env);
 // Before createApp: HazelJS swallows startup errors, and a bad area file must stop the worker here.
@@ -51,43 +46,23 @@ const stopRunner = startCampaignRunner({
 });
 
 // One AgentGraph run per lead (#15), on HazelJS's SQL durable run store.
-const { runtime, store } = createLeadGraphRuntime(prisma);
-const leadRuns = new LeadRunRepository(prisma);
-const stopLeadRunner = startLeadRunner({
-  leads: leadRuns,
-  reviews: { prisma, reviewRepo: new ReviewRepository(prisma, discovery), leadSource, logger, now },
-  graph: {
-    runtime,
-    store,
-    runs: leadRuns,
-    website: {
-      leads: new LeadWebsiteRepository(prisma),
-      webReader: container.resolve<WebReaderPort>(WEB_READER),
-      logger,
-    },
-    context: {
-      leads: new LeadContextRepository(prisma),
-      webContext: container.resolve<WebContextPort>(WEB_CONTEXT),
-      logger,
-      now,
-    },
-    label: {
-      reviews: new ReviewLabelRepository(prisma),
-      llm: new LlmService(new LlmSpendRepository(prisma), container.resolve<LlmPort>(LLM), logger),
-      logger,
-    },
-    score: { leads: new ScoreRepository(prisma), logger },
+const stopLeadRunner = startLeadRunner(
+  buildLeadRunnerDeps({
+    prisma,
+    leadSource,
+    webReader: container.resolve<WebReaderPort>(WEB_READER),
+    webContext: container.resolve<WebContextPort>(WEB_CONTEXT),
+    llm: container.resolve<LlmPort>(LLM),
     logger,
     now,
-  },
-  logger,
-  now,
-  concurrency: env.LEAD_RUNNER_CONCURRENCY,
-});
+    concurrency: env.LEAD_RUNNER_CONCURRENCY,
+    startGate: new PaidStartGate(),
+  }),
+);
 
-// In this order: the runner may still need the database to save a run id.
+// In this order: both runners may still need the database to save a paid run's id.
 registerRunnerShutdown(app, stopRunner, logger);
-registerLeadRunnerShutdown(app, stopLeadRunner);
+registerLeadRunnerShutdown(app, stopLeadRunner, logger);
 registerPrismaShutdown(app);
 // The API gets these from listen(); on SIGINT/SIGTERM they run the handlers above, then exit 0.
 app.getShutdownManager().setupSignalHandlers();

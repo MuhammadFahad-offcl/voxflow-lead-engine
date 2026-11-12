@@ -52,7 +52,8 @@ let replies: Reply[] = [];
 
 class Stubbed extends AnthropicLlmAdapter {
   protected override readonly baseUrl = stubUrl;
-  protected override readonly timeoutMs = 200;
+  // Long enough for a first request under the full suite's load; the no-answer case waits it once.
+  protected override readonly timeoutMs = 1000;
   protected override readonly retryDelayMs = 1;
 }
 
