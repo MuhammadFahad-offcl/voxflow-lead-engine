@@ -119,16 +119,45 @@ export class LeadRunRepository {
   }
 
   /**
-   * Tells whether a campaign is still ENRICHING, read just before a paid reviews step.
+   * Claims an ENRICHING campaign for its pass-2 reviews step, so a second worker never runs the
+   * step (and its paid Apify start) at the same time.
+   *
+   * Uses the campaign runner's lease column: that runner only claims DISCOVERING campaigns, and
+   * discover clears the lease when it moves the campaign to ENRICHING. One UPDATE that repeats the
+   * condition, so of two workers only one gets the claim.
    * @param campaignId - `Campaign.id`.
-   * @returns False when it left ENRICHING (e.g. the founder paused it) or does not exist.
-   * @throws Prisma errors when the database cannot be read.
+   * @param now - The lease time; it is also the claim's proof of ownership.
+   * @param leaseMs - How old a claim must be to count as abandoned, in milliseconds.
+   * @returns The claim's time, or null when the campaign left ENRICHING (e.g. the founder paused
+   * it) or another worker holds it.
+   * @throws Prisma errors when the database cannot be written.
    */
-  async isEnriching(campaignId: string): Promise<boolean> {
-    const count = await this.prisma.campaign.count({
-      where: { id: campaignId, status: 'ENRICHING' },
+  async claimReviews(campaignId: string, now: Date, leaseMs: number): Promise<Date | null> {
+    const { count } = await this.prisma.campaign.updateMany({
+      where: {
+        id: campaignId,
+        status: 'ENRICHING',
+        OR: [
+          { discoveryClaimedAt: null },
+          { discoveryClaimedAt: { lt: new Date(now.getTime() - leaseMs) } },
+        ],
+      },
+      data: { discoveryClaimedAt: now },
     });
-    return count === 1;
+    return count === 1 ? now : null;
+  }
+
+  /**
+   * Ends a reviews claim; does nothing when another worker took the campaign over.
+   * @param campaignId - `Campaign.id`.
+   * @param claimedAt - The value {@link claimReviews} returned.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async releaseReviews(campaignId: string, claimedAt: Date): Promise<void> {
+    await this.prisma.campaign.updateMany({
+      where: { id: campaignId, discoveryClaimedAt: claimedAt },
+      data: { discoveryClaimedAt: null },
+    });
   }
 
   /**

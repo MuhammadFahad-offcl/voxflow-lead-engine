@@ -33,7 +33,9 @@ const EnvShape = z.object({
   // Read by docker compose, not by the app: the app connects with DATABASE_URL.
   POSTGRES_PASSWORD: z.string().optional(),
   LIGHTPANDA_CDP_URL: LightpandaCdpUrl,
-  API_HOST: z.string().min(1).default('127.0.0.1'),
+  // ADR-0003: the API answers only on this machine (the three Vapi paths reach it through the
+  // Cloudflare tunnel, which connects locally). Any other address would open it to the network.
+  API_HOST: z.enum(['127.0.0.1', 'localhost']).default('127.0.0.1'),
   API_PORT: port(4000),
   WEB_PORT: port(3000),
   // How many leads the worker's lead runner runs at once (FR-32, #15). Kept small: each lead's web

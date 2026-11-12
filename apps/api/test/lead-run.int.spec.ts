@@ -136,3 +136,41 @@ describe('ReviewRepository.leadsNeedingReviews after the lead graph', () => {
     await prisma.lead.update({ where: { id }, data: { status: 'FILTERED_OUT' } });
   });
 });
+
+// Proves the reviews step's campaign claim: one worker at a time, leased, and never on a campaign
+// that left ENRICHING (T-1 audit: two workers must not both reach the paid reviews start).
+describe('LeadRunRepository.claimReviews', () => {
+  it('gives the campaign to one worker, again after release or once the lease runs out', async () => {
+    const now = new Date();
+    const first = await runs().claimReviews(campaignId, now, LEASE_MS);
+    const second = await runs().claimReviews(campaignId, new Date(now.getTime() + 1000), LEASE_MS);
+    const expired = await runs().claimReviews(
+      campaignId,
+      new Date(now.getTime() + LEASE_MS + 1),
+      LEASE_MS,
+    );
+
+    expect(first).toEqual(now);
+    expect(second).toBeNull();
+    expect(expired).not.toBeNull();
+    // Only the holder releases: the first claim is no longer it.
+    await runs().releaseReviews(campaignId, now);
+    expect(await runs().claimReviews(campaignId, new Date(), LEASE_MS)).toBeNull();
+    if (expired !== null) await runs().releaseReviews(campaignId, expired);
+    expect(await runs().claimReviews(campaignId, new Date(), LEASE_MS)).not.toBeNull();
+    await prisma.campaign.update({ where: { id: campaignId }, data: { discoveryClaimedAt: null } });
+  });
+
+  it('refuses a campaign the founder paused', async () => {
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'PAUSED', pausedFrom: 'ENRICHING' },
+    });
+
+    expect(await runs().claimReviews(campaignId, new Date(), LEASE_MS)).toBeNull();
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: 'ENRICHING', pausedFrom: null },
+    });
+  });
+});

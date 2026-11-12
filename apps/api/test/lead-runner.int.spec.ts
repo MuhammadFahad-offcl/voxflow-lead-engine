@@ -266,3 +266,30 @@ describe('lead runner at the LLM spend cap', () => {
     expect(await campaignStatus(prisma, campaignId)).toBe('ENRICHING');
   });
 });
+
+// Proves NFR-1/NFR-2 with two workers (T-1 audit): the reviews step runs once per campaign, and a
+// worker that finds the other's run in flight skips it instead of pausing the campaign for a check.
+describe('lead runner with two workers at once', () => {
+  it('starts one reviews run and never pauses the campaign', async () => {
+    const { prisma, campaignId } = await demoDatabase('voxflow_lead_runner_two_workers_test');
+    const leadSource = new FakeLeadSourceAdapter(logger);
+    const realStart = leadSource.startReviews.bind(leadSource);
+    // A slow Apify start, so the two passes overlap at the paid step.
+    const startReviews = jest
+      .spyOn(leadSource, 'startReviews')
+      .mockImplementation(async (placeIds, limit) => {
+        await new Promise((done) => setTimeout(done, 500));
+        return realStart(placeIds, limit);
+      });
+
+    await Promise.all([
+      runLeadRunnerOnce(runnerDeps(prisma, { leadSource })),
+      runLeadRunnerOnce(runnerDeps(prisma, { leadSource })),
+    ]);
+    await runUntilIdle(runnerDeps(prisma, { leadSource }));
+
+    expect(startReviews).toHaveBeenCalledTimes(1);
+    const campaign = await prisma.campaign.findUniqueOrThrow({ where: { id: campaignId } });
+    expect(campaign).toMatchObject({ status: 'SCORING', pauseReason: null });
+  });
+});

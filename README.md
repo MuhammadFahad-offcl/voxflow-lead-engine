@@ -71,7 +71,7 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 
 | Command                       | What it does                                                              |
 | ----------------------------- | ------------------------------------------------------------------------- |
-| `pnpm dev`                    | API (http://127.0.0.1:4000), worker and dashboard (http://localhost:3000) |
+| `pnpm dev`                    | API (http://127.0.0.1:4000), worker and dashboard (http://127.0.0.1:3000) |
 | `pnpm build`                  | compile `packages/shared` and `apps/api`, production build of `apps/web`  |
 | `pnpm typecheck`              | TypeScript build mode across all packages, tests included                 |
 | `pnpm lint`                   | ESLint (typescript-eslint strict + stylistic, sonarjs)                    |
@@ -80,10 +80,12 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm test` / `pnpm test:cov` | Jest tests, without / with a coverage report; need Postgres running       |
 | `pnpm db:migrate`             | apply migrations, then regenerate the Prisma client (`prisma generate`)   |
 | `pnpm db:seed`                | seed the organization, settings, dental niche and catalog; re-run is safe |
+| `pnpm seed:perf`              | add 5,000 fictional scored leads to time the dashboard (NFR-3); safe      |
 | `pnpm db:generate`            | write the client to `apps/api/src/generated/`; `db:migrate` also runs it  |
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 | `pnpm read-website <url>`     | try the real web reader on one live site; prints counts, writes nothing   |
 | `pnpm llm:record`             | **costs money:** record the demo clinics' labelling answers (see below)   |
+| `pnpm seed:perf`              | add 5,000 fictional, already-scored leads to time the dashboard (NFR-3)   |
 
 `pnpm llm:record` calls Claude for each fictional demo clinic and saves the answers in `fixtures/llm/`, which demo mode replays. Run it after changing the labelling prompt. It needs `ANTHROPIC_API_KEY` and a seeded, running database. Every call counts toward this month's LLM cap, like any other. It stops before going past `--max-usd` (default 0.10). `--size-check` also prices one 30-review call without saving it. The first recording cost $0.002.
 

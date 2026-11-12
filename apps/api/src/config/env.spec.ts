@@ -42,6 +42,13 @@ describe('loadEnv', () => {
     }
   });
 
+  it('refuses an API_HOST other than 127.0.0.1 or localhost (ADR-0003)', () => {
+    expect(loadEnv({ ...minimal, API_HOST: 'localhost' }).API_HOST).toBe('localhost');
+    for (const host of ['0.0.0.0', '::', 'my-laptop.local', '::1 ']) {
+      expect(errorOf({ ...minimal, API_HOST: host }).variables).toEqual(['API_HOST (invalid)']);
+    }
+  });
+
   it('treats an empty value, as .env.example leaves keys, as unset', () => {
     expect(loadEnv({ ...minimal, ANTHROPIC_API_KEY: '' }).ANTHROPIC_API_KEY).toBeUndefined();
   });
