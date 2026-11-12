@@ -72,3 +72,19 @@ export async function apiGet<T>(path: string, schema: z.ZodType<T>): Promise<T> 
   if (status >= 400) throw new ApiError(status, body);
   return schema.parse(body);
 }
+
+/**
+ * Sends a JSON body and returns the answer as it is, so the caller can show a 400's messages.
+ * @param path - Path, e.g. "/campaigns".
+ * @param body - The JSON body; none for an action such as a retry.
+ * @returns The status and parsed body.
+ * @throws ApiError (status 0) when the API is down.
+ */
+export function apiPost(path: string, body?: unknown): Promise<{ status: number; body: unknown }> {
+  return send(path, {
+    method: 'POST',
+    ...(body === undefined
+      ? {}
+      : { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }),
+  });
+}
