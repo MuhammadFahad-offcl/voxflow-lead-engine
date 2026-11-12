@@ -4,7 +4,8 @@
  * profile's weights in `scoreLead`, never from here.
  *
  * Fixed numbers here (2 of the last 30, more than half, 2+ doctors, 3+ treatments, 100+ reviews,
- * +923…) are the niche file's rule texts and the founder's #14 decisions.
+ * +923…) are the niche file's rule texts and the founder's #14 decisions. The minimum of stored
+ * reviews for reviews_unreplied comes from the niche file itself (`minReviews`).
  *
  * Serves: FR-14 (score with evidence), PRD "Lead scoring model"; issue #14.
  * Used by: apps/api/src/scoring/score-lead.ts, apps/api/src/scoring/signals.spec.ts.
@@ -19,6 +20,11 @@ export interface SignalFinding {
   sourceUrl?: string;
   /** `Review.id` of the quoted review, for review signals. */
   reviewId?: string;
+  /**
+   * True when the evidence explains why the signal earns nothing (too few reviews to judge): it is
+   * stored with 0 points so the lead page shows the reason.
+   */
+  noPoints?: true;
 }
 
 type SignalRule = (facts: LeadFacts, niche: NicheRules) => SignalFinding | null;
@@ -106,7 +112,18 @@ const noOnlineBooking: SignalRule = (facts) => {
     : { evidence, sourceUrl: website.sourceUrl };
 };
 
-const reviewsUnreplied: SignalRule = (facts) => {
+const reviewsUnreplied: SignalRule = (facts, niche) => {
+  const stored = facts.reviews.length;
+  // From the niche file (founder decision after #14); a niche version without it has no minimum.
+  const minimum = niche.signalWeights.PAIN['reviews_unreplied']?.minReviews ?? 0;
+  if (stored < minimum) {
+    const noun = stored === 1 ? 'review' : 'reviews';
+    const count = stored === 0 ? 'No reviews' : `Only ${String(stored)} ${noun}`;
+    return {
+      evidence: `${count} stored, fewer than the ${String(minimum)} needed`,
+      noPoints: true,
+    };
+  }
   const newest = newestReviews(facts.reviews);
   const unreplied = newest.filter((review) => !review.ownerReplied).length;
   // "More than half": 16 of 30 counts, 15 of 30 does not. Fewer than 30 stored count as they are.

@@ -167,6 +167,45 @@ describe('reviews_unreplied', () => {
   });
 });
 
+// Proves the founder's minimum (after #14): with fewer stored reviews than the niche's `minReviews`
+// the signal earns 0 points and says why; at the minimum the normal rule applies.
+describe('reviews_unreplied with a minimum of stored reviews', () => {
+  const rule = SIGNAL_RULES.reviews_unreplied;
+  const withMinimum: NicheRules = {
+    ...NICHE,
+    signalWeights: {
+      ...NICHE.signalWeights,
+      PAIN: { reviews_unreplied: { points: 7, minReviews: 10 } },
+    },
+  };
+  const allUnreplied = (total: number) => reviews(total, () => ({ ownerReplied: false }));
+
+  it('gives 0 points for 9 stored reviews, all unreplied, and says how many are stored', () => {
+    expect(rule(facts({ reviews: allUnreplied(9) }), withMinimum)).toEqual({
+      evidence: 'Only 9 reviews stored, fewer than the 10 needed',
+      noPoints: true,
+    });
+  });
+
+  it('says "review" for a single stored review', () => {
+    expect(rule(facts({ reviews: allUnreplied(1) }), withMinimum)?.evidence).toBe(
+      'Only 1 review stored, fewer than the 10 needed',
+    );
+  });
+
+  it('applies the normal rule at exactly 10 stored reviews', () => {
+    expect(rule(facts({ reviews: allUnreplied(10) }), withMinimum)).toEqual({
+      evidence: '10 of the last 10 reviews have no owner reply',
+    });
+  });
+
+  it('still gives no points at 10 stored reviews when half or fewer are unreplied', () => {
+    const half = reviews(10, (n) => ({ ownerReplied: n > 5 }));
+
+    expect(rule(facts({ reviews: half }), withMinimum)).toBeNull();
+  });
+});
+
 // Proves the founder's no_online_booking rule: both the website and the Maps listing must lack booking.
 describe('no_online_booking', () => {
   const rule = SIGNAL_RULES.no_online_booking;

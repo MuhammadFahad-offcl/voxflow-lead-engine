@@ -60,8 +60,14 @@ export interface LeadFacts {
 
 /** The scoring rules of one niche version, as its `NicheProfile` row stores them. */
 export interface NicheRules {
-  /** Points per signal key, grouped by dimension; they add up to 100. */
-  signalWeights: Record<Dimension, Record<string, { points: number }>>;
+  /**
+   * Points per signal key, grouped by dimension; they add up to 100. `minReviews` is set only on
+   * reviews_unreplied: the stored reviews it needs before it can earn points.
+   */
+  signalWeights: Record<
+    Dimension,
+    Record<string, { points: number; minReviews?: number | undefined }>
+  >;
   /** Hot at or above `hot`, warm at or above `warm`, cold below. */
   tiers: { hot: number; warm: number };
   /** Maps categories that count as a niche match. */

@@ -44,6 +44,8 @@ const everything: LeadFacts = {
     labelled('b', 'PHONE_UNANSWERED', false),
     labelled('c', 'BOOKING_OR_WAIT', false),
     labelled('d', 'BOOKING_OR_WAIT', true),
+    // Six more, so the lead has the 10 stored reviews reviews_unreplied needs.
+    ...['e', 'f', 'g', 'h', 'i', 'j'].map((id) => labelled(id, 'OTHER', false)),
   ],
   reviewCount: 140,
   category: 'Dental clinic',
@@ -114,9 +116,18 @@ describe('scoreLead', () => {
     expect(result.signals.every((signal) => signal.evidence.trim() !== '')).toBe(true);
   });
 
-  it('gives 0, COLD and no signals when nothing has evidence', () => {
+  it('gives 0 and COLD when nothing has evidence; only the 0-point review note is kept', () => {
     expect(scoreLead(nothing, DENTAL)).toEqual({
-      signals: [],
+      signals: [
+        {
+          key: 'reviews_unreplied',
+          dimension: 'PAIN',
+          points: 0,
+          evidence: 'No reviews stored, fewer than the 10 needed',
+          sourceUrl: null,
+          reviewId: null,
+        },
+      ],
       total: 0,
       breakdown: { pain: 0, fit: 0, reachability: 0, abilityToPay: 0 },
       tier: 'COLD',
@@ -159,6 +170,19 @@ describe('scoreLead', () => {
     );
 
     expect(signal).toMatchObject({ points: 15, reviewId: 'a' });
+  });
+
+  it('keeps a 0-point finding with 0 points: it explains the lead, it adds nothing', () => {
+    const few = { ...everything, reviews: everything.reviews.slice(0, 9) };
+
+    const result = scoreLead(few, DENTAL);
+
+    expect(result.signals.find((s) => s.key === 'reviews_unreplied')).toMatchObject({
+      points: 0,
+      evidence: 'Only 9 reviews stored, fewer than the 10 needed',
+    });
+    expect(result.total).toBe(93);
+    expect(result.breakdown.pain).toBe(33);
   });
 
   it('refuses a weight for a signal it has no rule for', () => {

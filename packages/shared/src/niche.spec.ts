@@ -47,6 +47,19 @@ describe('NicheFile', () => {
     ]);
   });
 
+  it('keeps the minimum of stored reviews on reviews_unreplied', () => {
+    const parsed = NicheFile.parse(dental);
+
+    expect(parsed.signalWeights.PAIN.reviews_unreplied.minReviews).toBe(10);
+  });
+
+  it('rejects a minimum of stored reviews below 1', () => {
+    const zero = structuredClone(dental);
+    zero.signalWeights.PAIN['reviews_unreplied'] = { points: 7, rule: 'r', minReviews: 0 } as never;
+
+    expect(NicheFile.safeParse(zero).success).toBe(false);
+  });
+
   it('rejects an unknown signal key, so a typo cannot score silently', () => {
     // All 13 real keys stay with their points. Zod drops the unknown key before the sum is added
     // up, so the sum is still 100 and the unknown key is the only issue.

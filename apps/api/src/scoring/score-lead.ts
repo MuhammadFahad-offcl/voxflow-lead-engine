@@ -14,7 +14,7 @@ import { SIGNAL_RULES } from './signals.js';
 /** A tier, as `Lead.tier` stores it. */
 export type Tier = 'HOT' | 'WARM' | 'COLD';
 
-/** One signal that earned points, as a `Signal` row stores it. */
+/** One signal with evidence, as a `Signal` row stores it; 0 points when the evidence says why not. */
 interface ScoredSignal {
   key: string;
   dimension: Dimension;
@@ -26,7 +26,7 @@ interface ScoredSignal {
 
 /** A lead's score. */
 export interface ScoreResult {
-  /** One per signal with evidence; each key at most once. */
+  /** One per signal with evidence, 0-point notes included; each key at most once. */
   signals: ScoredSignal[];
   /** 0 to 100. */
   total: number;
@@ -59,7 +59,7 @@ export function tierFor(total: number, tiers: NicheRules['tiers']): Tier {
  * Scores one lead against its niche version's rules.
  *
  * No evidence, no points: a signal whose rule finds nothing, or only blank evidence, is left out.
- * Each signal counts once. Does not read or write anything.
+ * A finding marked `noPoints` is kept with 0 points. Each signal counts once. Does not read or write anything.
  * @param facts - What is known about the lead.
  * @param niche - The niche version's weights, thresholds, category keywords and premium areas.
  * @returns The signals with points, the total, the breakdown and the tier.
@@ -77,15 +77,17 @@ export function scoreLead(facts: LeadFacts, niche: NicheRules): ScoreResult {
       const finding = SIGNAL_RULES[key](facts, niche);
       const evidence = finding?.evidence.trim() ?? '';
       if (finding === null || evidence === '') continue;
+      // A 0-point note keeps its evidence for the lead page and adds nothing to the score.
+      const earned = finding.noPoints === true ? 0 : points;
       signals.push({
         key,
         dimension,
-        points,
+        points: earned,
         evidence,
         sourceUrl: finding.sourceUrl ?? null,
         reviewId: finding.reviewId ?? null,
       });
-      breakdown[BREAKDOWN_KEY[dimension]] += points;
+      breakdown[BREAKDOWN_KEY[dimension]] += earned;
     }
   }
   const total = signals.reduce((sum, signal) => sum + signal.points, 0);

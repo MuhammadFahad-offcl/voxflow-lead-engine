@@ -246,7 +246,7 @@ A lead's score is the sum of points from 13 signals in four dimensions, out of 1
 | Pain (max 40)           | At least 2 of the last 30 reviews say the phone goes unanswered or the clinic is hard to reach | 15     | The review texts                 |
 | Pain                    | At least 2 of the last 30 reviews mention difficulty booking or long waits                     | 10     | The review texts                 |
 | Pain                    | No online booking on the website or Maps listing                                               | 8      | The pages checked                |
-| Pain                    | More than half of the last 30 reviews have no owner reply                                      | 7      | Reply count from the review data |
+| Pain                    | More than half of the last 30 reviews have no owner reply; at least 10 reviews stored          | 7      | Reply count from the review data |
 | Fit (max 25)            | Maps category matches the niche profile                                                        | 10     | The category                     |
 | Fit                     | Evidence of several doctors or services                                                        | 8      | Page text or listing             |
 | Fit                     | 100 or more Google reviews (patient volume)                                                    | 7      | Review count                     |

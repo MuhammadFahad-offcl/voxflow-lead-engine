@@ -34,10 +34,15 @@ const signalGroup = <const K extends readonly [string, ...string[]]>(keys: K) =>
     Object.fromEntries(keys.map((key) => [key, Signal])) as Record<K[number], typeof Signal>,
   );
 
+// reviews_unreplied alone may set a minimum of stored reviews (founder decision after #14): with
+// fewer, "more than half unreplied" says too little. Optional, so a stored niche version from
+// before the rule keeps scoring as it did.
+const UnrepliedSignal = Signal.extend({ minReviews: z.number().int().positive().optional() });
+
 /** A niche's points per signal, grouped by dimension, adding up to 100 (`NicheProfile.signalWeights`). */
 export const SignalWeights = z
   .strictObject({
-    PAIN: signalGroup(SIGNAL_KEYS.PAIN),
+    PAIN: signalGroup(SIGNAL_KEYS.PAIN).extend({ reviews_unreplied: UnrepliedSignal }),
     FIT: signalGroup(SIGNAL_KEYS.FIT),
     REACHABILITY: signalGroup(SIGNAL_KEYS.REACHABILITY),
     ABILITY_TO_PAY: signalGroup(SIGNAL_KEYS.ABILITY_TO_PAY),
