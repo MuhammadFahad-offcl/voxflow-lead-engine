@@ -82,6 +82,7 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 ## Niche score thresholds
 
 - `NicheProfile.tiers` (`{ hot, warm }`) holds the score thresholds of that niche version (FR-15): hot at or above `hot`, warm at or above `warm`, cold below. It is seeded and checked like the other niche fields. The #14 migration backfilled every stored `dental-clinic` version with `{ hot: 70, warm: 45 }`, which its file has always listed.
+- `NicheProfile.defaultAreas` holds the area quick picks of the new-campaign form (#16, FR-1). Unlike `reviewLabels` and `tiers`, it was **not** backfilled: the #16 migration only adds the column (empty by default), and `pnpm db:seed` stores it with niche **v5**, the first version whose row has it. Older versions keep an empty list; new campaigns use v5.
 
 ## Lead score
 

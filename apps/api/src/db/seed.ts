@@ -43,8 +43,7 @@ export interface SeededNiche {
  * edited later on the dashboard survive a re-seed. To change a niche, raise its `version` in the
  * file: the new version is added next to the old one, which campaigns may still use.
  * Does not write `Service.embedding`: it stays NULL until C2-01.
- * Does not store the niche's `defaultAreas`: it is validated here, and gets its column in #16,
- * which uses it, as decided for #7. `reviewLabels` got its column in #13 and `tiers` in #14.
+ * `reviewLabels` got its column in #13, `tiers` in #14 and `defaultAreas` in #16 (niche v5).
  * @param prisma - Client connected to the database to seed.
  * @param configDir - The repo's `config/` folder.
  * @returns The niche version the file holds, and whether this run added it (false when it was
@@ -82,6 +81,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<See
     tiers: niche.tiers,
     premiumAreas: niche.premiumAreas,
     reviewLabels: niche.reviewLabels,
+    defaultAreas: niche.defaultAreas,
     scriptTemplate,
   };
   // An edit that keeps the version would otherwise be skipped without a word.
@@ -98,6 +98,7 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<See
       tiers: true,
       premiumAreas: true,
       reviewLabels: true,
+      defaultAreas: true,
       scriptTemplate: true,
     },
   });

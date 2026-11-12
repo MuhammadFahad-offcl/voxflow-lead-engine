@@ -166,6 +166,7 @@ model NicheProfile {
   tiers            Json // FR-15, #14: { hot, warm } score thresholds, e.g. { hot: 70, warm: 45 }
   premiumAreas     String[]
   reviewLabels     String[] @default([]) // FR-13, #13: labels the review-labelling task may give
+  defaultAreas     String[] @default([]) // FR-1, #16: area quick picks on the new-campaign form
   scriptTemplate   String   @db.Text
   createdAt        DateTime @default(now())
 

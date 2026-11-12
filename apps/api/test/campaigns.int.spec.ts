@@ -219,6 +219,32 @@ describe('GET /campaigns and /campaigns/:id', () => {
   it('answers 404 for an unknown campaign', async () => {
     expect((await call('GET', '/campaigns/no-such-campaign')).status).toBe(404);
   });
+
+  it('counts qualified leads: every lead of the campaign but the FILTERED_OUT ones (#16)', async () => {
+    const { body: created } = await create({
+      nicheSlug: 'dental-clinic',
+      city: 'Lahore',
+      areas: ['DHA'],
+    });
+    const id = String(created['id']);
+    const { organizationId } = await prisma.campaign.findUniqueOrThrow({ where: { id } });
+    const lead = (n: number, status: 'DISCOVERED' | 'SCORED' | 'FILTERED_OUT') => ({
+      organizationId,
+      campaignId: id,
+      placeId: `fictional-qualified-${String(n)}`,
+      name: 'Fictional Clinic',
+      rawPlace: {},
+      status,
+    });
+    await prisma.lead.createMany({
+      data: [lead(1, 'DISCOVERED'), lead(2, 'SCORED'), lead(3, 'FILTERED_OUT')],
+    });
+
+    const { body } = await call('GET', `/campaigns/${id}`);
+
+    expect(CampaignSummary.parse(body).qualifiedCount).toBe(2);
+    expect(created['qualifiedCount']).toBe(0);
+  });
 });
 
 // Proves pause remembers the status, resume returns to it, and illegal moves are 409 (FR-3).

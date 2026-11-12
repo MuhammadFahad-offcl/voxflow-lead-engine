@@ -75,6 +75,21 @@ export const IdealClient = z.object({
   excludeChains: z.boolean(),
   chainRule: z.string().min(1),
 });
+/**
+ * One niche as `GET /niches` returns it: its newest version, for the new-campaign form (FR-1).
+ */
+export const NicheSummary = z.object({
+  slug: z.string(),
+  name: z.string(),
+  version: z.number().int().positive(),
+  // The form multiplies this by the areas to show the grid size live (FR-2).
+  searchTermCount: z.number().int().positive(),
+  // Quick picks for the areas field; empty for a niche version stored before v5 (#16).
+  defaultAreas: z.array(z.string()),
+});
+/** Parsed niche summary. Shares the schema's name so one import gives both. */
+export type NicheSummary = z.infer<typeof NicheSummary>;
+
 /** Parsed ideal-client rules. Shares the schema's name so one import gives both. */
 export type IdealClient = z.infer<typeof IdealClient>;
 

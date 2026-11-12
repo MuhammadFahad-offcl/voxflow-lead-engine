@@ -45,6 +45,7 @@ function toSummary(campaign: CampaignWithNiche): CampaignSummary {
     duplicateCount: campaign.duplicateCount,
     duplicateRate: duplicateRate(campaign.foundCount, campaign.duplicateCount),
     filteredCount: campaign.filteredCount,
+    qualifiedCount: campaign._count.leads,
     createdAt: campaign.createdAt.toISOString(),
   };
 }
