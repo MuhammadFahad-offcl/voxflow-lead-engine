@@ -7,7 +7,8 @@
  * Used by: apps/web/app/campaigns/new/*, apps/web/lib/campaign-form.spec.ts.
  */
 import { z } from 'zod';
-import { ApiRefusal } from './api';
+// Not './api': this file runs in the browser (the new-campaign form), and api.ts is server-only.
+import { ApiRefusal } from './api-refusal';
 
 /** Messages per form field; `form` holds the ones that belong to no field. */
 export type FieldErrors = Partial<Record<'nicheSlug' | 'city' | 'areas' | 'form', string[]>>;

@@ -6,7 +6,8 @@
  * Used by: apps/web/app/campaigns/[id]/*, apps/web/lib/lead-table.spec.ts.
  */
 import type { CampaignSummary, LeadPage } from '@voxflow/shared';
-import { ApiError, ApiRefusal } from './api';
+import { ApiError } from './api';
+import { ApiRefusal } from './api-refusal';
 
 // Statuses in which discovery or the reviews step can still add or change leads.
 const CAMPAIGN_RUNNING = new Set<CampaignSummary['status']>(['DISCOVERING', 'ENRICHING']);

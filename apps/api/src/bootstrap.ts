@@ -47,6 +47,9 @@ export function loadEnvOrExit(source: Readonly<Record<string, string | undefined
   }
 }
 
+/** The largest JSON or form body the API reads, in bytes. */
+const BODY_LIMIT_BYTES = 64 * 1024;
+
 /**
  * Registers the env and the root logger in DI, then creates the HazelJS app with every provider.
  *
@@ -77,7 +80,9 @@ export async function createApp(env: Env): Promise<HazelApp> {
     fake: FakeWebContextAdapter,
   });
   bindAdapter<LlmPort>(container, env, LLM, { real: AnthropicLlmAdapter, fake: FakeLlmAdapter });
-  return HazelApp.create(AppModule);
+  // Every body this API takes is a few kilobytes (a campaign is under 3 KB); HazelJS's default is
+  // 1 MiB. A larger body is answered 413 before it is parsed (NFR-5, T-1 audit).
+  return HazelApp.create(AppModule, { bodyLimit: BODY_LIMIT_BYTES });
 }
 
 /**
