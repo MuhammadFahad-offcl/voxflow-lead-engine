@@ -40,6 +40,9 @@ import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 
 const LEASE_MS = 15 * 60 * 1000;
+// Every test here runs whole graph runs (several database steps per lead); Jest's 5-second
+// default is too short under the full suite's parallel load.
+jest.setTimeout(60_000);
 let prisma: PrismaProvider;
 let campaignId: string;
 const logger = {
