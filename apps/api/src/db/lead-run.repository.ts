@@ -103,6 +103,52 @@ export class LeadRunRepository {
   }
 
   /**
+   * Lists the campaigns whose leads are being enriched: the ones the reviews step looks at.
+   * @returns `Campaign.id`s of ENRICHING campaigns, oldest first.
+   * @throws Prisma errors when the database cannot be read.
+   */
+  async enrichingCampaigns(): Promise<string[]> {
+    const campaigns = await this.prisma.campaign.findMany({
+      where: { status: 'ENRICHING' },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+    return campaigns.map((campaign) => campaign.id);
+  }
+
+  /**
+   * Moves every ENRICHING campaign with no lead left to run (none DISCOVERED or ENRICHED) to
+   * SCORING. One UPDATE, so a lead added meanwhile keeps its campaign ENRICHING.
+   *
+   * Does not move it further: it stays SCORING until Cycle 2 adds scripting. FAILED leads do not
+   * hold the campaign back (FR-32).
+   * @returns The `Campaign.id`s that moved.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async finishEnrichment(): Promise<string[]> {
+    const moved = await this.prisma.campaign.updateManyAndReturn({
+      where: { status: 'ENRICHING', leads: { none: { status: { in: [...RUNNABLE] } } } },
+      data: { status: 'SCORING' },
+      select: { id: true },
+    });
+    return moved.map((campaign) => campaign.id);
+  }
+
+  /**
+   * Pauses an ENRICHING campaign with a reason for the dashboard (FR-3, FR-33); resuming returns it
+   * to ENRICHING.
+   * @param campaignId - `Campaign.id`.
+   * @param reason - A fixed sentence for the founder.
+   * @throws Prisma errors when the database cannot be written.
+   */
+  async pauseEnrichment(campaignId: string, reason: string): Promise<void> {
+    await this.prisma.campaign.updateMany({
+      where: { id: campaignId, status: 'ENRICHING' },
+      data: { status: 'PAUSED', pausedFrom: 'ENRICHING', pauseReason: reason },
+    });
+  }
+
+  /**
    * Records the HazelJS run id of the lead's new graph run.
    * @param lead - The claimed lead.
    * @param runId - The `AgentRun` id the run will be stored under.
