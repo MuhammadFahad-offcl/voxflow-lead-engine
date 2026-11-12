@@ -1,0 +1,7 @@
+# Example request for the niches API (FR-1), for the VS Code REST Client extension.
+# Start the API and seed the database first (`pnpm db:seed`). The API listens on 127.0.0.1 only (ADR-0003).
+
+@base = http://127.0.0.1:4000
+
+### The niches a new campaign can use: newest version, search-term count, area quick picks
+GET {{base}}/niches
