@@ -24,5 +24,8 @@ GET {{base}}/campaigns/{{campaignId}}/leads?tier=HOT&area=DHA&minScore=70&maxSco
 ### Page 2
 GET {{base}}/campaigns/{{campaignId}}/leads?page=2
 
+### The same filters as a CSV download: exactly the filtered rows
+GET {{base}}/campaigns/{{campaignId}}/leads.csv?tier=HOT&area=DHA
+
 ### 400: an unknown filter is refused, not ignored
 GET {{base}}/campaigns/{{campaignId}}/leads?colour=red

@@ -1,9 +1,10 @@
 /**
  * Integration tests of the lead table over HTTP on a test database: `GET /campaigns/:id/leads`
- * filters, sorts and pages one campaign's leads with their evidence.
+ * filters, sorts and pages one campaign's leads with their evidence, and `leads.csv` exports
+ * exactly the filtered rows.
  *
- * Serves: FR-30 (lead table: filter, sort), FR-14, FR-32, US-14; issue #16 acceptance ("filter by
- * tier and score range, sort by column").
+ * Serves: FR-30 (lead table: filter, sort, CSV), FR-14, FR-32, US-14; issue #16 acceptance ("filter
+ * by tier and score range, sort by column; the export is exactly the filtered rows").
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
@@ -253,5 +254,43 @@ describe('GET /campaigns/:id/leads', () => {
       expect(await response.text()).not.toContain('LUKEWARM');
     }
     expect((await get('/campaigns/fictionalmissingcampaign0/leads')).status).toBe(404);
+  });
+});
+
+// Proves FR-30's export: exactly the filtered rows, in the table's order, as a CSV download.
+describe('GET /campaigns/:id/leads.csv', () => {
+  it('downloads exactly the filtered rows as text/csv', async () => {
+    const response = await get(`/campaigns/${campaignId}/leads.csv?area=DHA&minScore=10`);
+    const lines = (await response.text()).trimEnd().split('\r\n');
+
+    expect(response.headers.get('content-type')).toBe('text/csv; charset=utf-8');
+    expect(response.headers.get('content-disposition')).toBe(
+      `attachment; filename="leads-${campaignId}.csv"`,
+    );
+    expect(lines).toHaveLength(3);
+    expect(lines[1]).toContain('"Alpha Dental, DHA",DHA,+923000000001,MOBILE');
+    expect(lines[1]).toContain(
+      '2 of the last 3 reviews say the phone goes unanswered | Listing phone ends 0001 | Maps category: Dental clinic',
+    );
+    expect(lines[2]?.startsWith('Charlie Dental,dha,')).toBe(true);
+  });
+
+  it('starts with a UTF-8 byte-order mark, for Excel on Windows', async () => {
+    const response = await get(`/campaigns/${campaignId}/leads.csv`);
+
+    expect(new Uint8Array(await response.arrayBuffer()).slice(0, 3)).toEqual(
+      new Uint8Array([0xef, 0xbb, 0xbf]),
+    );
+  });
+
+  it('answers 400 for a bad filter and 404 for an unknown campaign, as the table does', async () => {
+    expect((await get(`/campaigns/${campaignId}/leads.csv?colour=red`)).status).toBe(400);
+    expect((await get('/campaigns/fictionalmissingcampaign0/leads.csv')).status).toBe(404);
+  });
+
+  it('exports every lead of every page when unfiltered', async () => {
+    const response = await get(`/campaigns/${pagedCampaignId}/leads.csv`);
+
+    expect((await response.text()).trimEnd().split('\r\n')).toHaveLength(56);
   });
 });

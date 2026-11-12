@@ -1,6 +1,6 @@
 /**
  * Database access for the lead table: one campaign's leads, filtered, sorted and paged, with their
- * signals.
+ * signals; or all of them, for the CSV export.
  *
  * Serves: FR-30 (lead table), FR-14 (evidence), US-14, NFR-3 (reads by the campaignId index, signals
  * in one query); issue #16.
@@ -114,5 +114,22 @@ export class LeadTableRepository {
       this.prisma.lead.count({ where }),
     ]);
     return { rows, total };
+  }
+
+  /**
+   * Reads every lead of a campaign that matches the filters, in the table's order, for the CSV.
+   *
+   * Does not page: the export is exactly the filtered rows (FR-30), a few thousand at most in v1.
+   * @param campaignId - `Campaign.id`.
+   * @param query - Filters and sort; the page is ignored.
+   * @returns The rows.
+   * @throws Prisma errors when the database cannot be read.
+   */
+  all(campaignId: string, query: LeadListQuery): Promise<LeadTableRow[]> {
+    return this.prisma.lead.findMany({
+      where: whereOf(campaignId, query),
+      orderBy: orderOf(query),
+      select: ROW,
+    });
   }
 }
