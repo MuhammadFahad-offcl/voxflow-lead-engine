@@ -167,6 +167,8 @@ export class ReviewRepository {
    * Finds leads in a campaign that passed the ideal-client filter and have no reviews yet.
    *
    * Does not return a lead marked with {@link NO_REVIEWS_ERROR}: its paid run already happened.
+   * Nor one that started its lead graph (#15): the graph runs only after the reviews settled, and a
+   * failure there replaces the lead's error, so the mark alone would not stop a second purchase.
    * @param campaignId - `Campaign.id`.
    * @returns Leads eligible for pass-2 reviews scraping.
    */
@@ -176,6 +178,7 @@ export class ReviewRepository {
         campaignId,
         status: { not: 'FILTERED_OUT' },
         reviews: { none: {} },
+        graphRunId: null,
         // A NOT on a nullable column drops its nulls in SQL, so the null case is spelled out.
         OR: [{ error: null }, { error: { not: NO_REVIEWS_ERROR } }],
       },
