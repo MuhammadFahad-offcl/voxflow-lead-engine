@@ -5,8 +5,11 @@
  * Used by: the `dev:start` script in apps/api/package.json, which runs the compiled dist/main.js.
  */
 import { loadEnvOrExit } from './bootstrap.js';
+import { exitIfPortTaken } from './port-check.js';
 import { startServer } from './server.js';
 
 // Before anything HazelJS builds: it would swallow a validation error (see startServer).
 const env = loadEnvOrExit(process.env);
+// Also before HazelJS: its listen() turns a taken port into an uncaught exception.
+await exitIfPortTaken(env);
 await startServer(env, env.API_PORT);

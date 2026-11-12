@@ -13,6 +13,14 @@ import { allowedOnlyLookup, isPublicAddress, ReadRefusedError } from './public-a
 import { safeGet } from './safe-get.js';
 
 const HTML = '<html><body><h1>Fictional Smile Clinic</h1></body></html>';
+// "دكتر" (doctor) in windows-1256, the code page of many older Urdu and Arabic sites.
+const DOCTOR_1256 = Buffer.from([0xcf, 0xdf, 0xca, 0xd1]);
+const page1256 = (head: string) =>
+  Buffer.concat([
+    Buffer.from(`<html><head>${head}</head><body>`),
+    DOCTOR_1256,
+    Buffer.from('</body></html>'),
+  ]);
 const MAX_BYTES = 1000;
 const BIG = 'x'.repeat(MAX_BYTES + 1);
 // {local} becomes the port of the local service the redirects try to reach.
@@ -27,6 +35,15 @@ const ROUTES: Record<string, [number, OutgoingHttpHeaders, (string | Buffer)?]> 
   '/redirect-private-name': [302, { location: 'http://intranet.example:{local}/' }],
   '/redirect-file': [302, { location: 'file:///etc/passwd' }],
   '/loop': [302, { location: '/loop' }],
+  '/cp1256-header': [200, { 'content-type': 'text/html; charset=windows-1256' }, page1256('')],
+  '/cp1256-meta': [200, { 'content-type': 'text/html' }, page1256('<meta charset="windows-1256">')],
+  '/unknown-charset': [200, { 'content-type': 'text/html; charset=x-fictional' }, HTML],
+  '/unknown-header-cp1256-meta': [
+    200,
+    { 'content-type': 'text/html; charset=x-fictional' },
+    page1256('<meta charset="windows-1256">'),
+  ],
+  '/utf16-meta': [200, { 'content-type': 'text/html' }, `<meta charset="utf-16">${HTML}`],
 };
 
 // The "public" site listens on ::1, which only this spec's rule lets through; 127.0.0.1 stays
@@ -98,6 +115,18 @@ const get = (path: string, timeoutMs?: number) => safeGet(siteUrl(path), options
 describe('safeGet', () => {
   it('reads a page and says which URL answered', async () => {
     expect(await get('/home')).toEqual({ url: siteUrl('/home'), status: 200, body: HTML });
+  });
+
+  // T-1 audit: a page in another code page must not come back garbled (FR-9, FR-10 read its text).
+  it('decodes a page in the charset its header or meta names, else as UTF-8', async () => {
+    expect((await get('/cp1256-header')).body).toContain('دكتر');
+    expect((await get('/cp1256-meta')).body).toContain('دكتر');
+    expect((await get('/unknown-charset')).body).toBe(HTML);
+  });
+
+  it('falls back to the meta after an unknown header label, and reads a utf-16 meta as UTF-8', async () => {
+    expect((await get('/unknown-header-cp1256-meta')).body).toContain('دكتر');
+    expect((await get('/utf16-meta')).body).toBe(`<meta charset="utf-16">${HTML}`);
   });
 
   it('returns a 403 with its body, so the caller can see a challenge page', async () => {
