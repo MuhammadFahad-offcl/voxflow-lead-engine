@@ -10,7 +10,7 @@ Fixes are in three PRs. Merge them in this order:
 | B   | `chore/cycle-1-audit-security` | Links only for http(s), dashboard bound to 127.0.0.1, server API client kept out of the browser, 64 KiB body limit, log scan |
 | C   | `chore/cycle-1-audit-p2`       | Non-UTF-8 pages, a clear exit when the port is taken, tests for untested failure paths                                       |
 
-The three branches merge cleanly together. On the merged tree, typecheck, lint, knip, 959 tests and `pnpm build` all pass.
+The three branches merge cleanly together. On the merged tree, typecheck, lint, knip, 960 tests and `pnpm build` all pass.
 
 ## 1. Inventory
 
@@ -40,13 +40,13 @@ Jest with `--coverage`, all three projects, on `main` and then on the three PRs 
 |        | Statements | Branches |  Lines | Tests |
 | ------ | ---------: | -------: | -----: | ----: |
 | Before |     97.00% |   89.80% | 97.65% |   919 |
-| After  |     97.93% |   90.12% | 98.55% |   959 |
+| After  |     97.98% |   90.18% | 98.60% |   960 |
 
 Files that changed most (lines / branches):
 
 | File                         | Before        | After         |
 | ---------------------------- | ------------- | ------------- |
-| `scheduler/lead-runner.ts`   | 66.7% / 64.3% | 93.3% / 75.0% |
+| `scheduler/lead-runner.ts`   | 66.7% / 64.3% | 95.4% / 76.7% |
 | `pipeline/lead.graph.ts`     | 95.3% / 86.8% | 100% / 89.5%  |
 | `db/lead-run.repository.ts`  | 100% / 70.0%  | 100% / 75.0%  |
 | `bootstrap.ts`               | 68.8% / 0%    | 70.6% / 0%    |
@@ -83,7 +83,7 @@ The attack plan had 33 attacks. For each one we wrote a test or ran a check:
 | 8   | P2  | A taken port 4000 crashed the API with an uncaught EADDRINUSE stack trace                                                              | Manual run, then `port-check.spec.ts`                         | PR C: check the port first and exit with one clear line              |
 | 9   | P3  | `pnpm seed:perf` was missing from the README Scripts table                                                                             | Review                                                        | PR A                                                                 |
 
-Also hardened, though not a bug: the API body limit went from HazelJS's 1 MiB default to 64 KiB. A malformed body already got a 400, and that is now tested.
+Also hardened, though not a bug: the API body limit went from HazelJS's 1 MiB default to 64 KiB. A malformed body already got a 400, and that is now tested. `/webhooks/vapi` will need a larger limit for end-of-call reports; that is noted on #28.
 
 Two gaps were not fixed here:
 
