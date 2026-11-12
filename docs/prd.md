@@ -7,7 +7,7 @@ Nov 3, 2026 · Muhammad Fahad
 | Field               | Value                                                                                                                                              |
 | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Product             | VoxFlow Lead Engine                                                                                                                                |
-| Document version    | 0.5 (Cycle 1 slipped 4 days; later cycles shifted)                                                                                                 |
+| Document version    | 0.6 (reviews_unreplied needs 10 stored reviews)                                                                                                    |
 | Status              | Draft, awaiting owner review                                                                                                                       |
 | Owner               | Muhammad Fahad, Founder, VoxFlow AI Solutions                                                                                                      |
 | Technical reviewer  | Claude                                                                                                                                             |
@@ -246,7 +246,7 @@ A lead's score is the sum of points from 13 signals in four dimensions, out of 1
 | Pain (max 40)           | At least 2 of the last 30 reviews say the phone goes unanswered or the clinic is hard to reach | 15     | The review texts                 |
 | Pain                    | At least 2 of the last 30 reviews mention difficulty booking or long waits                     | 10     | The review texts                 |
 | Pain                    | No online booking on the website or Maps listing                                               | 8      | The pages checked                |
-| Pain                    | More than half of the last 30 reviews have no owner reply                                      | 7      | Reply count from the review data |
+| Pain                    | More than half of the last 30 reviews have no owner reply; at least 10 reviews stored          | 7      | Reply count from the review data |
 | Fit (max 25)            | Maps category matches the niche profile                                                        | 10     | The category                     |
 | Fit                     | Evidence of several doctors or services                                                        | 8      | Page text or listing             |
 | Fit                     | 100 or more Google reviews (patient volume)                                                    | 7      | Review count                     |
@@ -524,10 +524,11 @@ What comes after v1 is decided in early January 2027 from the December data, not
 
 ### Changelog
 
-| Date       | Version | Change                                                                                                |
-| ---------- | ------- | ----------------------------------------------------------------------------------------------------- |
-| 9 Nov 2026 | 0.5     | Cycle 1 slipped 4 days; HazelJS has no fixed deadline (Q9)                                            |
-| 5 Nov 2026 | 0.4     | FR-8: closed places, keyword plurals, government or school names. FR-7: reopened places re-checked    |
-| 4 Nov 2026 | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)             |
-| 3 Nov 2026 | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting |
-| 3 Nov 2026 | 0.1     | First draft for owner review                                                                          |
+| Date        | Version | Change                                                                                                         |
+| ----------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| 12 Nov 2026 | 0.6     | Lead scoring: reviews_unreplied needs at least 10 stored reviews; fewer gives a 0-point signal with the reason |
+| 9 Nov 2026  | 0.5     | Cycle 1 slipped 4 days; HazelJS has no fixed deadline (Q9)                                                     |
+| 5 Nov 2026  | 0.4     | FR-8: closed places, keyword plurals, government or school names. FR-7: reopened places re-checked             |
+| 4 Nov 2026  | 0.3     | Apify costs measured in the #9 spike: hybrid two-pass design, ≈ $21–27 a month (ADR-0015)                      |
+| 3 Nov 2026  | 0.2     | Review fixes: Apify result caps, cached calendar slots, Vapi webhook recovery, per-task model setting          |
+| 3 Nov 2026  | 0.1     | First draft for owner review                                                                                   |

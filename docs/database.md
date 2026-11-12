@@ -87,6 +87,7 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 
 - The score step (#14) sets `Lead.score` (0–100), `scoreBreakdown` (Zod `ScoreBreakdown`: `pain`, `fit`, `reachability`, `abilityToPay`), `tier` and status `SCORED`. It replaces the lead's `Signal` rows in the same transaction, so the stored score is always the sum of the stored signals' points (FR-14).
 - A `Signal` row exists only for a signal that found evidence (`evidence` never empty), once per key (`@@unique([leadId, key])`). Review signals cite the newest matching review in `reviewId` and quote the two newest. Website signals cite the first page read in `sourceUrl`.
+- A row with `points = 0` is a note that explains a missing score (today only `reviews_unreplied` with fewer stored reviews than the niche's `minReviews`). It is not evidence for anything: the solution step (FR-17) must accept only signals with `points > 0`.
 - The points come from the campaign's niche version (`NicheProfile.signalWeights`) and the tier from its `tiers`, so an old campaign keeps scoring by the rules it was created with.
 
 ## Retention (NFR-6)

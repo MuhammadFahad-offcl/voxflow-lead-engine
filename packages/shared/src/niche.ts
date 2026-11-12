@@ -23,7 +23,8 @@ const SIGNAL_KEYS = {
   ABILITY_TO_PAY: ['working_website', 'premium_area', 'active_marketing'],
 } as const;
 
-const Signal = z.object({
+// Strict, so a typo in a signal's fields (e.g. "minReview") fails instead of being dropped.
+const Signal = z.strictObject({
   points: z.number().int().positive(),
   // The rule in words, shown next to the evidence on the lead page.
   rule: z.string().min(1),
@@ -34,10 +35,18 @@ const signalGroup = <const K extends readonly [string, ...string[]]>(keys: K) =>
     Object.fromEntries(keys.map((key) => [key, Signal])) as Record<K[number], typeof Signal>,
   );
 
+// reviews_unreplied alone may set a minimum of stored reviews (founder decision after #14): with
+// fewer, "more than half unreplied" says too little. Optional, so a stored niche version from
+// before the rule keeps scoring as it did.
+// At most 30 reviews are stored per lead (MAX_REVIEWS_PER_LEAD), so a higher minimum never scores.
+const UnrepliedSignal = Signal.extend({
+  minReviews: z.number().int().positive().max(30).optional(),
+});
+
 /** A niche's points per signal, grouped by dimension, adding up to 100 (`NicheProfile.signalWeights`). */
 export const SignalWeights = z
   .strictObject({
-    PAIN: signalGroup(SIGNAL_KEYS.PAIN),
+    PAIN: signalGroup(SIGNAL_KEYS.PAIN).extend({ reviews_unreplied: UnrepliedSignal }),
     FIT: signalGroup(SIGNAL_KEYS.FIT),
     REACHABILITY: signalGroup(SIGNAL_KEYS.REACHABILITY),
     ABILITY_TO_PAY: signalGroup(SIGNAL_KEYS.ABILITY_TO_PAY),

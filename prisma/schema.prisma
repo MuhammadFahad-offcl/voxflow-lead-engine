@@ -280,7 +280,8 @@ model Review {
   @@index([leadId])
 }
 
-/// One piece of scored evidence (FR-14). No evidence, no points.
+/// One piece of scored evidence (FR-14). No evidence, no points. A row with points = 0 only explains
+/// a missing score (too few reviews) and never supports a solution (FR-17).
 model Signal {
   id        String          @id @default(cuid())
   leadId    String

@@ -8,7 +8,7 @@
     "sourceOfTruth": "docs/prd.md → Lead scoring model, Call design"
   },
   "slug": "dental-clinic",
-  "version": 3,
+  "version": 4,
   "name": "Dental clinics",
   "searchTerms": ["dental clinic", "dentist", "dental surgeon", "orthodontist"],
   "categoryKeywords": [
@@ -59,7 +59,8 @@
       },
       "reviews_unreplied": {
         "points": 7,
-        "rule": "more than half of the last 30 reviews (the 30 most recent by publishedAt) have no owner reply"
+        "minReviews": 10,
+        "rule": "more than half of the last 30 reviews (the 30 most recent by publishedAt) have no owner reply; needs at least minReviews stored reviews, fewer gives 0 points"
       }
     },
     "FIT": {
