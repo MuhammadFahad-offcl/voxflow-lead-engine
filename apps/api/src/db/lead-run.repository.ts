@@ -76,6 +76,8 @@ export class LeadRunRepository {
    * @param leaseMs - How old a claim must be to count as abandoned, in milliseconds.
    * @param limit - The most leads to claim; the runner's concurrency.
    * @returns The leads this pass now holds; empty when nothing is free.
+   * @throws Prisma errors when the database cannot be read or written; Error when a claimed lead is
+   * not DISCOVERED or ENRICHED, which the condition rules out (a bug, not data).
    */
   async claimNext(now: Date, leaseMs: number, limit: number): Promise<ClaimedLead[]> {
     const where = claimable(now, leaseMs);
@@ -91,9 +93,11 @@ export class LeadRunRepository {
       data: { graphClaimedAt: now },
       select: { id: true, campaignId: true, status: true, websiteStatus: true, graphRunId: true },
     });
-    return claimed.flatMap(({ status, ...lead }) =>
-      // Always true: the WHERE only matches runnable statuses. The check narrows the type.
-      isRunnable(status) ? [{ ...lead, status, claimedAt: now }] : [],
-    );
+    return claimed.map(({ status, ...lead }) => {
+      // The WHERE only matches runnable statuses; the check narrows the type. Dropping the lead
+      // instead would leave it claimed with no runner until the lease ran out.
+      if (!isRunnable(status)) throw new Error(`Claimed lead ${lead.id} is ${status}`);
+      return { ...lead, status, claimedAt: now };
+    });
   }
 }
