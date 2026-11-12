@@ -4,7 +4,7 @@
  * the API stays bound to localhost with no CORS (ADR-0003).
  *
  * Serves: FR-30 (dashboard pages), NFR-3 (2-second timeout); issue #16.
- * Used by: apps/web/app/**, apps/web/lib/api.spec.ts.
+ * Used by: apps/web/app/** (apiDownload by the CSV export route), apps/web/lib/api.spec.ts.
  */
 import { z } from 'zod';
 
@@ -20,6 +20,11 @@ const API_BASE_URL = `http://${env.API_HOST}:${String(env.API_PORT)}`;
 const TIMEOUT_MS = 2000;
 // A write gets longer: cutting it off would not stop the API from committing it.
 const POST_TIMEOUT_MS = 10_000;
+
+/** The API's 400 body: one entry per refused field, with its messages. */
+export const ApiRefusal = z.object({
+  errors: z.array(z.object({ field: z.string(), messages: z.array(z.string()) })),
+});
 
 /** The API answered with an error status, could not be reached, or sent something unreadable. */
 export class ApiError extends Error {
@@ -107,4 +112,40 @@ export function apiPost(path: string, body: unknown): Promise<{ status: number; 
     { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
     POST_TIMEOUT_MS,
   );
+}
+
+/**
+ * Fetches a file from the API and hands it on unchanged, for a download route.
+ *
+ * Does not apply the 2-second timeout: an export of thousands of rows may take longer. The
+ * browser's request signal ends it instead, when the founder cancels the download.
+ * @param path - Path and query, e.g. "/campaigns/abc/leads.csv?tier=HOT".
+ * @param signal - The incoming request's signal.
+ * @returns The API's file, with its content type and file name; for an error status or an API
+ * that cannot be reached (502), a one-line text message instead of the API's JSON.
+ */
+export async function apiDownload(path: string, signal?: AbortSignal): Promise<Response> {
+  try {
+    const response = await fetch(`${API_BASE_URL}${path}`, {
+      cache: 'no-store',
+      ...(signal === undefined ? {} : { signal }),
+    });
+    if (response.status >= 400) {
+      return new Response(`The export failed: the API answered ${String(response.status)}.`, {
+        status: response.status,
+        headers: { 'content-type': 'text/plain; charset=utf-8' },
+      });
+    }
+    const headers = new Headers();
+    for (const name of ['content-type', 'content-disposition']) {
+      const value = response.headers.get(name);
+      if (value !== null) headers.set(name, value);
+    }
+    return new Response(response.body, { status: response.status, headers });
+  } catch {
+    return new Response('The export failed: the API is not reachable.', {
+      status: 502,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+    });
+  }
 }
