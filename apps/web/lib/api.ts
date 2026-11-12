@@ -21,11 +21,6 @@ const TIMEOUT_MS = 2000;
 // A write gets longer: cutting it off would not stop the API from committing it.
 const POST_TIMEOUT_MS = 10_000;
 
-/** The API's 400 body: one entry per refused field, with its messages. */
-export const ApiRefusal = z.object({
-  errors: z.array(z.object({ field: z.string(), messages: z.array(z.string()) })),
-});
-
 /** The API answered with an error status, could not be reached, or sent something unreadable. */
 export class ApiError extends Error {
   /**

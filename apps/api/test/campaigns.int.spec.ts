@@ -136,6 +136,31 @@ describe('POST /campaigns', () => {
     });
   });
 
+  it('answers 400, never 500, for a body that is not JSON or not sent as JSON (T-1 audit)', async () => {
+    const malformed = await fetch(`${baseUrl}/campaigns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{',
+    });
+    const plainText = await fetch(`${baseUrl}/campaigns`, { method: 'POST', body: 'hello' });
+
+    expect([malformed.status, plainText.status]).toEqual([400, 400]);
+  });
+
+  it('answers 413 for a body over 64 KiB, before reading it (T-1 audit)', async () => {
+    const response = await fetch(`${baseUrl}/campaigns`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        nicheSlug: 'dental-clinic',
+        city: 'x'.repeat(70_000),
+        areas: ['DHA'],
+      }),
+    });
+
+    expect(response.status).toBe(413);
+  });
+
   it('refuses an unknown key with 400 and never echoes its value', async () => {
     const { status, body } = await create({
       nicheSlug: 'dental-clinic',

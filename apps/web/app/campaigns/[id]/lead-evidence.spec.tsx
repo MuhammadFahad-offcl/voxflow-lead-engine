@@ -87,6 +87,23 @@ describe('LeadEvidence', () => {
     expect(html.indexOf('Only 3 reviews stored')).toBeGreaterThan(muted);
   });
 
+  it('never links a javascript: or data: source, and still shows its evidence (T-1 audit)', () => {
+    const [first, second] = lead.signals;
+    if (first === undefined || second === undefined) throw new Error('fixture lost its signals');
+    const hostile = {
+      ...lead,
+      signals: [
+        { ...first, sourceUrl: 'javascript:alert(document.cookie)' },
+        { ...second, sourceUrl: 'data:text/html,<script>alert(1)</script>' },
+      ],
+    };
+
+    const html = renderToStaticMarkup(<LeadEvidence lead={hostile} />);
+
+    expect(html).not.toContain('<a ');
+    expect(html).toContain('2 of the last 3 reviews say the phone goes unanswered');
+  });
+
   it('shows a FAILED lead’s step and error, and says when there is no evidence yet', () => {
     const failed = {
       ...lead,
