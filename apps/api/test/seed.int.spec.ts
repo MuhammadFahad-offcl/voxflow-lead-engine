@@ -34,16 +34,20 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// Proves the seed creates exactly the v1 rows, with the PRD defaults, and that a re-run changes nothing.
+// Proves the seed creates exactly the configured rows, with the PRD defaults, and that a re-run
+// changes nothing.
 describe('seed', () => {
-  it('creates 1 organization, its settings, dental-clinic v1 and 10 services, twice in a row', async () => {
-    await seed(prisma, configDir);
+  it('creates 1 organization, its settings, the dental-clinic version and 10 services, twice in a row', async () => {
+    const first = await seed(prisma, configDir);
     const settingsAfterFirst = await prisma.settings.findUniqueOrThrow({
       where: { organizationId: SEED_ORGANIZATION_ID },
     });
 
-    await seed(prisma, configDir);
+    const second = await seed(prisma, configDir);
 
+    // The niche file's version, not a fixed one: the seed's log line prints this.
+    expect(first).toEqual({ slug: 'dental-clinic', version: 4, added: true });
+    expect(second).toEqual({ slug: 'dental-clinic', version: 4, added: false });
     expect(await counts()).toEqual({ organizations: 1, settings: 1, niches: 1, services: 10 });
     // updatedAt would move if the second run had written the row.
     expect(
