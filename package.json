@@ -21,6 +21,7 @@
     "db:studio": "prisma studio",
     "read-website": "tsx --tsconfig apps/api/tsconfig.json apps/api/src/read-website.ts",
     "llm:record": "tsx --env-file-if-exists=.env --tsconfig apps/api/tsconfig.json apps/api/src/llm-record.ts",
+    "seed:perf": "tsx --env-file-if-exists=.env --tsconfig apps/api/tsconfig.json apps/api/src/seed-perf.ts",
     "postinstall": "prisma generate",
     "prepare": "husky"
   },
