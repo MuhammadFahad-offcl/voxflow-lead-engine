@@ -1,5 +1,5 @@
 /**
- * Jest config: runs the `api` and `shared` projects' specs as ES modules through ts-jest.
+ * Jest config: runs the `api`, `web` and `shared` projects' specs as ES modules through ts-jest.
  *
  * Serves: NFR-9 (issue #3, monorepo scaffold).
  * Used by: `pnpm test` and `pnpm test:cov`.
@@ -20,6 +20,18 @@ export default {
       moduleNameMapper: { '^(\\.{1,2}/.*)\\.js$': '$1' },
       transform: {
         '^.+\\.ts$': ['ts-jest', { useESM: true, tsconfig: '<rootDir>/tsconfig.spec.json' }],
+      },
+    },
+    {
+      // The dashboard's pure helpers and components, rendered to HTML with react-dom/server: no
+      // browser environment and no extra testing library (#16).
+      displayName: 'web',
+      rootDir: '<rootDir>/apps/web',
+      testEnvironment: 'node',
+      testMatch: ['<rootDir>/lib/**/*.spec.ts', '<rootDir>/app/**/*.spec.{ts,tsx}'],
+      extensionsToTreatAsEsm: ['.ts', '.tsx'],
+      transform: {
+        '^.+\\.tsx?$': ['ts-jest', { useESM: true, tsconfig: '<rootDir>/tsconfig.spec.json' }],
       },
     },
     {
