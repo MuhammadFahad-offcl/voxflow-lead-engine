@@ -1,6 +1,6 @@
 /**
- * A campaign status as a coloured badge: running statuses blue, waiting amber, done green,
- * failed red.
+ * A campaign status as a coloured badge: discovering, enriching and calling blue, scoring and
+ * scripting indigo, waiting amber, done green, failed red.
  *
  * Serves: FR-30 (campaigns list: status badge), FR-3; issue #16.
  * Used by: apps/web/app/campaigns/page.tsx, apps/web/app/campaigns/[id]/page.tsx.

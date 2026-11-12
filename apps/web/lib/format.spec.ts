@@ -7,7 +7,7 @@
 import { describe, expect, it } from '@jest/globals';
 import { karachiTime, percent } from './format';
 
-// Proves NFR-13: a UTC time shows in Pakistan time (UTC+5, no daylight saving), whatever the zone.
+// Proves NFR-13: a UTC time shows in Pakistan time (UTC+5, no daylight saving).
 describe('karachiTime', () => {
   it('shows 08:15 UTC as 13:15 in Karachi', () => {
     expect(karachiTime('2026-11-12T08:15:00.000Z')).toBe('12 Nov 2026, 13:15');
