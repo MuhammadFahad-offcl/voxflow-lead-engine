@@ -4,13 +4,14 @@
  * leads through their lead graph, then every campaign with no lead left to run moves from
  * ENRICHING to SCORING.
  *
- * One worker process runs this loop; a pass ends before the next one starts. A lead's failure never
- * stops the pass or its campaign (FR-32). After a spend cap pauses a lead, the runner claims no new
+ * A pass ends before the next one starts. One worker normally runs this loop; the claims on leads and
+ * on a campaign's reviews step keep a second worker from doing the same work twice. A lead's
+ * failure never stops the pass or its campaign (FR-32). After a spend cap pauses a lead, the runner claims no new
  * lead for one lease, so it does not walk every lead into a cap it already knows about (FR-33).
  *
  * Serves: FR-11 (reviews), FR-32, FR-33, NFR-1, NFR-2, docs/architecture.md §9, ADR-0002,
  * ADR-0015; issue #15.
- * Used by: apps/api/src/worker.ts, apps/api/test/lead-runner.int.spec.ts.
+ * Used by: apps/api/src/worker.ts, lead-runner.spec.ts, apps/api/test/lead-runner.int.spec.ts.
  */
 import type { HazelApp } from '@hazeljs/core';
 import { DiscoveryRepository } from '../db/discovery.repository.js';
@@ -46,6 +47,10 @@ const RUNNER_INTERVAL_MS = 10_000;
  * own timeouts.
  */
 export const LEAD_LEASE_MS = 15 * 60 * 1000;
+// Outlasts one reviews step: a start, the adapter's 11-minute wait for the run, and the saves. It is
+// not renewed, so the ~4 minutes left over must cover the Apify client's retries; raise it with the
+// adapter's wait.
+const REVIEWS_LEASE_MS = 15 * 60 * 1000;
 // Fits HazelJS's 30-second shutdown limit; a reviews start usually saves its run id well inside it.
 const START_SAVE_WAIT_MS = 10_000;
 
@@ -58,7 +63,12 @@ const REVIEWS_CHECK_REASON =
 export interface LeadRunnerDeps {
   leads: Pick<
     LeadRunRepository,
-    'enrichingCampaigns' | 'isEnriching' | 'claimNext' | 'finishEnrichment' | 'pauseEnrichment'
+    | 'enrichingCampaigns'
+    | 'claimReviews'
+    | 'releaseReviews'
+    | 'claimNext'
+    | 'finishEnrichment'
+    | 'pauseEnrichment'
   >;
   reviews: EnrichReviewsDeps & { reviewRepo: Pick<ReviewRepository, 'openRun' | 'abandonRun'> };
   /** Held while a reviews step may start a paid run, so a shutdown waits for its id to be saved. */
@@ -163,19 +173,45 @@ const pauseForCheck = async (deps: LeadRunnerDeps, campaignId: string): Promise<
 };
 
 /**
+ * Clears this worker's claim on a campaign's reviews step, logging instead of throwing.
+ *
+ * Does not retry: a claim left behind expires after REVIEWS_LEASE_MS, which only delays that
+ * campaign's next reviews step.
+ * @param deps - What the pass needs.
+ * @param campaignId - `Campaign.id`.
+ * @param claimedAt - The value the claim returned.
+ */
+const releaseReviewsClaim = async (
+  deps: LeadRunnerDeps,
+  campaignId: string,
+  claimedAt: Date,
+): Promise<void> => {
+  try {
+    await deps.leads.releaseReviews(campaignId, claimedAt);
+  } catch (error) {
+    deps.logger.error({ campaignId, ...errorFields(error) }, 'reviews claim not released');
+  }
+};
+
+/**
  * Runs the pass-2 reviews step for each ENRICHING campaign, inside the paid-start gate.
  *
  * The step itself pays once per lead: it acts only for leads with no reviews yet and saves its run
- * before reading it. Each campaign's status is read again just before its step, so one the founder
- * paused during a long step for another campaign is not paid for. A failure for one campaign is
- * logged and the others go on.
+ * before reading it. Each campaign is claimed just before its step, so a second worker skips it and
+ * one the founder paused during a long step for another campaign is not paid for. A failure for one
+ * campaign, its claim and its release included, is logged and the others go on.
  * @param deps - What the pass needs.
  * @throws Prisma errors when the list of campaigns cannot be read.
  */
 const collectReviews = async (deps: LeadRunnerDeps): Promise<void> => {
   for (const campaignId of await deps.leads.enrichingCampaigns()) {
+    // Claimed, not just read: a second worker skips the campaign instead of finding this worker's
+    // run without its id and pausing the campaign for a check (T-1 audit). The claim also ends a
+    // campaign the founder paused since the list was read.
+    let claimedAt: Date | null = null;
     try {
-      if (!(await deps.leads.isEnriching(campaignId))) continue;
+      claimedAt = await deps.leads.claimReviews(campaignId, deps.now(), REVIEWS_LEASE_MS);
+      if (claimedAt === null) continue;
       const result = await deps.startGate.run(() =>
         enrichReviewsForCampaign(deps.reviews, campaignId),
       );
@@ -188,6 +224,8 @@ const collectReviews = async (deps: LeadRunnerDeps): Promise<void> => {
     } catch (error) {
       // A run that cannot be read yet is read again next pass, for free.
       deps.logger.error({ campaignId, ...errorFields(error) }, 'reviews step failed');
+    } finally {
+      if (claimedAt !== null) await releaseReviewsClaim(deps, campaignId, claimedAt);
     }
   }
 };

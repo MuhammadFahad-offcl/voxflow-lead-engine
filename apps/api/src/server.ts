@@ -25,8 +25,8 @@ import { PrismaProvider } from './db/prisma.provider.js';
  * `GET /ready` reports `db` as unhealthy.
  * Does not disconnect Prisma on `app.close()`: only the shutdown path does (a signal, or an uncaught
  * error), because `close()` runs no shutdown handlers.
- * @param env - Parsed configuration. `API_HOST` should be 127.0.0.1 so only this laptop can reach
- * the API.
+ * @param env - Parsed configuration. `API_HOST` is 127.0.0.1 or localhost (the env schema refuses
+ * anything else), so only this laptop can reach the API.
  * @param port - TCP port number, normally `env.API_PORT`. 0 lets the operating system pick one.
  * @returns The running app, so the caller can read its address and close it.
  * @throws When a class provider's constructor throws, or an async factory one depends on rejects.

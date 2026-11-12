@@ -76,6 +76,9 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm lint
       - run: pnpm knip
+      # Every package builds from the fresh install: the API (tsc) and the dashboard (next build). Typecheck
+      # alone misses Next.js build errors, such as a server-only module pulled into a client bundle.
+      - run: pnpm build
       # Proves a fresh database migrates and seeds, as the README quick start does (#7).
       - run: pnpm exec prisma migrate deploy
       - run: pnpm db:seed
