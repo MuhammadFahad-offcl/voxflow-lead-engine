@@ -85,7 +85,6 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 | `pnpm read-website <url>`     | try the real web reader on one live site; prints counts, writes nothing   |
 | `pnpm llm:record`             | **costs money:** record the demo clinics' labelling answers (see below)   |
-| `pnpm seed:perf`              | add 5,000 fictional, already-scored leads to time the dashboard (NFR-3)   |
 
 `pnpm llm:record` calls Claude for each fictional demo clinic and saves the answers in `fixtures/llm/`, which demo mode replays. Run it after changing the labelling prompt. It needs `ANTHROPIC_API_KEY` and a seeded, running database. Every call counts toward this month's LLM cap, like any other. It stops before going past `--max-usd` (default 0.10). `--size-check` also prices one 30-review call without saving it. The first recording cost $0.002.
 

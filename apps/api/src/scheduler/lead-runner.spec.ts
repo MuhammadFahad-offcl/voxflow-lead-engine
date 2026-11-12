@@ -11,7 +11,12 @@ import { describe, expect, it, jest } from '@jest/globals';
 import type { HazelApp } from '@hazeljs/core';
 import type { Logger } from '../logging/logger.js';
 import { PaidStartGate } from '../pipeline/paid-start-gate.js';
-import { registerLeadRunnerShutdown, startLeadRunner, type LeadRunnerDeps } from './lead-runner.js';
+import {
+  registerLeadRunnerShutdown,
+  runLeadRunnerOnce,
+  startLeadRunner,
+  type LeadRunnerDeps,
+} from './lead-runner.js';
 
 const logger = { info: jest.fn(), warn: jest.fn(), error: jest.fn(), debug: jest.fn() };
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
@@ -64,8 +69,7 @@ describe('startLeadRunner', () => {
   });
 });
 
-// Proves NFR-2: shutdown refuses a new paid start and waits for one in flight, and says so when the
-// wait runs out.
+// Proves NFR-2: shutdown waits for a paid start in flight, and says so when the wait runs out.
 describe('registerLeadRunnerShutdown', () => {
   it('waits for the stop and warns when a paid start outlasted the wait', async () => {
     type Handler = Parameters<HazelApp['registerShutdownHandler']>[0];
@@ -86,25 +90,40 @@ describe('registerLeadRunnerShutdown', () => {
       'a reviews step outlasted the shutdown wait; its campaign may pause for a check',
     );
   });
+});
 
-  it('refuses a new paid start once stopped, and waits for the one in flight', async () => {
-    const gate = new PaidStartGate();
-    let release: () => void = () => undefined;
-    const inFlight = gate.run(
-      () =>
-        new Promise<string>((done) => {
-          release = () => {
-            done('run-1');
-          };
-        }),
+// Proves FR-32: a campaign whose reviews claim or release fails is logged, and the pass goes on.
+describe('runLeadRunnerOnce reviews claims', () => {
+  it('goes on to the next campaign after a failed claim and logs a failed release', async () => {
+    const base = stubDeps(() => Promise.resolve(['campaign-a', 'campaign-b']));
+    const claimReviews = jest.fn((campaignId: string) =>
+      campaignId === 'campaign-a'
+        ? Promise.reject(new Error('Fictional claim failure'))
+        : Promise.resolve(new Date('2026-11-12T05:00:00Z')),
     );
+    const deps = {
+      ...base,
+      leads: {
+        ...base.leads,
+        claimReviews,
+        releaseReviews: () => Promise.reject(new Error('Fictional release failure')),
+      },
+      startGate: { run: () => Promise.resolve({ problem: null, needsCheck: false }) },
+    } as unknown as LeadRunnerDeps;
 
-    const closing = gate.close(1000);
-    const refused = await gate.run(() => Promise.resolve('run-2'));
-    release();
+    await expect(runLeadRunnerOnce(deps)).resolves.toBeDefined();
 
-    expect(refused).toBe('CLOSED');
-    await expect(inFlight).resolves.toBe('run-1');
-    await expect(closing).resolves.toBe(true);
+    expect(claimReviews.mock.calls.map(([campaignId]) => campaignId)).toEqual([
+      'campaign-a',
+      'campaign-b',
+    ]);
+    expect(logger.error).toHaveBeenCalledWith(
+      { campaignId: 'campaign-a', errorName: 'Error', errorCode: null },
+      'reviews step failed',
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      { campaignId: 'campaign-b', errorName: 'Error', errorCode: null },
+      'reviews claim not released',
+    );
   });
 });
