@@ -38,6 +38,12 @@ const ROUTES: Record<string, [number, OutgoingHttpHeaders, (string | Buffer)?]> 
   '/cp1256-header': [200, { 'content-type': 'text/html; charset=windows-1256' }, page1256('')],
   '/cp1256-meta': [200, { 'content-type': 'text/html' }, page1256('<meta charset="windows-1256">')],
   '/unknown-charset': [200, { 'content-type': 'text/html; charset=x-fictional' }, HTML],
+  '/unknown-header-cp1256-meta': [
+    200,
+    { 'content-type': 'text/html; charset=x-fictional' },
+    page1256('<meta charset="windows-1256">'),
+  ],
+  '/utf16-meta': [200, { 'content-type': 'text/html' }, `<meta charset="utf-16">${HTML}`],
 };
 
 // The "public" site listens on ::1, which only this spec's rule lets through; 127.0.0.1 stays
@@ -116,6 +122,11 @@ describe('safeGet', () => {
     expect((await get('/cp1256-header')).body).toContain('دكتر');
     expect((await get('/cp1256-meta')).body).toContain('دكتر');
     expect((await get('/unknown-charset')).body).toBe(HTML);
+  });
+
+  it('falls back to the meta after an unknown header label, and reads a utf-16 meta as UTF-8', async () => {
+    expect((await get('/unknown-header-cp1256-meta')).body).toContain('دكتر');
+    expect((await get('/utf16-meta')).body).toBe(`<meta charset="utf-16">${HTML}`);
   });
 
   it('returns a 403 with its body, so the caller can see a challenge page', async () => {

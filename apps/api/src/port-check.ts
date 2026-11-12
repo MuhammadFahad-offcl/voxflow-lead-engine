@@ -1,7 +1,7 @@
 /**
  * Startup check that the API's port is free, so a second `pnpm dev` stops with one clear line.
  *
- * Serves: NFR-10 (clear startup failures), ADR-0003 (the API on 127.0.0.1:API_PORT); T-1 audit.
+ * Serves: ADR-0003 (the API on 127.0.0.1:API_PORT), ADR-0013 (the patched HazelJS listen); T-1 audit.
  * Used by: apps/api/src/main.ts, before the HazelJS app is built.
  */
 import { createServer } from 'node:net';

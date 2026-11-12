@@ -8,7 +8,7 @@
  * enrich → score; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
-import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
+import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { resolve } from 'node:path';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
@@ -384,6 +384,10 @@ describe('runLeadGraph at a spend cap', () => {
 describe('runLeadGraph when HazelJS stops the run', () => {
   // Read inside each test: deps is built in beforeAll.
   const checkpoints = () => deps.store.checkpointService;
+  // Restores the spies even when a test fails, so a broken save never leaks into the next test.
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   it('times the run out between nodes, keeps the finished step and frees the lead', async () => {
     const lead = await prisma.lead.findFirstOrThrow({
@@ -407,13 +411,12 @@ describe('runLeadGraph when HazelJS stops the run', () => {
       },
     };
     const save = checkpoints().save.bind(checkpoints());
-    const slow = jest.spyOn(checkpoints(), 'save').mockImplementationOnce(async (...args) => {
+    jest.spyOn(checkpoints(), 'save').mockImplementationOnce(async (...args) => {
       await new Promise((done) => setTimeout(done, 1_000));
       return save(...args);
     });
 
     const outcome = await runLeadGraph({ ...deps, runtime }, claimed);
-    slow.mockRestore();
 
     expect(outcome).toMatchObject({ status: 'STOPPED' });
     expect((await runOf(outcome)).status).toBe('timed_out');
@@ -429,12 +432,9 @@ describe('runLeadGraph when HazelJS stops the run', () => {
     });
     await backToDiscovered(lead.id);
     const claimed = await claimOne(lead.id);
-    const broken = jest
-      .spyOn(checkpoints(), 'save')
-      .mockRejectedValueOnce(new Error('fictional connection lost'));
+    jest.spyOn(checkpoints(), 'save').mockRejectedValueOnce(new Error('fictional connection lost'));
 
     const outcome = await runLeadGraph(deps, claimed);
-    broken.mockRestore();
 
     expect(outcome).toMatchObject({ status: 'FAILED', step: LEAD_STEP.CONTEXT });
     expect((await runOf(outcome)).status).toBe('failed');

@@ -66,23 +66,36 @@ const CHARSET = /charset=["']?([\w-]+)/i;
 const META_SCAN_BYTES = 1024;
 
 /**
+ * Makes a decoder for a charset label.
+ * @param label - A label such as `windows-1256`, or undefined when none was found.
+ * @returns The decoder, or undefined when there is no label or TextDecoder does not know it.
+ */
+const decoderFor = (label: string | undefined): TextDecoder | undefined => {
+  if (label === undefined) return undefined;
+  try {
+    return new TextDecoder(label);
+  } catch {
+    return undefined;
+  }
+};
+
+/**
  * Decodes a page in the charset its header names, else the one its own <meta> names, else UTF-8.
  * Older Urdu and Arabic sites often use windows-1256; read as UTF-8 their text would be garbled.
+ *
+ * Does not sniff the bytes: a page that declares nothing, or only unknown labels, is read as UTF-8.
  * @param body - The raw bytes.
  * @param contentType - The response's Content-Type header, if any.
- * @returns The text; UTF-8 when the label is missing or unknown.
+ * @returns The text.
  */
 const decode = (body: Buffer, contentType: string | undefined): string => {
-  const label =
-    CHARSET.exec(contentType ?? '')?.[1] ??
-    CHARSET.exec(body.subarray(0, META_SCAN_BYTES).toString('latin1'))?.[1] ??
-    'utf-8';
-  try {
-    return new TextDecoder(label).decode(body);
-  } catch {
-    // An unknown label: TextDecoder refuses it, and UTF-8 is the web's default.
-    return body.toString('utf8');
-  }
+  const header = decoderFor(CHARSET.exec(contentType ?? '')?.[1]);
+  if (header !== undefined) return header.decode(body);
+  const meta = decoderFor(CHARSET.exec(body.subarray(0, META_SCAN_BYTES).toString('latin1'))?.[1]);
+  // A <meta> that could be read as ASCII cannot be UTF-16, so the HTML spec reads such a page as
+  // UTF-8; an unknown label falls back to UTF-8, the web's default.
+  if (meta === undefined || meta.encoding.startsWith('utf-16')) return body.toString('utf8');
+  return meta.decode(body);
 };
 
 const readBody = async (
