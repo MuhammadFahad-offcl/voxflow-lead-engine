@@ -4,11 +4,11 @@ Run 12 Nov 2026 on `main` at `65f97cf` (after #147 and #148), with prompt T-1 an
 
 Fixes are in three PRs. Merge them in this order:
 
-| PR  | Branch                         | What it fixes                                                                                                                |
-| --- | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| A   | `chore/cycle-1-audit`          | Loopback-only `API_HOST`, one reviews run per campaign, `pnpm build` in CI, lead-runner tests, this report                   |
-| B   | `chore/cycle-1-audit-security` | Links only for http(s), dashboard bound to 127.0.0.1, server API client kept out of the browser, 64 KiB body limit, log scan |
-| C   | `chore/cycle-1-audit-p2`       | Non-UTF-8 pages, a clear exit when the port is taken, tests for untested failure paths                                       |
+| PR     | Branch                         | What it fixes                                                                                                                |
+| ------ | ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
+| A #152 | `chore/cycle-1-audit`          | Loopback-only `API_HOST`, one reviews run per campaign, `pnpm build` in CI, lead-runner tests, this report                   |
+| B #153 | `chore/cycle-1-audit-security` | Links only for http(s), dashboard bound to 127.0.0.1, server API client kept out of the browser, 64 KiB body limit, log scan |
+| C #154 | `chore/cycle-1-audit-p2`       | Non-UTF-8 pages, a clear exit when the port is taken, tests for untested failure paths                                       |
 
 The three branches merge cleanly together. On the merged tree, typecheck, lint, knip, 960 tests and `pnpm build` all pass.
 
