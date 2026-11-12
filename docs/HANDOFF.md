@@ -4,12 +4,10 @@
 
 ## Cycle 1 issues remaining
 
-Cycle 1 is due **13 Nov 2026**. Issues #3–#13 are closed. Issues #14–#16 remain.
+Cycle 1 is due **13 Nov 2026**. Issues #3–#15 are closed. Issue #16 remains.
 
 | Issue | Title                                                           | Prompt                                         |
 | ----- | --------------------------------------------------------------- | ---------------------------------------------- |
-| #14   | Scoring rules (pure) + signals + tiers, unit tests ≥ 80%        | `docs/prompts/cycle-1-scored-leads.md` → C1-12 |
-| #15   | Lead `AgentGraph` (enrich → score) with per-lead status, retry  | `docs/prompts/cycle-1-scored-leads.md` → C1-13 |
 | #16   | Dashboard — campaigns list, new campaign form, lead table + CSV | `docs/prompts/cycle-1-scored-leads.md` → C1-14 |
 
 ## Keys still needed
@@ -67,6 +65,25 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 - **Cap banner:** `GET /costs/status` reports `blocked` once less than one cent of the monthly cap is left. The gate stops calls just under the cap, so "spent ≥ cap" would never show. Merged by the founder in #127.
 - **Demo mode:** labelling replays the answers `pnpm llm:record` saved in `fixtures/llm/`. A prompt change needs a new recording.
 
+### #14 decisions (2026-11-12)
+
+- **`reviews_unreplied` needs at least 10 stored reviews** (`minReviews` in the niche file, dental-clinic v4, #133). With fewer, the signal is stored as a **0-point `Signal` row** whose evidence says why ("Only 1 review stored, fewer than the 10 needed"). A 0-point row is never evidence for a solution: FR-17 (Cycle 2) must accept only signals with `points > 0`.
+- The demo clinics store 1–3 reviews, so the demo has no HOT lead under v4 (p01 67, p06 69 WARM). Fahad accepted this.
+
+### #15 decisions (2026-11-12)
+
+- **The lead graph is a HazelJS `AgentGraph`** of function nodes: `ENRICH_WEBSITE → ENRICH_CONTEXT → LABEL_REVIEWS → SCORE → END` (`pipeline/lead.graph.ts`). Runs and checkpoints go through HazelJS's `createSqlDurableRunStore` (`agent_runs`, `agent_run_checkpoints`); `Lead.graphRunId` holds the run id. `@hazeljs/eval` 2.0.13 is installed only because `@hazeljs/agent` 2.0.13 cannot be imported without it (ADR-0001 update; Fahad files the upstream issue).
+- **No resume in AgentGraph 2.0.13:** a resumed or retried lead starts a new run at its next step, chosen from its status; every step skips stored work. Each node renews the runner's claim first.
+- **Reviews are a once-per-campaign pre-step** in the lead runner, not a graph node: one paid Apify run per campaign (ADR-0015). A lead is claimed only once its reviews are settled.
+- **Failures:** a node error marks the lead FAILED with `failedStep` and a stored sentence (never a library's message). A failed web search does **not** fail the lead (FR-12 is "should", #12).
+- **Spend caps wait:** the lead keeps its status, its run is SUSPENDED and it keeps its claim; the runner claims no new lead for one lease (15 min).
+- **A reviews run that may exist without a saved id** pauses the campaign ("Check the Apify console; resuming starts a new reviews run") and abandons that reservation.
+- **Campaign:** ENRICHING → SCORING when no lead is DISCOVERED or ENRICHED; it stays SCORING until Cycle 2.
+- **Retry:** `POST /leads/:id/retry` puts a FAILED lead back at ENRICHED (labelling or scoring failed) or DISCOVERED (otherwise).
+- **`LEAD_RUNNER_CONCURRENCY`** (env, 1–10, default 3) is the number of leads per pass.
+- **`pnpm dev` starts the worker too, and its first pass runs within a second.** To send an API request without the worker (e.g. to pause a campaign), start only the API: `pnpm --filter @voxflow/shared build && pnpm --filter api build && pnpm --filter api dev:start`.
+- Fahad's real DHA campaign `cmw3kqq6n0000vgva01vcfdef` (#10, niche v3) is **PAUSED** in his dev DB. Do not resume it without his go: in live mode the worker would buy reviews and make Perplexity and Claude calls for its 56 leads.
+
 ## The workflow (every issue)
 
 1. Read the issue prompt in `docs/prompts/cycle-1-scored-leads.md` and the FRs it names in `docs/prd.md`.
@@ -77,7 +94,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 6. Use the `reviewer` agent before opening PRs.
 7. Open PRs with the template in `.github/pull_request_template.md`. Filled: summary, FR/NFR/ADR ids, how tested, risks.
 8. **Fahad merges. Never merge yourself.**
-9. After every merge to `main`: `pnpm install`, `pnpm db:migrate`, `pnpm test` (Docker Desktop must be running).
+9. After every merge to `main`: `pnpm install`, `pnpm db:migrate`, `pnpm db:seed`, `pnpm test` (Docker Desktop must be running). The seed adds a new niche version when `config/niches/*.json` raised its `version`; its log line names the version ("dental-clinic niche v4 (added)" or "(already stored)"). Campaigns created before keep the version they were created with.
 
 ### Checkpoints
 
