@@ -67,7 +67,7 @@ describe('LeadEvidence', () => {
     );
   });
 
-  it('lists every signal with its points and evidence, highest first, including the 0-point note', () => {
+  it('lists every signal with its points and evidence, in the order the API sends them, including the 0-point note', () => {
     const text = textOf(lead);
 
     expect(text).toContain(

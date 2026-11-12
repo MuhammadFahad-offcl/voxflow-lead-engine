@@ -19,7 +19,8 @@ const DIMENSIONS = [
 /**
  * Renders the evidence.
  * @param props - The lead.
- * @param props.lead - A lead-table row, with its signals highest points first.
+ * @param props.lead - A lead-table row. Does not sort its signals: the API sends them highest
+ * points first.
  * @returns The breakdown and the signal list; for a lead with neither, a line saying so.
  */
 export function LeadEvidence({ lead }: Readonly<{ lead: LeadRow }>) {

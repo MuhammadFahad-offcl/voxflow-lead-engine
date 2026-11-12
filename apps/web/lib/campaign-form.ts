@@ -7,6 +7,7 @@
  * Used by: apps/web/app/campaigns/new/*, apps/web/lib/campaign-form.spec.ts.
  */
 import { z } from 'zod';
+import { ApiRefusal } from './api';
 
 /** Messages per form field; `form` holds the ones that belong to no field. */
 export type FieldErrors = Partial<Record<'nicheSlug' | 'city' | 'areas' | 'form', string[]>>;
@@ -48,11 +49,6 @@ export function gridSize(searchTermCount: number, areas: readonly string[]): num
   return searchTermCount * areas.length;
 }
 
-// The API's 400 body: one entry per field, with its messages.
-const ApiValidation = z.object({
-  errors: z.array(z.object({ field: z.string(), messages: z.array(z.string()) })),
-});
-
 /**
  * Turns a 400 from `POST /campaigns`, or the ZodError of a check before sending, into messages.
  * @param body - The API's JSON body, or a ZodError.
@@ -63,7 +59,7 @@ export function toFieldErrors(body: unknown): FieldErrors {
   const issues =
     body instanceof z.ZodError
       ? body.issues.map((issue) => ({ field: issue.path.join('.'), messages: [issue.message] }))
-      : (ApiValidation.safeParse(body).data?.errors ?? []);
+      : (ApiRefusal.safeParse(body).data?.errors ?? []);
   const errors: FieldErrors = {};
   for (const { field, messages } of issues) {
     const name = field.split('.')[0];

@@ -40,6 +40,11 @@ describe('sortLink', () => {
     expect(sortLink({ sort: 'reviews', dir: 'desc' }, 'reviews')).toBe('?sort=reviews&dir=asc');
   });
 
+  it('flips ascending back to descending, and reads a direction set without a sort as score', () => {
+    expect(sortLink({ sort: 'reviews', dir: 'asc' }, 'reviews')).toBe('?sort=reviews&dir=desc');
+    expect(sortLink({ dir: 'asc' }, 'score')).toBe('?sort=score&dir=desc');
+  });
+
   it('starts name A–Z, and treats the default score sort as already highest first', () => {
     expect(sortLink({}, 'name')).toBe('?sort=name&dir=asc');
     expect(sortLink({}, 'score')).toBe('?sort=score&dir=asc');

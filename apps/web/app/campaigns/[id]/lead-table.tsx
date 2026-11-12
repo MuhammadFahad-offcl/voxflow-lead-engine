@@ -1,7 +1,7 @@
 /**
  * The lead table of a campaign page: one row per lead, sortable column headings, and each row
- * expanding (native `<details>`, no client script) to its evidence. FAILED rows carry a Retry
- * button.
+ * expanding (native `<details>`, no client script) to its evidence. A FAILED row's Retry button is
+ * in its expanded part: a form may not sit inside `<summary>`.
  *
  * Serves: FR-30 (lead table: sort, expand to evidence), FR-14, FR-32 (retry); issue #16.
  * Used by: apps/web/app/campaigns/[id]/page.tsx.
@@ -30,14 +30,27 @@ export function LeadTable({
   query,
 }: Readonly<{ campaignId: string; page: LeadPage; query: LeadQuery }>) {
   if (page.leads.length === 0) return <p className="py-6 text-slate-600">No lead matches.</p>;
-  const heading = (label: string, sort?: 'score' | 'name' | 'reviews') =>
-    sort === undefined ? (
-      <span>{label}</span>
-    ) : (
+  const sorted = query.sort ?? 'score';
+  const direction = query.dir ?? (sorted === 'name' ? 'asc' : 'desc');
+  const arrow = direction === 'asc' ? ' ▲' : ' ▼';
+  const heading = (label: string, sort?: 'score' | 'name' | 'reviews') => {
+    if (sort === undefined) return <span>{label}</span>;
+    const active = sorted === sort;
+    return (
       <Link href={sortLink(query, sort)} className="underline">
         {label}
+        {active ? arrow : null}
+        {active ? <span className="sr-only">{` (sorted ${direction}ending)`}</span> : null}
       </Link>
     );
+  };
+  // Each cell names its column for screen readers: the headings are not a real table header.
+  const cell = (label: string, value: string | number, className = '') => (
+    <span className={className}>
+      <span className="sr-only">{label}: </span>
+      {value}
+    </span>
+  );
   return (
     <div className="border bg-white text-sm">
       <div className={`${COLUMNS} border-b font-medium text-slate-600`}>
@@ -52,29 +65,29 @@ export function LeadTable({
       {page.leads.map((lead) => (
         <details key={lead.id} className="border-b last:border-0">
           <summary className={`${COLUMNS} cursor-pointer hover:bg-slate-50`}>
-            <span className="font-medium">{lead.name}</span>
-            <span>{lead.area ?? '—'}</span>
-            <span>{lead.phone ?? '—'}</span>
-            <span>{lead.reviewCount ?? '—'}</span>
-            <span className="font-semibold">{lead.score ?? '—'}</span>
-            <span className={lead.tier === null ? '' : TIER_COLOURS[lead.tier]}>
-              {lead.tier ?? '—'}
-            </span>
-            <span>
-              {lead.status}
-              {lead.status === 'FAILED' ? (
-                <form action={retryLead.bind(null, campaignId, lead.id)} className="inline">
-                  <button
-                    type="submit"
-                    className="ml-2 rounded border px-2 text-xs hover:bg-slate-100"
-                  >
-                    Retry
-                  </button>
-                </form>
-              ) : null}
-            </span>
+            {cell('Name', lead.name, 'font-medium')}
+            {cell('Area', lead.area ?? '—')}
+            {cell('Phone', lead.phone ?? '—')}
+            {cell('Reviews', lead.reviewCount ?? '—')}
+            {cell('Score', lead.score ?? '—', 'font-semibold')}
+            {cell('Tier', lead.tier ?? '—', lead.tier === null ? '' : TIER_COLOURS[lead.tier])}
+            {cell('Status', lead.status === 'FAILED' ? 'FAILED — open to retry' : lead.status)}
           </summary>
           <LeadEvidence lead={lead} />
+          {lead.status === 'FAILED' ? (
+            <form
+              action={retryLead.bind(null, campaignId, lead.id)}
+              className="bg-slate-50 px-4 pb-3"
+            >
+              <button
+                type="submit"
+                aria-label={`Retry ${lead.name}`}
+                className="rounded border px-3 py-1 text-sm hover:bg-slate-100"
+              >
+                Retry from the failed step
+              </button>
+            </form>
+          ) : null}
         </details>
       ))}
     </div>

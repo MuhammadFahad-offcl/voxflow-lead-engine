@@ -18,12 +18,14 @@ const STATUSES = ['DISCOVERED', 'ENRICHED', 'SCORED', 'FAILED', 'FILTERED_OUT'];
  * @param props - The current state.
  * @param props.campaignId - The campaign, for the CSV link.
  * @param props.query - The current filters, shown as the fields' values.
+ * @param props.refused - True when the API refused these filters: no export is offered then.
  * @returns The form.
  */
 export function LeadFilters({
   campaignId,
   query,
-}: Readonly<{ campaignId: string; query: LeadQuery }>) {
+  refused,
+}: Readonly<{ campaignId: string; query: LeadQuery; refused: boolean }>) {
   const field = 'rounded border border-slate-300 bg-white px-2 py-1';
   return (
     <form method="get" className="flex flex-wrap items-end gap-3 text-sm">
@@ -53,6 +55,7 @@ export function LeadFilters({
         Score
         <input
           name="minScore"
+          aria-label="Minimum score"
           type="number"
           min={0}
           max={100}
@@ -62,6 +65,7 @@ export function LeadFilters({
         –
         <input
           name="maxScore"
+          aria-label="Maximum score"
           type="number"
           min={0}
           max={100}
@@ -75,12 +79,14 @@ export function LeadFilters({
       <button type="submit" className="rounded bg-slate-900 px-3 py-1 text-white">
         Apply
       </button>
-      <a
-        href={`/campaigns/${campaignId}/export${toSearch(query, { page: undefined })}`}
-        className="underline"
-      >
-        Export CSV
-      </a>
+      {refused ? null : (
+        <a
+          href={`/campaigns/${campaignId}/export${toSearch(query, { page: undefined })}`}
+          className="underline"
+        >
+          Export CSV
+        </a>
+      )}
     </form>
   );
 }

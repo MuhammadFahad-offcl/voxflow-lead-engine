@@ -1,6 +1,7 @@
 /**
  * `/campaigns/[id]`: one campaign's status and counts, then its lead table with filters, sort,
- * paging and CSV export. While the campaign is still running, the page reloads every 10 seconds.
+ * paging and CSV export. While work is in flight the page re-renders every 10 seconds, keeping
+ * open rows and typed filters.
  *
  * Serves: FR-30 (campaign page, lead table), FR-3, FR-32 (retry), US-14 ("found, duplicate,
  * filtered and qualified counts"; filter, sort, export), NFR-13; issue #16.
@@ -10,16 +11,14 @@ import { CampaignSummary, LeadPage } from '@voxflow/shared';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { connection } from 'next/server';
-import { z } from 'zod';
 import { ApiError, apiGet } from '../../../lib/api';
 import { karachiTime, percent } from '../../../lib/format';
 import { readLeadQuery, toSearch, type LeadQuery } from '../../../lib/lead-query';
+import { refusalMessages, shouldRefresh } from '../../../lib/lead-table';
 import { StatusBadge } from '../status-badge';
+import { AutoRefresh } from './auto-refresh';
 import { LeadFilters } from './lead-filters';
 import { LeadTable } from './lead-table';
-
-// Statuses in which the worker is still changing the campaign's leads.
-const RUNNING = new Set(['DISCOVERING', 'ENRICHING']);
 
 /**
  * Reads the campaign, or shows Next.js's 404 page for an unknown id.
@@ -36,11 +35,6 @@ async function readCampaign(id: string): Promise<CampaignSummary> {
   }
 }
 
-// The API's 400 body: one entry per refused filter, with its messages.
-const Refusal = z.object({
-  errors: z.array(z.object({ field: z.string(), messages: z.array(z.string()) })),
-});
-
 /**
  * Reads one page of the campaign's leads, or why the API refused the filters.
  *
@@ -56,11 +50,7 @@ async function readLeads(campaignId: string, search: string): Promise<LeadPage |
     return await apiGet(`/campaigns/${campaignId}/leads${search}`, LeadPage);
   } catch (error) {
     if (!(error instanceof ApiError) || error.status !== 400) throw error;
-    const refusal = Refusal.safeParse(error.body).data?.errors ?? [];
-    const messages = refusal.flatMap(({ field, messages: list }) =>
-      list.map((m) => `${field}: ${m}`),
-    );
-    return messages.length > 0 ? messages : ['These filters are not valid.'];
+    return refusalMessages(error.body);
   }
 }
 
@@ -93,8 +83,7 @@ export default async function CampaignPage({
   ];
   return (
     <main className="mx-auto max-w-6xl px-6 py-8">
-      {/* React hoists this into <head>: a plain reload, no client script. */}
-      {RUNNING.has(campaign.status) ? <meta httpEquiv="refresh" content="10" /> : null}
+      <AutoRefresh active={shouldRefresh(campaign.status, leads)} />
       <h1 className="text-2xl font-semibold">
         {campaign.nicheSlug} · {campaign.city} · {campaign.areas.join(', ')}
       </h1>
@@ -119,7 +108,7 @@ export default async function CampaignPage({
         <h2 className="text-lg font-semibold">
           Leads{Array.isArray(leads) ? null : ` (${String(leads.total)})`}
         </h2>
-        <LeadFilters campaignId={campaign.id} query={query} />
+        <LeadFilters campaignId={campaign.id} query={query} refused={Array.isArray(leads)} />
         {Array.isArray(leads) ? (
           <div role="alert" className="rounded bg-amber-50 px-3 py-2 text-sm text-amber-900">
             <ul>
@@ -153,15 +142,25 @@ function LeadPager({
   query,
 }: Readonly<{ campaignId: string; leads: LeadPage; query: LeadQuery }>) {
   const pages = Math.max(1, Math.ceil(leads.total / leads.pageSize));
+  // Page 1 is the clean URL, without ?page=1.
+  const previous = leads.page === 2 ? undefined : String(leads.page - 1);
+  if (leads.leads.length === 0 && leads.total > 0) {
+    // A page past the end, e.g. after the list shrank: offer the way back.
+    return (
+      <p className="py-6 text-slate-600">
+        This page is past the last one.{' '}
+        <Link href={toSearch(query, { page: undefined }) || '?'} className="underline">
+          Back to page 1
+        </Link>
+      </p>
+    );
+  }
   return (
     <>
       <LeadTable campaignId={campaignId} page={leads} query={query} />
       <nav aria-label="Lead pages" className="flex items-center gap-4 text-sm">
         {leads.page > 1 ? (
-          <Link
-            href={toSearch(query, { page: String(leads.page - 1) }) || '?'}
-            className="underline"
-          >
+          <Link href={toSearch(query, { page: previous }) || '?'} className="underline">
             Previous
           </Link>
         ) : null}
