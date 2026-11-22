@@ -13,9 +13,11 @@ import { resolve } from 'node:path';
 import { Agent, AgentError, AgentErrorCode, Tool, type AgentRuntime } from '@hazeljs/agent';
 import { SolutionAnswer } from '@voxflow/shared';
 import { z } from 'zod';
+import type { CatalogRepository } from '../db/catalog.repository.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { newAgentLlmScope, runInAgentLlmScope } from '../llm/gated-llm.provider.js';
 import { LlmOutputInvalidError } from '../llm/llm.service.js';
+import type { EmbeddingPort } from '../ports/embedding.port.js';
 import { checkSolutionPick } from './solution-validation.js';
 
 /** The agent's name in the runtime. */
@@ -46,13 +48,36 @@ export interface CatalogMatch {
 /** Finds the active catalog services closest to a text, closest first. */
 export type CatalogSearch = (text: string, k: number) => Promise<CatalogMatch[]>;
 
+/**
+ * Builds the tool's catalog search: embed the text, then the closest active services in pgvector.
+ *
+ * Does not record the embedding's cost: the query is a few dozen tokens (a fraction of a cent).
+ * @param embedder - The bound embedder; the fake in demo mode, matching the seeded vectors.
+ * @param catalog - The repository of the database to search.
+ * @returns The search the agent's `searchCatalog` tool calls.
+ */
+export const createCatalogSearch =
+  (embedder: EmbeddingPort, catalog: Pick<CatalogRepository, 'searchSimilar'>): CatalogSearch =>
+  async (text, k) => {
+    const [vector] = (await embedder.embed([text])).vectors;
+    if (vector === undefined) throw new Error('The embedder returned no vector');
+    const services = await catalog.searchSimilar(vector, k);
+    return services.map(({ slug, name, problem, fittingSignals }) => ({
+      slug,
+      name,
+      problem,
+      fittingSignals,
+    }));
+  };
+
 /** The lead the agent works on, with its evidenced signals (points > 0). */
 export interface SolutionLead {
   organizationId: string;
-  campaignId: string;
-  leadId: string;
+  /** Stored on each cost record; null when recording, whose lead is in a scratch database. */
+  campaignId: string | null;
+  leadId: string | null;
   name: string;
-  area: string;
+  area: string | null;
   tier: string;
   score: number;
   signals: { key: string; dimension: string; points: number; evidence: string }[];
@@ -149,7 +174,7 @@ export function registerSolutionAgent(
 // The agent's input: the lead and its signals, by key; no database ids, so prompts replay anywhere.
 const describeLead = (lead: SolutionLead): string =>
   [
-    `Clinic: ${lead.name} (${lead.area}), tier ${lead.tier}, score ${String(lead.score)}.`,
+    `Clinic: ${lead.name} (${lead.area ?? 'area unknown'}), tier ${lead.tier}, score ${String(lead.score)}.`,
     'Signals (cite them by key):',
     ...lead.signals.map(
       (signal) =>

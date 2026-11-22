@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\":\"answer\",\"name\":null,\"answer\":{\"noStrongSignal\":true,\"reason\":\"None of the clinic's cited signals is a PAIN signal with real evidence, and no PAIN signal is listed, so no catalog service can be tied to a proven pain.\"}}",
+  "usage": {
+    "inputTokens": 2358,
+    "outputTokens": 90
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

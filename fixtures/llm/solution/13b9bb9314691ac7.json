@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\": \"answer\", \"name\": null, \"answer\": {\"serviceSlug\": \"missed-call-whatsapp-reply\", \"reason\": \"Reviews say the phone goes unanswered and patients leave, so a missed-call WhatsApp reply fits this clinic's biggest pain.\", \"signalIds\": [\"phone_unanswered_reviews\", \"mobile_number\"]}}",
+  "usage": {
+    "inputTokens": 2426,
+    "outputTokens": 125
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

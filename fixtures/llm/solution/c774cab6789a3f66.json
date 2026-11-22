@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\":\"answer\",\"name\":null,\"answer\":{\"serviceSlug\":\"online-booking-page\",\"reason\":\"The clinic has no online booking widget on its website or Maps listing, so visitors who want an appointment leave without contacting it.\",\"signalIds\":[\"no_online_booking\",\"working_website\"]}}",
+  "usage": {
+    "inputTokens": 2337,
+    "outputTokens": 98
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

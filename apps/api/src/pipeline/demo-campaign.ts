@@ -1,21 +1,22 @@
 /**
- * Test helper: a demo campaign on the fictional DHA clinics, discovered and with its pass-2 reviews
+ * A demo campaign on the fictional DHA clinics, discovered and with its pass-2 reviews
  * stored, all through the fake adapters. Its leads are ready for the lead graph.
  *
- * Serves: FR-36 (demo mode); issue #15 tests.
- * Used by: apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts,
- * apps/api/test/lead-runner.int.spec.ts.
+ * Serves: FR-36 (demo mode); issue #15 tests, issue #19 (the solution recorder).
+ * Used by: apps/api/src/llm-record-solution.ts; apps/api/test/lead-run.int.spec.ts,
+ * apps/api/test/lead-graph.int.spec.ts, apps/api/test/lead-runner.int.spec.ts,
+ * apps/api/test/log-privacy.int.spec.ts.
  */
-import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
-import { DiscoveryRepository } from '../src/db/discovery.repository.js';
-import type { PrismaProvider } from '../src/db/prisma.provider.js';
-import { ReviewRepository } from '../src/db/review.repository.js';
-import { SEED_ORGANIZATION_ID } from '../src/db/seed.js';
-import type { Logger } from '../src/logging/logger.js';
-import { AREAS_DIR, loadAreaPolygons } from '../src/pipeline/area-polygons.js';
-import { discoverCampaign } from '../src/pipeline/discover.step.js';
-import { enrichReviewsForCampaign } from '../src/pipeline/enrich-reviews.step.js';
-import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
+import { FakeLeadSourceAdapter } from '../adapters/lead-source/fake.adapter.js';
+import { DiscoveryRepository } from '../db/discovery.repository.js';
+import type { PrismaProvider } from '../db/prisma.provider.js';
+import { ReviewRepository } from '../db/review.repository.js';
+import { SEED_ORGANIZATION_ID } from '../db/seed.js';
+import type { Logger } from '../logging/logger.js';
+import { AREAS_DIR, loadAreaPolygons } from './area-polygons.js';
+import { discoverCampaign } from './discover.step.js';
+import { enrichReviewsForCampaign } from './enrich-reviews.step.js';
+import { PaidStartGate } from './paid-start-gate.js';
 
 /**
  * Creates a DHA campaign on the seeded niche, discovers it and, unless told not to, stores its

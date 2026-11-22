@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\": \"tool\", \"name\": \"searchCatalog\", \"answer\": null}",
+  "usage": {
+    "inputTokens": 1887,
+    "outputTokens": 26
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

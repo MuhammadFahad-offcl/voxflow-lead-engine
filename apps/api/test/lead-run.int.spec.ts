@@ -13,7 +13,7 @@ import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { NO_REVIEWS_ERROR, ReviewRepository } from '../src/db/review.repository.js';
 import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
-import { discoverDemoCampaign } from './demo-campaign.js';
+import { discoverDemoCampaign } from '../src/pipeline/demo-campaign.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 

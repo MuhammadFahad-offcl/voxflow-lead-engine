@@ -19,7 +19,7 @@ import { seed } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
 import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 import { buildLeadRunnerDeps, runLeadRunnerOnce } from '../src/scheduler/lead-runner.js';
-import { discoverDemoCampaign } from './demo-campaign.js';
+import { discoverDemoCampaign } from '../src/pipeline/demo-campaign.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 

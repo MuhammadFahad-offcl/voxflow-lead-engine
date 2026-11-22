@@ -58,10 +58,11 @@ const reply = (answer: unknown): LlmReply => ({
   model: 'claude-haiku-5-5',
   stopReason: 'end_turn',
 });
-const TOOL = reply({ action: 'tool', name: 'searchCatalog' });
+const TOOL = reply({ action: 'tool', name: 'searchCatalog', answer: null });
 const pick = (signalIds: string[]) =>
   reply({
     action: 'answer',
+    name: null,
     answer: {
       serviceSlug: 'ai-voice-receptionist',
       reason: 'Reviews say nobody answers the phone, so every call needs answering.',
@@ -73,6 +74,7 @@ const INVENTED = pick(['phone_unanswered_reviews', 'invented_signal']);
 const BROKEN: LlmReply = { ...reply(null), text: 'not json' };
 const WEAK = reply({
   action: 'answer',
+  name: null,
   answer: { noStrongSignal: true, reason: 'No review or page shows a pain the catalog fixes.' },
 });
 

@@ -60,7 +60,7 @@ const scope = () =>
 // Proves every agent turn becomes one gated call with the lead's ids, and maps both answer kinds.
 describe('GatedLlmProvider', () => {
   it('sends one gated call with the scope’s task, ids and token limit, and maps a tool choice to tool_calls', async () => {
-    const llm = gate([{ action: 'tool', name: 'searchCatalog' }]);
+    const llm = gate([{ action: 'tool', name: 'searchCatalog', answer: null }]);
     const runScope = scope();
 
     const response = await runInAgentLlmScope(runScope, () =>
@@ -88,7 +88,7 @@ describe('GatedLlmProvider', () => {
   });
 
   it('maps a final answer to its JSON content and sends the tool result as part of the user text', async () => {
-    const llm = gate([{ action: 'answer', answer: { pick: 'ai-voice-receptionist' } }]);
+    const llm = gate([{ action: 'answer', name: null, answer: { pick: 'ai-voice-receptionist' } }]);
 
     const response = await runInAgentLlmScope(scope(), () =>
       new GatedLlmProvider(llm).chat(
