@@ -21,7 +21,7 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 
 ## Cycle 2 — Solutions and scripts (14–20 Nov)
 
-1. feat: catalog CRUD + embeddings (`EmbeddingPort`) + pgvector search; seed from `config/catalog/services.json` — FR-16
+1. feat: catalog CRUD + embeddings (`EmbeddingPort`) + pgvector search; seed from `config/catalog/services.json` — FR-16. v1 slim ships a read-only `GET /services`; create, edit, retire, re-embed on edit and the `/catalog` page are deferred (#163).
 2. spike: `@hazeljs/rag` pgvector store vs own repository; ADR — FR-16
 3. feat: solution agent with catalog/signal validation, retry, `NEEDS_REVIEW`, `NO_STRONG_SIGNAL` — FR-17
 4. feat: script agent filling the niche template — FR-18
