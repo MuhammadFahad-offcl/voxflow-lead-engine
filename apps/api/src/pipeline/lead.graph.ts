@@ -4,7 +4,7 @@
  * through HazelJS's SQL durable run store (`agent_runs`, `agent_run_checkpoints`), and the run id
  * is kept on `Lead.graphRunId`.
  *
- * `AgentGraph.execute()` (2.0.13) keeps its state in memory and cannot resume, so a resumed or
+ * `AgentGraph.execute()` (2.1.3) keeps its state in memory and cannot resume, so a resumed or
  * retried lead starts a new run at its next step, chosen from the lead's status, and every step
  * skips the work already stored. A paid call is repeated only when a crash falls between the call
  * and its save (accepted in the context and labelling steps). Each node first renews the runner's

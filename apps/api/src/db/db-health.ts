@@ -10,8 +10,8 @@ import type { PrismaProvider } from './prisma.provider.js';
 /**
  * Builds a critical health check that runs `SELECT 1` and gives up after 1 second.
  *
- * Does not set its own timer: HazelJS races the check against `timeout` and, with our patch
- * (ADR-0013), clears that timer when the check settles.
+ * Does not set its own timer: HazelJS races the check against `timeout` and, since 2.0.14,
+ * clears that timer when the check settles.
  * Does not cancel the query when the timeout fires; the pool's 5 s connection timeout
  * (`PrismaProvider`) ends a connection attempt to a database that never answers.
  * Does not put the database error in the result, because `/ready` is readable by anything on this

@@ -13,5 +13,11 @@ allowBuilds:
   esbuild: false
   prisma: false
 
-patchedDependencies:
-  '@hazeljs/core@2.0.13': patches/@hazeljs__core@2.0.13.patch
+# HazelJS 2.1.3 was published on install day (ADR-0001, 2026-11-22 update); drop once it passes the minimum age.
+minimumReleaseAgeExclude:
+  - '@hazeljs/agent@2.1.3'
+  - '@hazeljs/core@2.1.3'
+  - '@hazeljs/eval@2.1.3'
+  - '@hazeljs/prompts@2.1.3'
+  - '@hazeljs/rag@2.1.3'
+  - '@hazeljs/resilience@2.1.3'

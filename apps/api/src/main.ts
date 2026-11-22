@@ -1,7 +1,7 @@
 /**
  * Entry point of the API process: validates the environment, then starts the server.
  *
- * Serves: ADR-0003, ADR-0013 (127.0.0.1 by default), docs/architecture.md §12, NFR-8.
+ * Serves: ADR-0003, ADR-0001 (127.0.0.1 by default), docs/architecture.md §12, NFR-8.
  * Used by: the `dev:start` script in apps/api/package.json, which runs the compiled dist/main.js.
  */
 import { loadEnvOrExit } from './bootstrap.js';

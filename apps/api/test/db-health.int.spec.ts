@@ -1,7 +1,7 @@
 /**
  * Integration test of the `db` readiness check against a database that is down or hangs.
  *
- * Serves: NFR-10, ADR-0013 (cleared health-check timers), prompt C1-04 item 4.
+ * Serves: NFR-10, ADR-0001 (cleared health-check timers), prompt C1-04 item 4.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
