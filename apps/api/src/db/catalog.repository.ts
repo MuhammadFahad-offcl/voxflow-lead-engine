@@ -3,7 +3,8 @@
  * pgvector similarity search. Raw SQL because Prisma cannot read or write `vector(1024)`.
  *
  * Serves: FR-16 (catalog searched by similarity), ADR-0002 (pgvector), ADR-0006; issue #17.
- * Used by: apps/api/src/modules/catalog/, apps/api/src/db/seed.ts, apps/api/test/catalog.int.spec.ts.
+ * Used by: apps/api/src/modules/catalog/, apps/api/src/db/seed.ts, apps/api/test/catalog.int.spec.ts,
+ * createCatalogSearch in apps/api/src/agents/solution.agent.ts.
  */
 import { Inject, Injectable } from '@hazeljs/core';
 import { ServiceSummary } from '@voxflow/shared';

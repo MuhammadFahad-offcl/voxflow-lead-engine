@@ -5,7 +5,8 @@
  * the pick, retries once with the problems, and otherwise reports NEEDS_REVIEW.
  *
  * Serves: FR-17, US-5, NFR-9, ADR-0001 (HazelJS agents), ADR-0006; issue #19.
- * Used by: apps/api/src/pipeline/lead.graph.ts (#19 part 2), apps/api/src/agents/solution.agent.spec.ts.
+ * Used by: apps/api/src/llm-record-solution.ts, apps/api/src/db/solution.repository.ts,
+ * apps/api/test/solution-replay.int.spec.ts, solution.agent.spec.ts; the lead graph in #19 part 2.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile } from 'node:fs/promises';
@@ -55,6 +56,8 @@ export type CatalogSearch = (text: string, k: number) => Promise<CatalogMatch[]>
  * @param embedder - The bound embedder; the fake in demo mode, matching the seeded vectors.
  * @param catalog - The repository of the database to search.
  * @returns The search the agent's `searchCatalog` tool calls.
+ * @throws Error (from the returned search) when the embedder returns no vector; the embedder's and
+ * the database's errors.
  */
 export const createCatalogSearch =
   (embedder: EmbeddingPort, catalog: Pick<CatalogRepository, 'searchSimilar'>): CatalogSearch =>

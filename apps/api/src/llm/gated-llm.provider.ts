@@ -157,7 +157,8 @@ export class GatedLlmProvider implements LLMProvider {
       });
       scope.models.push(model);
       scope.costUsd = scope.costUsd.plus(costUsd);
-      // The refinement guarantees a name for "tool"; the check only narrows the type.
+      // The refinement guarantees a name for "tool"; the check only narrows the type. An answer sent
+      // along with a tool call is dropped: the model answers again after the tool's result.
       if (data.action === 'answer' || data.name === null) {
         return { content: JSON.stringify(data.answer) };
       }

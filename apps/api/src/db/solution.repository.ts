@@ -39,13 +39,18 @@ export class SolutionRepository {
         score: true,
         signals: {
           where: { points: { gt: 0 } },
-          orderBy: { key: 'asc' },
           select: { key: true, dimension: true, points: true, evidence: true },
         },
       },
     });
-    const { tier, score, ...rest } = lead;
+    const { tier, score, signals, ...rest } = lead;
     if (tier === null || score === null) throw new Error(`Lead ${leadId} has no score yet`);
-    return { ...rest, leadId, tier, score };
+    // Sorted here, by code point, not in SQL: Postgres orders text by the server's collation,
+    // which can differ between machines and would change the prompt.
+    const byKey = signals.toSorted((a, b) => {
+      if (a.key === b.key) return 0;
+      return a.key < b.key ? -1 : 1;
+    });
+    return { ...rest, signals: byKey, leadId, tier, score };
   }
 }

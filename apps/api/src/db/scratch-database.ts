@@ -18,7 +18,7 @@ const checkedName = (name: string): string => {
   return name;
 };
 
-// Runs one statement on the server, connected through the URL's own database.
+// Runs the statements in order on the server, connected through the URL's own database.
 const onServer = async (serverUrl: string, sql: string[]): Promise<void> => {
   const server = new PrismaClient({ adapter: new PrismaPg({ connectionString: serverUrl }) });
   try {
@@ -36,11 +36,14 @@ const onServer = async (serverUrl: string, sql: string[]): Promise<void> => {
  * @param serverUrl - Any connection URL on the server, normally DATABASE_URL.
  * @param name - Database to (re)create; lowercase letters and underscores, e.g. "voxflow_test".
  * @returns The connection URL of the new database.
- * @throws Error when `name` is not lowercase letters and underscores; errors from Postgres or
- * `prisma migrate deploy`.
+ * @throws Error when `name` is not lowercase letters and underscores or is the database `serverUrl`
+ * connects to; errors from Postgres or `prisma migrate deploy`.
  */
 export async function createScratchDatabase(serverUrl: string, name: string): Promise<string> {
   const database = checkedName(name);
+  if (new URL(serverUrl).pathname === `/${database}`) {
+    throw new Error('Refusing to recreate the database DATABASE_URL names');
+  }
   // Dropped first so every run proves the migrations apply to an empty database.
   await onServer(serverUrl, [
     `DROP DATABASE IF EXISTS ${database} WITH (FORCE)`,

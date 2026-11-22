@@ -11,7 +11,8 @@
  *
  * Serves: FR-11 (reviews), FR-32, FR-33, NFR-1, NFR-2, docs/architecture.md §9, ADR-0002,
  * ADR-0015; issue #15.
- * Used by: apps/api/src/worker.ts, lead-runner.spec.ts, apps/api/test/lead-runner.int.spec.ts.
+ * Used by: apps/api/src/worker.ts, apps/api/src/llm-record-solution.ts, lead-runner.spec.ts,
+ * apps/api/test/lead-runner.int.spec.ts, apps/api/test/solution-replay.int.spec.ts.
  */
 import type { HazelApp } from '@hazeljs/core';
 import { DiscoveryRepository } from '../db/discovery.repository.js';

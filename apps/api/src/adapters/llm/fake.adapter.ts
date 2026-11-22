@@ -56,6 +56,10 @@ export function llmFixturePath(
   return join(fixturesDir, request.task.toLowerCase().replaceAll('_', '-'), `${hash}.json`);
 }
 
+// The script that records a task's answers.
+const recordScript = (task: LlmRequest['task']): string =>
+  task === 'SOLUTION' ? 'pnpm llm:record:solution' : 'pnpm llm:record';
+
 /** Serves fixtures/llm/<task>/<hash>.json. */
 @Injectable()
 export class FakeLlmAdapter implements LlmPort {
@@ -75,7 +79,7 @@ export class FakeLlmAdapter implements LlmPort {
     const body = await readFile(path, 'utf8').catch(() => null);
     if (body === null) {
       throw new LlmError(
-        `No recorded LLM answer at ${shown}; record it with \`pnpm llm:record\` (needs ANTHROPIC_API_KEY)`,
+        `No recorded LLM answer at ${shown}; record it with \`${recordScript(request.task)}\` (needs ANTHROPIC_API_KEY)`,
         false,
       );
     }

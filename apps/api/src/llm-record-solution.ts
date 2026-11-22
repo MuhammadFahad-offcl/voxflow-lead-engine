@@ -41,7 +41,7 @@ import { CatalogRepository } from './db/catalog.repository.js';
 import { LlmSpendRepository } from './db/llm-spend.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createScratchDatabase, dropScratchDatabase } from './db/scratch-database.js';
-import { embedMissingServices, seed } from './db/seed.js';
+import { SEED_ORGANIZATION_ID, embedMissingServices, seed } from './db/seed.js';
 import { SolutionRepository } from './db/solution.repository.js';
 import { Prisma } from './generated/prisma/client.js';
 import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from './llm/gated-llm.provider.js';
@@ -59,10 +59,11 @@ const FIXTURES_DIR = resolve(REPO, 'fixtures/llm');
 const SCRATCH_DATABASE = 'voxflow_solution_record';
 // The founder approved these six and nothing else; any other set stops the script before a call.
 const WARM_CLINICS = ['p01', 'p03', 'p06', 'p07', 'p10', 'p11'].map((p) => `fictional-place-${p}`);
-// A typical run: a tool turn, then the answer with the tool's result (tokens, from the prompt sizes).
+// A typical run: a tool turn, then the answer with the tool's result (tokens, from the first
+// recording's usage).
 const TYPICAL_TURNS = [
-  { inputTokens: 1_000, outputTokens: 30 },
-  { inputTokens: 1_300, outputTokens: 80 },
+  { inputTokens: 1_900, outputTokens: 26 },
+  { inputTokens: 2_400, outputTokens: 120 },
 ];
 
 // An amount above zero. NaN or Infinity would switch the guard off, so they are refused.
@@ -99,6 +100,8 @@ class SpendGuard implements LlmPort {
         false,
       );
     }
+    // A reply that fails after billing (e.g. an unexpected shape) is not added, so the printed total
+    // can be low; the gate still records that attempt at its worst-case cost against the cap.
     const reply = await this.real.complete(request);
     this.spent = this.spent.plus(llmCostUsd(reply.model, reply.usage));
     return reply;
@@ -108,6 +111,8 @@ class SpendGuard implements LlmPort {
 /**
  * Builds the demo clinics in a scratch database and records their solution answers.
  * @param args - Command-line arguments after the script name.
+ * @throws Error for a bad `--max-usd`, a missing ANTHROPIC_API_KEY or seeded organization, or a
+ * WARM set other than the approved six; LlmError when the guard stops a call; database errors.
  */
 async function main(args: readonly string[]): Promise<void> {
   const maxArg = MaxUsd.safeParse(
@@ -125,8 +130,9 @@ async function main(args: readonly string[]): Promise<void> {
   const guard = new SpendGuard(new AnthropicLlmAdapter(env, logger), maxUsd);
   let scratch: PrismaProvider | null = null;
   try {
-    const organization = await dev.organization.findFirst({ orderBy: { createdAt: 'asc' } });
-    if (organization === null) throw new Error('No organization found: run pnpm db:seed');
+    // The seeded organization: the clinics belong to it, so their calls are billed to it.
+    const organization = await dev.organization.findUnique({ where: { id: SEED_ORGANIZATION_ID } });
+    if (organization === null) throw new Error('No seeded organization found: run pnpm db:seed');
     const { model } = await spend.budget(
       organization.id,
       'SOLUTION',
@@ -206,7 +212,8 @@ async function main(args: readonly string[]): Promise<void> {
 }
 
 main(process.argv.slice(2)).catch((error: unknown) => {
-  // Only the message: the script's own messages are fixed, and an LlmError never holds a prompt.
+  // Only the message, never the stack: an LlmError never holds a prompt, and the rest are the
+  // script's own messages or Postgres, Prisma and migrate errors, which hold no secrets.
   process.stderr.write(`${error instanceof Error ? error.message : 'Recording failed'}\n`);
   process.exitCode = 1;
 });
