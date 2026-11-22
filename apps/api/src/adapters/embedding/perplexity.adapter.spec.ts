@@ -150,13 +150,21 @@ describe('PerplexityEmbeddingAdapter', () => {
     expect(requests).toHaveLength(0);
   });
 
-  it('throws a not-billed error for an HTTP error, without the body', async () => {
+  it('throws a not-billed error for a 4xx, without the body', async () => {
     reply = json(401, { error: 'Secret detail' });
 
     const error = await rejection(adapter().embed(['first', 'second']));
 
     expect(error.message).toBe('Embeddings API refused the request: HTTP 401');
     expect(error.maybeBilled).toBe(false);
+  });
+
+  it('throws a maybe-billed error for a 429 or a 5xx, whose billing the docs do not state', async () => {
+    reply = json(429, {});
+    expect((await rejection(adapter().embed(['first']))).maybeBilled).toBe(true);
+
+    reply = json(503, {});
+    expect((await rejection(adapter().embed(['first']))).maybeBilled).toBe(true);
   });
 
   it('throws a maybe-billed error for an answer that is not the embeddings shape', async () => {
@@ -181,6 +189,16 @@ describe('PerplexityEmbeddingAdapter', () => {
     expect((await rejection(adapter().embed(['first', 'second']))).message).toBe(
       'Embeddings API answer has an unexpected shape',
     );
+  });
+
+  it('throws a maybe-billed error for an all-zero vector', async () => {
+    const zeros = Buffer.alloc(EMBEDDING_DIMENSIONS).toString('base64');
+    reply = answer([{ index: 0, embedding: zeros }]);
+
+    const error = await rejection(adapter().embed(['first']));
+
+    expect(error.message).toBe('Embeddings API answer has an unexpected shape');
+    expect(error.maybeBilled).toBe(true);
   });
 
   it('throws a maybe-billed error when the API does not answer in time', async () => {

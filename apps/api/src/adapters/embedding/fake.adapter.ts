@@ -9,6 +9,7 @@ import { Injectable } from '@hazeljs/core';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   EMBEDDING_DIMENSIONS,
+  EMBEDDING_MAX_TEXTS,
   EmbeddingError,
   type EmbeddingPort,
   type EmbeddingResult,
@@ -17,7 +18,7 @@ import { toUnitVector } from './unit-vector.js';
 
 // pplx-embed-v1-0.6b's rate, $0.004 per million tokens, so demo costs have the right size.
 const USD_PER_TOKEN = new Prisma.Decimal('0.004').dividedBy(1_000_000);
-// Letters and digits in any script, so Urdu words count too.
+// Letters and digits in any script. Urdu diacritics (zer, zabar) split a word; still deterministic.
 const WORD = /[\p{L}\p{N}]+/gu;
 
 // FNV-1a, 32-bit: a fixed, well-spread hash, so a word always lands in the same dimension.
@@ -48,11 +49,18 @@ export class FakeEmbeddingAdapter implements EmbeddingPort {
    * Lowercases each text, splits it into words, adds 1 to the word's hashed dimension per
    * occurrence, then scales the counts to unit length. One token per word.
    * @inheritDoc
-   * @throws EmbeddingError when a text has no words.
+   * @throws EmbeddingError for no texts or more than 512, or when a text has no words.
    */
   embed(texts: string[]): Promise<EmbeddingResult> {
     // Runs inside then(), so a bad text rejects the promise like the real adapter, never throws.
     return Promise.resolve().then(() => {
+      // The real adapter's limits, so a caller bug fails in demo mode and tests too.
+      if (texts.length === 0 || texts.length > EMBEDDING_MAX_TEXTS) {
+        throw new EmbeddingError(
+          `Embed 1 to ${String(EMBEDDING_MAX_TEXTS)} texts per request`,
+          false,
+        );
+      }
       const wordLists = texts.map(wordsOf);
       if (wordLists.some((words) => words.length === 0)) {
         throw new EmbeddingError('Cannot embed a text with no words', false);

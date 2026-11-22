@@ -12,6 +12,9 @@ export const EMBEDDING = 'EmbeddingPort';
 /** Length of every vector: the size of `Service.embedding` (`vector(1024)`). */
 export const EMBEDDING_DIMENSIONS = 1024;
 
+/** Most texts one {@link EmbeddingPort.embed} call takes: Perplexity's limit per request. */
+export const EMBEDDING_MAX_TEXTS = 512;
+
 /**
  * A failed embedding request. The message is a fixed phrase, optionally with an HTTP status, never
  * a response body, key or input text, so it is safe to log.
@@ -51,7 +54,8 @@ export interface EmbeddingPort {
    * Does not record the cost: the caller writes the `CostRecord(PERPLEXITY_EMBEDDINGS)`.
    * @param texts - The texts, each with at least one word.
    * @returns The vectors in the same order as `texts`, the tokens used and the cost.
-   * @throws EmbeddingError when the request fails or the answer is not usable.
+   * @throws EmbeddingError for no texts or more than {@link EMBEDDING_MAX_TEXTS}, or when the
+   * request fails or the answer is not usable.
    */
   embed(texts: string[]): Promise<EmbeddingResult>;
 }

@@ -12,14 +12,13 @@ import { ENV, type Env } from '../../config/env.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import {
   EMBEDDING_DIMENSIONS,
+  EMBEDDING_MAX_TEXTS,
   EmbeddingError,
   type EmbeddingPort,
   type EmbeddingResult,
 } from '../../ports/embedding.port.js';
 import { toUnitVector } from './unit-vector.js';
 
-// The API's limit per request.
-const MAX_TEXTS = 512;
 // A batch of short service texts answers in about a second; past this the request is dropped.
 const TIMEOUT_MS = 30_000;
 
@@ -66,16 +65,19 @@ export class PerplexityEmbeddingAdapter implements EmbeddingPort {
   /**
    * Sends one request for all texts and decodes the answer.
    *
-   * Does not retry: the docs do not say which failures are unbilled, and the seed re-embeds
-   * whatever is still missing on its next run.
+   * Does not retry: the docs do not say which failures are unbilled, so a 429 or 5xx counts as
+   * maybe billed, and the seed re-embeds whatever is still missing on its next run.
    * @inheritDoc
    * @throws EmbeddingError for no texts or more than 512, an HTTP error, a timeout, a dropped
    * connection, or an answer that is not JSON, not the embeddings shape, or missing a vector; its
    * `maybeBilled` says whether the request may have been billed.
    */
   async embed(texts: string[]): Promise<EmbeddingResult> {
-    if (texts.length === 0 || texts.length > MAX_TEXTS) {
-      throw new EmbeddingError(`Embed 1 to ${String(MAX_TEXTS)} texts per request`, false);
+    if (texts.length === 0 || texts.length > EMBEDDING_MAX_TEXTS) {
+      throw new EmbeddingError(
+        `Embed 1 to ${String(EMBEDDING_MAX_TEXTS)} texts per request`,
+        false,
+      );
     }
     const parsed = EmbeddingsResponse.safeParse(await this.post(texts));
     // Not parsed.error: a Zod message may quote the response.
@@ -84,7 +86,10 @@ export class PerplexityEmbeddingAdapter implements EmbeddingPort {
     const vectors = texts.map((_, index) => {
       const item = data.find((candidate) => candidate.index === index);
       const values = item === undefined ? null : decodeInt8(item.embedding);
-      if (values?.length !== EMBEDDING_DIMENSIONS) throw unexpectedShape();
+      // An all-zero vector has no direction; checked here because this 200 was billed.
+      if (values?.length !== EMBEDDING_DIMENSIONS || values.every((value) => value === 0)) {
+        throw unexpectedShape();
+      }
       return toUnitVector(values);
     });
     return {
@@ -118,10 +123,13 @@ export class PerplexityEmbeddingAdapter implements EmbeddingPort {
       );
     }
     if (!response.ok) {
-      await response.body?.cancel();
+      // Only the status matters; a failed cancel must not replace the EmbeddingError.
+      await response.body?.cancel().catch(() => undefined);
+      // A 4xx was refused before any work; for 429 and 5xx the docs do not say, so assume billed.
+      const maybeBilled = response.status === 429 || response.status >= 500;
       throw new EmbeddingError(
         `Embeddings API refused the request: HTTP ${String(response.status)}`,
-        false,
+        maybeBilled,
       );
     }
     try {

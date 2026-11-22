@@ -61,4 +61,11 @@ describe('FakeEmbeddingAdapter', () => {
   it('refuses a text with no words', async () => {
     await expect(adapter.embed(['  ...  '])).rejects.toThrow(EmbeddingError);
   });
+
+  it('refuses no texts, or more than 512, like the real adapter', async () => {
+    await expect(adapter.embed([])).rejects.toThrow(EmbeddingError);
+    await expect(adapter.embed(new Array<string>(513).fill('word'))).rejects.toThrow(
+      EmbeddingError,
+    );
+  });
 });
