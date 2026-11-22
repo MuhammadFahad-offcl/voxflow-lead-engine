@@ -21,3 +21,4 @@ minimumReleaseAgeExclude:
   - '@hazeljs/prompts@2.1.3'
   - '@hazeljs/rag@2.1.3'
   - '@hazeljs/resilience@2.1.3'
+  - '@hazeljs/testing@2.1.3'

@@ -27,6 +27,7 @@
     "zod": "4.6.7"
   },
   "devDependencies": {
+    "@hazeljs/testing": "2.1.3",
     "@voxflow/shared": "workspace:*"
   }
 }
