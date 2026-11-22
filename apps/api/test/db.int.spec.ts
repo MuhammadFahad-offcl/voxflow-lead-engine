@@ -5,7 +5,7 @@
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
-// Not the package root: 2.0.13's index needs @hazeljs/eval, which is not installed.
+// Not the package root: @hazeljs/agent 2.1.3 does not export the durable run store from its index.
 import { createSqlDurableRunStore } from '@hazeljs/agent/dist/run/durable-run-store.js';
 import type { HazelApp } from '@hazeljs/core';
 import { PrismaPg } from '@prisma/adapter-pg';

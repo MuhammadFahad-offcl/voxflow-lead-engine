@@ -1,7 +1,7 @@
 /**
  * Integration test of the real API server on a random local port.
  *
- * Serves: ADR-0003, ADR-0013, NFR-10, and the tests asked for in prompts C1-01 item 5 and C1-04
+ * Serves: ADR-0003, ADR-0001, NFR-10, and the tests asked for in prompts C1-01 item 5 and C1-04
  * item 4 (docs/prompts/cycle-1-scored-leads.md): bound address, GET /health, GET /ready and its
  * `db` check.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
@@ -21,7 +21,7 @@ const baseUrlOf = (app: HazelApp): string => {
   return `http://127.0.0.1:${String(address.port)}`;
 };
 
-// Proves 127.0.0.1-only binding (ADR-0003, ADR-0013) and the probes in docs/architecture.md §13.
+// Proves 127.0.0.1-only binding (ADR-0003, ADR-0001) and the probes in docs/architecture.md §13.
 describe('API server', () => {
   let app: HazelApp;
 

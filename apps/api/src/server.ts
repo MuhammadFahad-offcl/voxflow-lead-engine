@@ -1,7 +1,7 @@
 /**
  * Creates the HazelJS app and binds it to one network address.
  *
- * Serves: ADR-0001, ADR-0002, ADR-0003, ADR-0013, NFR-5, NFR-10 (`db` readiness check).
+ * Serves: ADR-0001, ADR-0002, ADR-0003, NFR-5, NFR-10 (`db` readiness check).
  * Used by: apps/api/src/main.ts, apps/api/test/db.int.spec.ts, apps/api/test/server.int.spec.ts.
  */
 import type { HazelApp } from '@hazeljs/core';

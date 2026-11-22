@@ -72,8 +72,8 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 ### #15 decisions (2026-11-12)
 
-- **The lead graph is a HazelJS `AgentGraph`** of function nodes: `ENRICH_WEBSITE → ENRICH_CONTEXT → LABEL_REVIEWS → SCORE → END` (`pipeline/lead.graph.ts`). Runs and checkpoints go through HazelJS's `createSqlDurableRunStore` (`agent_runs`, `agent_run_checkpoints`); `Lead.graphRunId` holds the run id. `@hazeljs/eval` 2.0.13 is installed only because `@hazeljs/agent` 2.0.13 cannot be imported without it (ADR-0001 update; Fahad files the upstream issue).
-- **No resume in AgentGraph 2.0.13:** a resumed or retried lead starts a new run at its next step, chosen from its status; every step skips stored work. Each node renews the runner's claim first.
+- **The lead graph is a HazelJS `AgentGraph`** of function nodes: `ENRICH_WEBSITE → ENRICH_CONTEXT → LABEL_REVIEWS → SCORE → END` (`pipeline/lead.graph.ts`). Runs and checkpoints go through HazelJS's `createSqlDurableRunStore` (`agent_runs`, `agent_run_checkpoints`); `Lead.graphRunId` holds the run id. `@hazeljs/eval` is installed only because `@hazeljs/agent` cannot be imported without it; still true in 2.1.3 (ADR-0001 updates).
+- **No resume in AgentGraph (2.0.13 and 2.1.3):** a resumed or retried lead starts a new run at its next step, chosen from its status; every step skips stored work. Each node renews the runner's claim first.
 - **Reviews are a once-per-campaign pre-step** in the lead runner, not a graph node: one paid Apify run per campaign (ADR-0015). A lead is claimed only once its reviews are settled.
 - **Failures:** a node error marks the lead FAILED with `failedStep` and a stored sentence (never a library's message). A failed web search does **not** fail the lead (FR-12 is "should", #12).
 - **Spend caps wait:** the lead keeps its status, its run is SUSPENDED and it keeps its claim; the runner claims no new lead for one lease (15 min).
