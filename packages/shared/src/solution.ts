@@ -3,7 +3,7 @@
  * that the lead has no strong signal.
  *
  * Serves: FR-17, US-5; issue #19.
- * Used by: apps/api/src/agents/solution.agent.ts, apps/api/src/agents/solution-validation.ts.
+ * Used by: apps/api/src/agents/solution.agent.ts.
  */
 import { z } from 'zod';
 

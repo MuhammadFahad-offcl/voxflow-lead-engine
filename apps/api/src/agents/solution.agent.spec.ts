@@ -12,7 +12,7 @@ import { bindAgentSuite, describeAgent, expectTools } from '@hazeljs/testing';
 import type { LlmSpend, LlmSpendRepository } from '../db/llm-spend.repository.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from '../llm/gated-llm.provider.js';
-import { LlmService } from '../llm/llm.service.js';
+import { LlmService, SpendCapReachedError } from '../llm/llm.service.js';
 import type { Logger } from '../logging/logger.js';
 import type { LlmPort, LlmReply } from '../ports/llm.port.js';
 import {
@@ -70,6 +70,7 @@ const pick = (signalIds: string[]) =>
   });
 const VALID = pick(['phone_unanswered_reviews', 'mobile_number']);
 const INVENTED = pick(['phone_unanswered_reviews', 'invented_signal']);
+const BROKEN: LlmReply = { ...reply(null), text: 'not json' };
 const WEAK = reply({
   action: 'answer',
   answer: { noStrongSignal: true, reason: 'No review or page shows a pain the catalog fixes.' },
@@ -81,11 +82,18 @@ const SCENARIOS: Record<string, LlmReply[]> = {
   'invented then valid': [TOOL, INVENTED, TOOL, VALID],
   'invalid twice': [TOOL, INVENTED, TOOL, INVENTED],
   weak: [TOOL, WEAK],
+  // Not JSON twice in one turn: the gate gives up (LlmOutputInvalidError), the runner retries.
+  'schema broken then valid': [TOOL, BROKEN, BROKEN, TOOL, VALID],
+  // The cap refuses before any answer is used.
+  'cap reached': [],
+  // The model gives up after the failed search; the outage must still fail the run.
+  'search fails': [TOOL, WEAK],
 };
 
 // A fresh runtime, gate and catalog per case; `run(scenario)` replays that scenario's answers.
 const createContext = () => {
   let replies: LlmReply[] = [];
+  let scenario = '';
   const spends: LlmSpend[] = [];
   const toolCalls: string[] = [];
   const port: LlmPort = {
@@ -99,7 +107,7 @@ const createContext = () => {
     budget: () =>
       Promise.resolve({
         model: 'claude-haiku-5-5',
-        capUsd: new Prisma.Decimal(10),
+        capUsd: new Prisma.Decimal(scenario === 'cap reached' ? 0 : 10),
         spentUsd: new Prisma.Decimal(0),
       }),
     record: (row: LlmSpend) => {
@@ -116,12 +124,14 @@ const createContext = () => {
   });
   registerSolutionAgent(runtime, () => {
     toolCalls.push('searchCatalog');
+    if (scenario === 'search fails') return Promise.reject(new Error('database is down'));
     return Promise.resolve(SERVICES);
   });
   return {
     agentName: SOLUTION_AGENT,
-    run: async (scenario: string) => {
-      replies = [...(SCENARIOS[scenario] ?? [])];
+    run: async (name: string) => {
+      scenario = name;
+      replies = [...(SCENARIOS[name] ?? [])];
       const started = Date.now();
       const outcome = await runSolutionAgent(runtime, LEAD);
       return {
@@ -140,7 +150,7 @@ const details = (metadata: Record<string, unknown> | undefined) =>
   metadata as { outcome: Outcome; spends: LlmSpend[]; unused: number };
 
 // Proves FR-17 end to end through HazelJS: a valid pick, one retry, NEEDS_REVIEW and
-// NO_STRONG_SIGNAL, with every model call capped and recorded against the lead.
+// NO_STRONG_SIGNAL, every model call capped and recorded against the lead, and outages surfacing.
 const suite = describeAgent('solution agent', ({ test }) => {
   test('picks a retrieved service citing a PAIN signal after one searchCatalog call', async ({
     run,
@@ -170,8 +180,13 @@ const suite = describeAgent('solution agent', ({ test }) => {
 
     expectTools(result, ['searchCatalog', 'searchCatalog']);
     expect(outcome).toMatchObject({ kind: 'pick', serviceSlug: 'ai-voice-receptionist' });
-    // Both runs' calls are paid and recorded: 4 calls, 4 cost records.
+    // Both runs' calls are paid and recorded: 4 calls, 4 cost records, all in the outcome's cost.
     expect(spends).toHaveLength(4);
+    const recorded = spends.reduce(
+      (sum, { amountUsd }) => sum.plus(amountUsd),
+      new Prisma.Decimal(0),
+    );
+    expect(outcome.costUsd.equals(recorded)).toBe(true);
   });
 
   test('reports needs review after two invalid answers, naming the problem', async ({ run }) => {
@@ -190,6 +205,26 @@ const suite = describeAgent('solution agent', ({ test }) => {
 
     expectTools(result, ['searchCatalog']);
     expect(outcome).toMatchObject({ kind: 'noStrongSignal', model: 'claude-haiku-5-5' });
+  });
+
+  test('counts an answer that failed the schema twice as invalid and retries the run', async ({
+    run,
+  }) => {
+    const result = await run('schema broken then valid');
+    const { outcome, unused } = details(result.metadata);
+
+    expect(outcome).toMatchObject({ kind: 'pick', serviceSlug: 'ai-voice-receptionist' });
+    expect(unused).toBe(0);
+  });
+
+  test('lets the cap error reach the caller unwrapped, with nothing sent', async ({ run }) => {
+    await expect(run('cap reached')).rejects.toBeInstanceOf(SpendCapReachedError);
+  });
+
+  test('fails the run when searchCatalog fails, instead of ending as an exit status', async ({
+    run,
+  }) => {
+    await expect(run('search fails')).rejects.toThrow('database is down');
   });
 });
 
