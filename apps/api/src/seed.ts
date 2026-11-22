@@ -1,22 +1,28 @@
 /**
- * Entry point of `pnpm db:seed`: validates the environment, seeds, disconnects.
+ * Entry point of `pnpm db:seed`: validates the environment, seeds, embeds missing services,
+ * disconnects.
  *
- * Serves: FR-4, issue #7.
+ * Serves: FR-4, FR-16; issue #7, issue #17.
  * Used by: `migrations.seed` in prisma.config.ts, which `prisma db seed` runs through tsx.
  */
 import { resolve } from 'node:path';
-import { PrismaPg } from '@prisma/adapter-pg';
-import { loadEnvOrExit } from './bootstrap.js';
-import { seed } from './db/seed.js';
-import { PrismaClient } from './generated/prisma/client.js';
-import { createLogger } from './logging/logger.js';
+import { createApp, loadEnvOrExit } from './bootstrap.js';
+import { PrismaProvider } from './db/prisma.provider.js';
+import { embedMissingServices, seed } from './db/seed.js';
+import { LOGGER, type Logger } from './logging/logger.js';
+import { EMBEDDING, type EmbeddingPort } from './ports/embedding.port.js';
 
 const env = loadEnvOrExit(process.env);
-const logger = createLogger(env.LOG_LEVEL);
-
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: env.DATABASE_URL }) });
+// The app's container, so DEMO_MODE binds the embedder here exactly as in the API and worker.
+const container = (await createApp(env)).getContainer();
+const logger = container.resolve<Logger>(LOGGER);
+const prisma = container.resolve(PrismaProvider);
 try {
   const niche = await seed(prisma, resolve(import.meta.dirname, '../../../config'));
+  await embedMissingServices(prisma, {
+    embedder: container.resolve<EmbeddingPort>(EMBEDDING),
+    logger,
+  });
   // The version comes from the niche file, so the line says which rules new campaigns get.
   const state = niche.added ? 'added' : 'already stored';
   logger.info(

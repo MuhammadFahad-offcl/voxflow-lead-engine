@@ -12,6 +12,7 @@ import { Inject, Injectable } from '@hazeljs/core';
 import { z } from 'zod';
 import { llmCostUsd, llmMaxCostUsd } from '../config/llm-prices.js';
 import { LlmSpendRepository, type LlmSpend } from '../db/llm-spend.repository.js';
+import { toStoredUsd } from '../db/stored-usd.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { errorFields, LOGGER, type Logger } from '../logging/logger.js';
 import { karachiMonthStart, wouldPassCap } from '../pipeline/spend-cap.js';
@@ -26,11 +27,6 @@ import {
 
 // One retry: a second bad answer is unlikely to become good on a third try, and each try is paid.
 const MAX_ATTEMPTS = 2;
-
-// CostRecord.amountUsd keeps 5 decimals; a token costs $0.0000001, so round up, never down, or the
-// stored spend could sit below the real spend under a hard cap.
-const toStoredUsd = (usd: Prisma.Decimal): Prisma.Decimal =>
-  usd.toDecimalPlaces(5, Prisma.Decimal.ROUND_UP);
 
 /** A call refused because its worst case could take the month's LLM spend past the cap. */
 export class SpendCapReachedError extends Error {
