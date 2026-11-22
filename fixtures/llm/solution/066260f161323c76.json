@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\": \"answer\", \"name\": null, \"answer\": {\"serviceSlug\": \"whatsapp-booking-assistant\", \"reason\": \"Patients are waiting on phone calls during clinic hours to get appointments, and a WhatsApp booking assistant lets them book without calling.\", \"signalIds\": [\"whatsapp_link\", \"mobile_number\"]}}",
+  "usage": {
+    "inputTokens": 2308,
+    "outputTokens": 118
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

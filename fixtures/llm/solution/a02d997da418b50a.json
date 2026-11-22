@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\": \"answer\", \"name\": null, \"answer\": {\"serviceSlug\": \"whatsapp-booking-assistant\", \"reason\": \"Patients say they can only book by calling during clinic hours and wait for appointments, which a WhatsApp booking assistant directly addresses.\", \"signalIds\": [\"booking_wait_reviews\", \"category_match\"]}}",
+  "usage": {
+    "inputTokens": 2437,
+    "outputTokens": 117
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

@@ -1,0 +1,9 @@
+{
+  "text": "{\"action\":\"answer\",\"name\":null,\"answer\":{\"serviceSlug\":\"whatsapp-booking-assistant\",\"reason\":\"Patients complain about long waits and difficulty booking, and the clinic has no online booking, so a WhatsApp booking assistant addresses that pain directly.\",\"signalIds\":[\"booking_wait_reviews\",\"no_online_booking\"]}}",
+  "usage": {
+    "inputTokens": 2465,
+    "outputTokens": 121
+  },
+  "model": "claude-haiku-5-5",
+  "stopReason": "end_turn"
+}

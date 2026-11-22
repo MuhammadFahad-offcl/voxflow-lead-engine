@@ -21,8 +21,8 @@
  * It prints place ids, review counts, label counts and dollars; never the API key.
  * Usage: `pnpm llm:record [--max-usd=0.10] [--force] [--size-check]`.
  */
-import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { readFile, stat } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import process from 'node:process';
 import { NicheFile } from '@voxflow/shared';
 import { z } from 'zod';
@@ -35,37 +35,14 @@ import { LlmSpendRepository } from './db/llm-spend.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { Prisma } from './generated/prisma/client.js';
 import { LlmService } from './llm/llm.service.js';
+import { RecordingLlm } from './llm/recording-llm.js';
 import { buildLabellingTask, type ReviewToLabel } from './llm/review-labelling.js';
 import { createLogger } from './logging/logger.js';
 import { karachiMonthStart } from './pipeline/spend-cap.js';
 import { mapReviewsToRows } from './pipeline/review-mapper.js';
-import type { LlmPort, LlmReply, LlmRequest } from './ports/llm.port.js';
 
 const REPO = resolve(import.meta.dirname, '../../..');
 const FIXTURES_DIR = resolve(REPO, 'fixtures/llm');
-
-/** Calls the real model and saves each answer where the fake adapter will look for it. */
-class RecordingLlm implements LlmPort {
-  /**
-   * Wraps the real adapter.
-   * @param real - The Anthropic adapter.
-   */
-  constructor(private readonly real: LlmPort) {}
-
-  /**
-   * Sends the request and saves the raw answer and its usage, a bad answer included: the gate's
-   * retry prompt differs, so the fake replays the same two steps.
-   * @param request - The request.
-   * @returns The real answer.
-   */
-  async complete(request: LlmRequest): Promise<LlmReply> {
-    const reply = await this.real.complete(request);
-    const path = llmFixturePath(FIXTURES_DIR, request);
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, `${JSON.stringify(reply, null, 2)}\n`);
-    return reply;
-  }
-}
 
 const exists = (path: string) =>
   stat(path).then(
@@ -114,7 +91,7 @@ async function main(args: readonly string[]): Promise<void> {
   const prisma = new PrismaProvider(env);
   const spend = new LlmSpendRepository(prisma);
   const real = new AnthropicLlmAdapter(env, logger);
-  const recording = new LlmService(spend, new RecordingLlm(real), logger);
+  const recording = new LlmService(spend, new RecordingLlm(real, FIXTURES_DIR), logger);
   const measuring = new LlmService(spend, real, logger);
   // Outside the try, so the total so far is printed even when a call fails or the guard stops.
   let total = new Prisma.Decimal(0);

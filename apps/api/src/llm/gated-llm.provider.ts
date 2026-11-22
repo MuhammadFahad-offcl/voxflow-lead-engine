@@ -3,8 +3,8 @@
  * `LlmService` (monthly cap, cost record, schema check, demo-mode replay), never around it.
  *
  * `LlmService` sends one system and one user text with an answer schema, so a tool call is asked
- * for in that schema: `{ action: "tool", name }` or `{ action: "answer", answer }`. HazelJS sees
- * ordinary `tool_calls` and runs the real `@Tool`. The lead, campaign, task and answer schema come
+ * for in that schema: `{ action: "tool", name, answer: null }` or `{ action: "answer", name: null,
+ * answer }`. HazelJS sees ordinary `tool_calls` and runs the real `@Tool`. The lead, campaign, task and answer schema come
  * from an AsyncLocalStorage scope the caller opens around `AgentRuntime.execute`, because a
  * HazelJS chat request carries no metadata.
  *
@@ -49,8 +49,12 @@ export const GATED_RUNTIME_OPTIONS = { enableRetry: false, enableCircuitBreaker:
 
 const storage = new AsyncLocalStorage<AgentLlmScope>();
 
-// What the gate's answer schema allows: a tool to call, or the final answer.
-type GateAnswer = { action: 'tool'; name: string } | { action: 'answer'; answer: unknown };
+// What the gate's answer schema allows: a tool to call (name), or the final answer (answer).
+interface GateAnswer {
+  action: 'tool' | 'answer';
+  name: string | null;
+  answer: unknown;
+}
 
 /**
  * Builds a fresh scope for one agent run.
@@ -78,10 +82,10 @@ const howToAnswer = (tools: NonNullable<LLMChatRequest['tools']>): string =>
     ...(tools.length === 0
       ? []
       : [
-          'To call a tool, answer {"action": "tool", "name": "<tool name>"}. Tools:',
+          'To call a tool, answer {"action": "tool", "name": "<tool name>", "answer": null}. Tools:',
           ...tools.map(({ function: tool }) => `- ${tool.name}: ${tool.description}`),
         ]),
-    'To give your final answer, answer {"action": "answer", "answer": <your answer>}.',
+    'To give your final answer, answer {"action": "answer", "name": null, "answer": <your answer>}.',
   ].join('\n');
 
 /** Sends each agent turn through the LLM gate. */
@@ -116,16 +120,27 @@ export class GatedLlmProvider implements LLMProvider {
     if (withParameters !== undefined) {
       throw new Error(`Tool ${withParameters.function.name} takes parameters; not supported`);
     }
-    const answer = z.object({ action: z.literal('answer'), answer: scope.answer });
     const toolNames = tools.map(({ function: tool }) => tool.name);
-    // Typed by hand: the union of two schema types would otherwise infer as unknown.
-    const schema: z.ZodType<GateAnswer> =
-      toolNames.length === 0
-        ? answer
-        : z.discriminatedUnion('action', [
-            z.object({ action: z.literal('tool'), name: z.enum(toolNames) }),
-            answer,
-          ]);
+    // One object at the top, not a union of two: the first recording run's union at the top was
+    // refused by Anthropic's JSON outputs (HTTP 400). The pairing rule is checked by Zod instead.
+    const schema: z.ZodType<GateAnswer> = z
+      .object({
+        action: z.enum(['tool', 'answer']),
+        name: toolNames.length === 0 ? z.null() : z.enum(toolNames).nullable(),
+        answer: scope.answer.nullable(),
+      })
+      .superRefine((value, ctx) => {
+        if (value.action === 'tool' && value.name === null) {
+          ctx.addIssue({ code: 'custom', path: ['name'], message: 'name is required for "tool"' });
+        }
+        if (value.action === 'answer' && value.answer === null) {
+          ctx.addIssue({
+            code: 'custom',
+            path: ['answer'],
+            message: 'answer is required for "answer"',
+          });
+        }
+      });
     const system = request.messages.filter(({ role }) => role === 'system');
     const turns = request.messages.filter(({ role }) => role !== 'system');
     try {
@@ -141,7 +156,11 @@ export class GatedLlmProvider implements LLMProvider {
       });
       scope.models.push(model);
       scope.costUsd = scope.costUsd.plus(costUsd);
-      if (data.action === 'answer') return { content: JSON.stringify(data.answer) };
+      // The refinement guarantees a name for "tool"; the check only narrows the type. An answer sent
+      // along with a tool call is dropped: the model answers again after the tool's result.
+      if (data.action === 'answer' || data.name === null) {
+        return { content: JSON.stringify(data.answer) };
+      }
       const id = `call_${String(scope.models.length)}`;
       return {
         content: '',

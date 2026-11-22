@@ -35,7 +35,7 @@ import {
 import { LlmError, type LlmPort } from '../src/ports/llm.port.js';
 import { WebContextError, type WebContextPort } from '../src/ports/web-context.port.js';
 import type { WebReaderPort } from '../src/ports/web-reader.port.js';
-import { discoverDemoCampaign } from './demo-campaign.js';
+import { discoverDemoCampaign } from '../src/pipeline/demo-campaign.js';
 import { createTestDatabase } from './test-database.js';
 import { testEnv } from './test-env.js';
 

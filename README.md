@@ -85,8 +85,11 @@ Postgres reads `POSTGRES_PASSWORD` only when its volume is first created, so cha
 | `pnpm db:studio`              | browse the database in Prisma Studio                                      |
 | `pnpm read-website <url>`     | try the real web reader on one live site; prints counts, writes nothing   |
 | `pnpm llm:record`             | **costs money:** record the demo clinics' labelling answers (see below)   |
+| `pnpm llm:record:solution`    | **costs money:** record the WARM demo clinics' solution answers (below)   |
 
 `pnpm llm:record` calls Claude for each fictional demo clinic and saves the answers in `fixtures/llm/`, which demo mode replays. Run it after changing the labelling prompt. It needs `ANTHROPIC_API_KEY` and a seeded, running database. Every call counts toward this month's LLM cap, like any other. It stops before going past `--max-usd` (default 0.10). `--size-check` also prices one 30-review call without saving it. The first recording cost $0.002.
+
+`pnpm llm:record:solution` does the same for the solution agent's answers to the six WARM demo clinics. It builds the clinics in a scratch database (`voxflow_solution_record`, dropped at the end) so the prompts match what the tests replay, and only cost records reach your database. Run it after changing the solution prompt, a signal or the catalog. It prints the model and an estimate first, and stops before any call that could pass `--max-usd` (default 0.10). The first recording cost $0.0035.
 
 After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` updates the dependencies and, when it installs anything, regenerates the Prisma client; when nothing changed, pnpm skips it. `pnpm db:migrate` applies new migrations and always regenerates the client, because Prisma 7 does not do that on its own. So the pair always leaves the client in step with the schema.
 

@@ -6,6 +6,7 @@
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { describe, expect, it } from '@jest/globals';
+import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { LLMChatRequest } from '@hazeljs/agent';
 import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client.js';
@@ -60,7 +61,7 @@ const scope = () =>
 // Proves every agent turn becomes one gated call with the lead's ids, and maps both answer kinds.
 describe('GatedLlmProvider', () => {
   it('sends one gated call with the scope’s task, ids and token limit, and maps a tool choice to tool_calls', async () => {
-    const llm = gate([{ action: 'tool', name: 'searchCatalog' }]);
+    const llm = gate([{ action: 'tool', name: 'searchCatalog', answer: null }]);
     const runScope = scope();
 
     const response = await runInAgentLlmScope(runScope, () =>
@@ -88,7 +89,7 @@ describe('GatedLlmProvider', () => {
   });
 
   it('maps a final answer to its JSON content and sends the tool result as part of the user text', async () => {
-    const llm = gate([{ action: 'answer', answer: { pick: 'ai-voice-receptionist' } }]);
+    const llm = gate([{ action: 'answer', name: null, answer: { pick: 'ai-voice-receptionist' } }]);
 
     const response = await runInAgentLlmScope(scope(), () =>
       new GatedLlmProvider(llm).chat(
@@ -100,6 +101,30 @@ describe('GatedLlmProvider', () => {
     expect(llm.calls[0]?.user).toBe(
       'Lead: Fictional Clinic\n\n[Tool result: searchCatalog]\nOutput: []',
     );
+  });
+
+  // Regression: a union at the top of the schema was refused by the API (HTTP 400) when recording.
+  it('sends an answer schema with one object at the top, which the API accepts', async () => {
+    const llm = gate([{ action: 'tool', name: 'searchCatalog', answer: null }]);
+    await runInAgentLlmScope(scope(), () => new GatedLlmProvider(llm).chat(request()));
+    const sent = llm.calls[0]?.schema;
+    if (sent === undefined) throw new Error('no call was sent');
+
+    const { schema: json } = zodOutputFormat(sent);
+
+    expect(json).toMatchObject({ type: 'object' });
+    expect(json).not.toHaveProperty('anyOf');
+    expect(json).not.toHaveProperty('oneOf');
+  });
+
+  it.each([
+    ['a tool call with no name', { action: 'tool', name: null, answer: null }],
+    ['a final answer with no answer', { action: 'answer', name: null, answer: null }],
+  ])('rejects %s', async (_what, reply) => {
+    const llm = gate([{ action: 'tool', name: 'searchCatalog', answer: null }]);
+    await runInAgentLlmScope(scope(), () => new GatedLlmProvider(llm).chat(request()));
+
+    expect(llm.calls[0]?.schema.safeParse(reply).success).toBe(false);
   });
 
   it('refuses a call made outside a scope, so no agent call can skip the gate', async () => {
