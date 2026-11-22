@@ -4,8 +4,7 @@
  *
  * `LlmService` sends one system and one user text with an answer schema, so a tool call is asked
  * for in that schema: `{ action: "tool", name, answer: null }` or `{ action: "answer", name: null,
- * answer }`. HazelJS sees
- * ordinary `tool_calls` and runs the real `@Tool`. The lead, campaign, task and answer schema come
+ * answer }`. HazelJS sees ordinary `tool_calls` and runs the real `@Tool`. The lead, campaign, task and answer schema come
  * from an AsyncLocalStorage scope the caller opens around `AgentRuntime.execute`, because a
  * HazelJS chat request carries no metadata.
  *

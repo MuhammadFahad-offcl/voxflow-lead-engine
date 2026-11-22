@@ -15,7 +15,9 @@ import { testEnv } from './test-env.js';
  * forced drop would cut another spec's connections to the same database.
  * @param name - Database to (re)create; lowercase letters and underscores, e.g. "voxflow_test".
  * @returns The connection URL of the test database.
- * @throws Error when `name` is not lowercase letters and underscores; InvalidEnvError when DATABASE_URL is missing, or an error from Postgres or `prisma migrate deploy`.
+ * @throws InvalidEnvError (synchronously) when DATABASE_URL is missing; a rejection with Error when
+ * `name` is not lowercase letters and underscores or is the database DATABASE_URL names, or with
+ * an error from Postgres or `prisma migrate deploy`.
  */
 export function createTestDatabase(name = 'voxflow_test'): Promise<string> {
   return createScratchDatabase(testEnv().DATABASE_URL, name);

@@ -6,11 +6,11 @@
  * Serves: FR-17, FR-36 (demo mode with recorded LLM answers), FR-33, ADR-0006, ADR-0007; issue #19.
  * Used by: the root package.json script `llm:record:solution`, which runs it through tsx with `.env`.
  *
- * The answers must replay exactly, so the clinics are built the way the demo test builds them, not
- * read from the dev database (its demo leads may come from an older niche version). It creates the
- * scratch database `voxflow_solution_record` next to the dev one, seeds it, discovers the DHA demo
- * campaign and runs the lead graph to SCORE with every fake adapter (labelling replays its own
- * recordings). Then it runs the solution agent for the WARM clinics with the real model.
+ * The answers must replay exactly, so the clinics are built by `scoreDemoClinics`, as the replay
+ * test builds them, not read from the dev database (its demo leads may come from an older niche
+ * version). It creates the scratch database `voxflow_solution_record` next to the dev one, builds
+ * the scored clinics there with every fake adapter, then runs the solution agent for the WARM
+ * clinics with the real model.
  *
  * Spend is counted where it matters: each call goes through the real LLM gate against the database
  * in DATABASE_URL, so it counts against the monthly LLM cap and leaves a CostRecord there (no lead,
@@ -25,11 +25,7 @@ import process from 'node:process';
 import { AgentRuntime, LogLevel } from '@hazeljs/agent';
 import { z } from 'zod';
 import { FakeEmbeddingAdapter } from './adapters/embedding/fake.adapter.js';
-import { FakeLeadSourceAdapter } from './adapters/lead-source/fake.adapter.js';
 import { AnthropicLlmAdapter } from './adapters/llm/anthropic.adapter.js';
-import { FakeLlmAdapter } from './adapters/llm/fake.adapter.js';
-import { FakeWebContextAdapter } from './adapters/web-context/fake.adapter.js';
-import { FakeWebReaderAdapter } from './adapters/web-reader/fake.adapter.js';
 import {
   createCatalogSearch,
   registerSolutionAgent,
@@ -41,18 +37,16 @@ import { CatalogRepository } from './db/catalog.repository.js';
 import { LlmSpendRepository } from './db/llm-spend.repository.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createScratchDatabase, dropScratchDatabase } from './db/scratch-database.js';
-import { SEED_ORGANIZATION_ID, embedMissingServices, seed } from './db/seed.js';
+import { SEED_ORGANIZATION_ID } from './db/seed.js';
 import { SolutionRepository } from './db/solution.repository.js';
 import { Prisma } from './generated/prisma/client.js';
 import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from './llm/gated-llm.provider.js';
 import { LlmService } from './llm/llm.service.js';
 import { RecordingLlm } from './llm/recording-llm.js';
 import { createLogger } from './logging/logger.js';
-import { discoverDemoCampaign } from './pipeline/demo-campaign.js';
-import { PaidStartGate } from './pipeline/paid-start-gate.js';
+import { scoreDemoClinics } from './pipeline/demo-campaign.js';
 import { karachiMonthStart } from './pipeline/spend-cap.js';
 import { LlmError, type LlmPort, type LlmReply, type LlmRequest } from './ports/llm.port.js';
-import { buildLeadRunnerDeps, runLeadRunnerOnce } from './scheduler/lead-runner.js';
 
 const REPO = resolve(import.meta.dirname, '../../..');
 const FIXTURES_DIR = resolve(REPO, 'fixtures/llm');
@@ -155,27 +149,7 @@ async function main(args: readonly string[]): Promise<void> {
     const scratchUrl = await createScratchDatabase(env.DATABASE_URL, SCRATCH_DATABASE);
     scratch = new PrismaProvider({ ...env, DATABASE_URL: scratchUrl });
     const embedder = new FakeEmbeddingAdapter();
-    await seed(scratch, resolve(REPO, 'config'));
-    await embedMissingServices(scratch, { demoMode: true, embedder, logger: quiet });
-    await discoverDemoCampaign(scratch, quiet);
-    const deps = buildLeadRunnerDeps({
-      prisma: scratch,
-      leadSource: new FakeLeadSourceAdapter(quiet),
-      webReader: new FakeWebReaderAdapter(),
-      webContext: new FakeWebContextAdapter(),
-      llm: new FakeLlmAdapter(),
-      logger: quiet,
-      now: () => new Date(),
-      concurrency: 4,
-      startGate: new PaidStartGate(),
-    });
-    while ((await runLeadRunnerOnce(deps)).leads > 0);
-
-    const warm = await scratch.lead.findMany({
-      where: { tier: { in: ['WARM', 'HOT'] } },
-      orderBy: { placeId: 'asc' },
-      select: { id: true, placeId: true },
-    });
+    const warm = await scoreDemoClinics(scratch, quiet, embedder);
     const found = warm.map(({ placeId }) => placeId);
     if (found.join() !== WARM_CLINICS.join()) {
       throw new Error(`Expected the six WARM demo clinics, found: ${found.join(', ') || 'none'}`);
