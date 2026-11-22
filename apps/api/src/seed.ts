@@ -20,6 +20,7 @@ const prisma = container.resolve(PrismaProvider);
 try {
   const niche = await seed(prisma, resolve(import.meta.dirname, '../../../config'));
   await embedMissingServices(prisma, {
+    demoMode: env.DEMO_MODE,
     embedder: container.resolve<EmbeddingPort>(EMBEDDING),
     logger,
   });

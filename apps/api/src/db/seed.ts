@@ -19,7 +19,6 @@ import {
   NicheFile,
   SpendCaps,
 } from '@voxflow/shared';
-import { FakeEmbeddingAdapter } from '../adapters/embedding/fake.adapter.js';
 import type { PrismaClient } from '../generated/prisma/client.js';
 import type { Logger } from '../logging/logger.js';
 import type { EmbeddingPort } from '../ports/embedding.port.js';
@@ -37,6 +36,8 @@ const readJson = async (path: string): Promise<unknown> =>
 
 /** What {@link embedMissingServices} needs besides the database. */
 export interface EmbedDeps {
+  /** `env.DEMO_MODE`, so the log line says which embedder DI bound without checking classes. */
+  demoMode: boolean;
   /** Embeds the services that have no vector; the fake in demo mode. */
   embedder: EmbeddingPort;
   /** Gets one line before any embedding request. */
@@ -170,22 +171,24 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<See
  * Does not re-embed a service that has a vector, so a second run sends no request.
  * @param prisma - Client connected to the seeded database.
  * @param deps - The embedder and the logger.
+ * @param deps.demoMode - `env.DEMO_MODE`: true means the fake embedder is bound.
  * @param deps.embedder - The bound embedder; the fake in demo mode.
  * @param deps.logger - Gets one line, before the request, naming the embedder and the count.
  * @returns How many services it embedded; 0 when none was missing.
- * @throws EmbeddingError when embedding fails: nothing is written, and the next run retries;
+ * @throws EmbeddingError when embedding fails: no vector and no cost is written (a billed failure
+ * goes unrecorded), and the next run retries;
  * Prisma errors from the database.
  */
 export async function embedMissingServices(
   prisma: PrismaClient,
-  { embedder, logger }: EmbedDeps,
+  { demoMode, embedder, logger }: EmbedDeps,
 ): Promise<number> {
   const organizationId = SEED_ORGANIZATION_ID;
   const catalog = new CatalogRepository(prisma);
   const missing = await catalog.withoutEmbedding(organizationId);
   if (missing.length === 0) return 0;
   // Before the request, so a real (billed) run in the wrong mode shows at once.
-  const mode = embedder instanceof FakeEmbeddingAdapter ? 'fake' : 'real';
+  const mode = demoMode ? 'fake' : 'real';
   logger.info(
     { services: missing.length, adapter: embedder.constructor.name, mode },
     `embedding ${String(missing.length)} services with the ${mode} embedder (${embedder.constructor.name})`,

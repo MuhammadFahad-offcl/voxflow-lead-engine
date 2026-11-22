@@ -21,7 +21,7 @@ import { testEnv } from './test-env.js';
 
 const embedder = new FakeEmbeddingAdapter();
 const info = jest.fn();
-const logger = { info } as unknown as Logger;
+const logger: Pick<Logger, 'info'> = { info };
 
 let app: HazelApp;
 let baseUrl: string;
@@ -53,13 +53,37 @@ afterAll(async () => {
   await prisma.$disconnect();
 });
 
-// The tests below run in order: the first one embeds the catalog the others read.
+// The tests below run in order: the first needs a catalog with no vectors, the second embeds the
+// catalog the others read.
 
-// Proves the seed embeds every service once, says which embedder before it calls, and never stores $0.
+// Proves the seed embeds every service once, says which embedder before it calls, never stores $0,
+// and writes nothing from a short answer.
 describe('embedMissingServices', () => {
+  it('logs the real embedder first, and writes nothing when it returns fewer vectors than texts', async () => {
+    // Stands in for a real embedder whose answer lost a vector.
+    const short = {
+      embed: async (texts: string[]) => {
+        const result = await embedder.embed(texts);
+        return { ...result, vectors: result.vectors.slice(1) };
+      },
+    };
+
+    await expect(
+      embedMissingServices(prisma, { demoMode: false, embedder: short, logger }),
+    ).rejects.toThrow('fewer vectors');
+
+    expect(info).toHaveBeenCalledWith(
+      expect.objectContaining({ services: 10, mode: 'real' }),
+      expect.stringContaining('the real embedder'),
+    );
+    expect((await catalog.list()).some(({ embedded }) => embedded)).toBe(false);
+    expect(await prisma.costRecord.count({ where: { service: 'PERPLEXITY_EMBEDDINGS' } })).toBe(0);
+    info.mockClear();
+  });
+
   it('embeds the 10 services once, logs the fake embedder first, and records one rounded-up cost', async () => {
-    const first = await embedMissingServices(prisma, { embedder, logger });
-    const second = await embedMissingServices(prisma, { embedder, logger });
+    const first = await embedMissingServices(prisma, { demoMode: true, embedder, logger });
+    const second = await embedMissingServices(prisma, { demoMode: true, embedder, logger });
 
     expect([first, second]).toEqual([10, 0]);
     expect(info).toHaveBeenCalledTimes(1);
@@ -74,7 +98,7 @@ describe('embedMissingServices', () => {
     const costs = await prisma.costRecord.findMany({ where: { service: 'PERPLEXITY_EMBEDDINGS' } });
     expect(costs).toHaveLength(1);
     expect(costs[0]).toMatchObject({ organizationId: SEED_ORGANIZATION_ID, units: tokens });
-    // About $0.000001 exactly; rounded up so it is never stored as $0.
+    // A few millionths of a dollar, rounded up so it is never stored as $0.
     expect(costs[0]?.amountUsd.toString()).toBe('0.00001');
   });
 });

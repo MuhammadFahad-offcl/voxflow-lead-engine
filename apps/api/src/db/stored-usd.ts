@@ -9,7 +9,7 @@ import { Prisma } from '../generated/prisma/client.js';
 /**
  * Rounds a cost up to 5 decimal places.
  *
- * Up, never down: an LLM token or an embeddings batch costs less than $0.00001, so rounding down
+ * Up, never down: an LLM token or an embeddings batch can cost less than $0.00001, so rounding down
  * would store $0 and the stored spend could sit below the real spend under a hard cap.
  * @param usd - The exact cost, in US dollars.
  * @returns The amount to store: at least $0.00001 for any cost above 0.

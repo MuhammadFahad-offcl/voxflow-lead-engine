@@ -11,6 +11,13 @@ import { z } from 'zod';
 import { Prisma, type PrismaClient } from '../generated/prisma/client.js';
 import { PrismaProvider } from './prisma.provider.js';
 
+const ServiceToEmbed = z.object({
+  id: z.string(),
+  name: z.string(),
+  problem: z.string(),
+  expectedResult: z.string(),
+});
+
 const SimilarService = ServiceSummary.extend({
   // Cosine distance: 0 for the same direction, up to 2 for the opposite one.
   distance: z.number(),
@@ -47,15 +54,14 @@ export class CatalogRepository {
    * Lists an organization's services that have no vector yet, by slug.
    * @param organizationId - `Organization.id`.
    * @returns Each service's id and the fields its embedded text is built from.
-   * @throws Prisma errors when the database cannot be read.
+   * @throws Prisma errors when the database cannot be read; ZodError if a row has an unexpected shape.
    */
-  withoutEmbedding(
-    organizationId: string,
-  ): Promise<{ id: string; name: string; problem: string; expectedResult: string }[]> {
-    return this.prisma.$queryRaw`
+  async withoutEmbedding(organizationId: string): Promise<z.infer<typeof ServiceToEmbed>[]> {
+    const rows = await this.prisma.$queryRaw<unknown[]>`
       SELECT id, name, problem, "expectedResult" FROM "Service"
       WHERE "organizationId" = ${organizationId} AND embedding IS NULL
       ORDER BY slug`;
+    return z.array(ServiceToEmbed).parse(rows);
   }
 
   /**
@@ -74,11 +80,11 @@ export class CatalogRepository {
    *
    * Does not return retired services or services the seed has not embedded yet.
    * @param queryVector - 1024 numbers from the same embedder as the stored vectors.
-   * @param k - The most services to return.
+   * @param k - The most services to return: a positive integer.
    * @returns Up to `k` services, closest first, each with its distance.
    * @throws Prisma errors when the database cannot be read, or when the vector is not 1024 long.
    */
-  async searchSimilar(queryVector: number[], k = 5) {
+  async searchSimilar(queryVector: number[], k = 5): Promise<z.infer<typeof SimilarService>[]> {
     const vector = toVectorText(queryVector);
     const rows = await this.prisma.$queryRaw<unknown[]>`
       SELECT ${SUMMARY_COLUMNS}, embedding <=> ${vector}::vector AS distance
