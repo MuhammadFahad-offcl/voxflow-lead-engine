@@ -1,7 +1,7 @@
 /**
  * Startup check that the API's port is free, so a second `pnpm dev` stops with one clear line.
  *
- * Serves: ADR-0003 (the API on 127.0.0.1:API_PORT), ADR-0013 (the patched HazelJS listen); T-1 audit.
+ * Serves: ADR-0003 (the API on 127.0.0.1:API_PORT), ADR-0013 (HazelJS listen with a host); T-1 audit.
  * Used by: apps/api/src/main.ts, before the HazelJS app is built.
  */
 import { createServer } from 'node:net';
@@ -33,7 +33,7 @@ export const isPortFree = (host: string, port: number): Promise<boolean> =>
 /**
  * Logs one fatal line and ends the process with exit code 1 when `API_PORT` is taken.
  *
- * Why before HazelJS: version 2.0.13 has no `error` listener on its server, so EADDRINUSE from its
+ * Why before HazelJS: version 2.1.3 has no `error` listener on its server, so EADDRINUSE from its
  * `listen` is an uncaught exception with a stack trace and no hint of the cause.
  * Does not stop the other process or pick another port.
  * @param env - Parsed configuration; uses `API_HOST`, `API_PORT` and `LOG_LEVEL`.

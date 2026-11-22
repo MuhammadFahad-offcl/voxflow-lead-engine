@@ -1,6 +1,6 @@
 # 0013. Patch @hazeljs/core: bind to 127.0.0.1 and clear health-check timers
 
-- **Status:** Accepted
+- **Status:** Superseded on 2026-11-22: HazelJS 2.0.14 fixed both bugs upstream; the patch was removed when we pinned 2.1.3 (see ADR-0001, update 2026-11-22)
 - **Date:** 2026-11-04
 - **Deciders:** Muhammad Fahad
 - **PRD links:** NFR-5, NFR-8, NFR-10; ADR-0001, ADR-0003
@@ -40,3 +40,7 @@ Option 1: `patches/@hazeljs__core@2.0.13.patch`, registered under `patchedDepend
 - [hazel-js/hazeljs#36](https://github.com/hazel-js/hazeljs/issues/36) — `HealthCheckManager.runChecks` leaves timeout timers running
 
 When HazelJS releases the fixes, remove `patches/@hazeljs__core@2.0.13.patch` and its `patchedDependencies` entry in `pnpm-workspace.yaml`.
+
+## Superseded 2026-11-22
+
+HazelJS 2.0.14 fixed both bugs: [#35](https://github.com/hazel-js/hazeljs/issues/35) through PR #37 and [#36](https://github.com/hazel-js/hazeljs/issues/36) through PR #38. We moved to 2.1.3, deleted `patches/@hazeljs__core@2.0.13.patch` and removed `patchedDependencies` from `pnpm-workspace.yaml`. `apps/api/test/server-binding.int.spec.ts` still proves the 127.0.0.1 binding, and Jest still exits without the "did not exit" warning.

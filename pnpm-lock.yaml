@@ -162,9 +162,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-patchedDependencies:
-  '@hazeljs/core@2.0.13': fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9
-
 importers:
 
   .:
@@ -233,14 +230,14 @@ importers:
         specifier: 1.8.0
         version: 1.8.0(zod@4.6.7)
       '@hazeljs/agent':
-        specifier: 2.0.13
-        version: 2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/eval@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)))(@hazeljs/prompts@2.0.13)(@hazeljs/rag@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/prompts@2.0.13)(cheerio@1.2.0))(@hazeljs/resilience@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)))(@opentelemetry/api@1.10.0)(@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3))
+        specifier: 2.1.3
+        version: 2.1.3(@hazeljs/core@2.1.3)(@hazeljs/eval@2.1.3(@hazeljs/core@2.1.3))(@hazeljs/prompts@2.1.3)(@hazeljs/rag@2.1.3(@hazeljs/core@2.1.3)(@hazeljs/prompts@2.1.3)(cheerio@1.2.0))(@hazeljs/resilience@2.1.3(@hazeljs/core@2.1.3))(@opentelemetry/api@1.10.0)(@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3))
       '@hazeljs/core':
-        specifier: 2.0.13
-        version: 2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)
+        specifier: 2.1.3
+        version: 2.1.3
       '@hazeljs/eval':
-        specifier: 2.0.13
-        version: 2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))
+        specifier: 2.1.3
+        version: 2.1.3(@hazeljs/core@2.1.3)
       '@prisma/adapter-pg':
         specifier: 7.10.1
         version: 7.10.1
@@ -851,23 +848,26 @@ packages:
     resolution: {integrity: sha512-IkO+/KEUvwbVpiURZg+P7zF74z5Jxe0UgJxVni+RtoHQ6IZieXaO02kmadomap/q+l6bc/jdPGGqTjhuZnuz1Q==}
     engines: {node: ^20.19.0 || ^22.13.0 || >=24}
 
-  '@hazeljs/agent@2.0.13':
-    resolution: {integrity: sha512-bkZ1m4Y1kjHOnW/z6/PK0DOpG9z58z3FsHfinBj5jSagXZUkhow53s3VknKv9sBJ2ohJI31pJNcgd8ovQz7Zjg==}
+  '@hazeljs/agent@2.1.3':
+    resolution: {integrity: sha512-zJXqY8TqQkIs8G1m/71A2O6W8FnuGyc7uALGlYxNBu8Lkc/Kzftmxlz+bliElodYDIsO4QT7+tECGZOsi8jknQ==}
     peerDependencies:
-      '@hazeljs/agent-gatekeeper': ^2.0.13
-      '@hazeljs/core': ^2.0.13
-      '@hazeljs/eval': ^2.0.13
-      '@hazeljs/flow': ^2.0.13
-      '@hazeljs/guardrails': ^2.0.13
-      '@hazeljs/observability': ^2.0.13
-      '@hazeljs/prompts': ^2.0.13
-      '@hazeljs/rag': ^2.0.13
-      '@hazeljs/resilience': ^2.0.13
+      '@hazeljs/agent-gatekeeper': ^2.1.3
+      '@hazeljs/config': ^2.1.3
+      '@hazeljs/core': ^2.1.3
+      '@hazeljs/eval': ^2.1.3
+      '@hazeljs/flow': ^2.1.3
+      '@hazeljs/guardrails': ^2.1.3
+      '@hazeljs/observability': ^2.1.3
+      '@hazeljs/prompts': ^2.1.3
+      '@hazeljs/rag': ^2.1.3
+      '@hazeljs/resilience': ^2.1.3
       '@opentelemetry/api': ^1.9.0
       '@prisma/client': '*'
       redis: '>=4.0.0'
     peerDependenciesMeta:
       '@hazeljs/agent-gatekeeper':
+        optional: true
+      '@hazeljs/config':
         optional: true
       '@hazeljs/eval':
         optional: true
@@ -884,24 +884,24 @@ packages:
       redis:
         optional: true
 
-  '@hazeljs/core@2.0.13':
-    resolution: {integrity: sha512-29eD8R/AVv6KKLRZwCGY8h9AijMRSE96OILZA3v+8lBe4oVcodSgpQ2aMDOf/LO6bUvxrv/FkGZ8qJUo5pAOXA==}
+  '@hazeljs/core@2.1.3':
+    resolution: {integrity: sha512-+R8WoESghecrGW0rKwWDlIzu/f3nkFST6zB3rdhfvuGjIv/DgRJhiraY4YBKSW8rYUVWe6943xuDDJqBwNIT9Q==}
 
-  '@hazeljs/eval@2.0.13':
-    resolution: {integrity: sha512-8Il1U1UODGEbOa2CiYx3d0YqfT+x3+G5SRjtTTBbDvxnkoEUeqLhxK0DuL73UzOQ658kPD35CScMkqcGHCw0PQ==}
+  '@hazeljs/eval@2.1.3':
+    resolution: {integrity: sha512-rYb3PfNZgeLTvJoyIott95pJ8WxANUBePIPWamfPgFejQHQigB0FK0lG6k6kwwCK2mQ5xuE8uqFiyF6reP+70A==}
     peerDependencies:
-      '@hazeljs/core': ^2.0.13
+      '@hazeljs/core': ^2.1.3
 
-  '@hazeljs/prompts@2.0.13':
-    resolution: {integrity: sha512-XYPyPV523I7JpA8s4GL6L3XvezK1tdm1dkRMonB+rGy1DC2tLSJFhB6X2c/KVXHxly4r0E/MAdnCr83G3752Zw==}
+  '@hazeljs/prompts@2.1.3':
+    resolution: {integrity: sha512-KZs9pkGjQbVyKmBDQ/wWrw6McoZJ/7ED9mvdBGf+4hAV9LvyVOTTp/4+9B94m/TUkWIMqz4RYRWZ5ydWOQpTbA==}
 
-  '@hazeljs/rag@2.0.13':
-    resolution: {integrity: sha512-g2SKktpzkELImFtSlVgt5c18WRtdVSKRSubAaKciF6BjXMY/3m8cAx3kZJ7Nb7NVEjfmOJrtBgBT4h91HyHTKA==}
+  '@hazeljs/rag@2.1.3':
+    resolution: {integrity: sha512-AD76tN8N6n8XBupLvHcBvxBONrl5W/4gsEtBNuwgs77QkF4D6VvUQBMUFyZY0fuzP3TlhE++HfXzhArD/DMWKQ==}
     peerDependencies:
-      '@hazeljs/ai': ^2.0.13
-      '@hazeljs/core': ^2.0.13
-      '@hazeljs/memory': ^2.0.13
-      '@hazeljs/prompts': ^2.0.13
+      '@hazeljs/ai': ^2.1.3
+      '@hazeljs/core': ^2.1.3
+      '@hazeljs/memory': ^2.1.3
+      '@hazeljs/prompts': ^2.1.3
       '@huggingface/inference': ^2.0.0
       '@pinecone-database/pinecone': ^3.0.0
       '@qdrant/js-client-rest': ^1.9.0
@@ -940,10 +940,10 @@ packages:
       weaviate-ts-client:
         optional: true
 
-  '@hazeljs/resilience@2.0.13':
-    resolution: {integrity: sha512-xOIkpGqgiOXZi5gdgy5iNYW6rF7GmbcvoHTOhQUpb5syF/ecJ/1QH8MJyIpjOEiqgM5TnNGri60bWgbbeFRnUg==}
+  '@hazeljs/resilience@2.1.3':
+    resolution: {integrity: sha512-V30+d6KjPVzlW3AsxouYnIH5b4ZKSlVxuewOqVEd89cV9JzL3lMftezJOd9KyxcUdb0H4sQo3MFsk4wzCi0qng==}
     peerDependencies:
-      '@hazeljs/core': ^2.0.13
+      '@hazeljs/core': ^2.1.3
 
   '@humanfs/core@0.19.2':
     resolution: {integrity: sha512-UhXNm+CFMWcbChXywFwkmhqjs3PRCmcSa/hfBgLIb7oQ5HNb1wS0icWsGtSAUNgefHeI+eBrA8I1fxmbHsGdvA==}
@@ -4527,14 +4527,6 @@ packages:
   zeptomatch@2.1.0:
     resolution: {integrity: sha512-KiGErG2J0G82LSpniV0CtIzjlJ10E04j02VOudJsPyPwNZgGnRKQy7I1R7GMyg/QswnE4l7ohSGrQbQbjXPPDA==}
 
-  zod-to-json-schema@3.25.2:
-    resolution: {integrity: sha512-O/PgfnpT1xKSDeQYSCfRI5Gy3hPf91mKVDuYLUHZJMiDFptvP41MSnWofm8dnCm0256ZNfZIM7DSzuSMAFnjHA==}
-    peerDependencies:
-      zod: ^3.25.28 || ^4
-
-  zod@3.25.76:
-    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
-
   zod@4.6.7:
     resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
@@ -5069,21 +5061,20 @@ snapshots:
       '@eslint/core': 1.2.1
       levn: 0.4.1
 
-  '@hazeljs/agent@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/eval@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)))(@hazeljs/prompts@2.0.13)(@hazeljs/rag@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/prompts@2.0.13)(cheerio@1.2.0))(@hazeljs/resilience@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)))(@opentelemetry/api@1.10.0)(@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3))':
+  '@hazeljs/agent@2.1.3(@hazeljs/core@2.1.3)(@hazeljs/eval@2.1.3(@hazeljs/core@2.1.3))(@hazeljs/prompts@2.1.3)(@hazeljs/rag@2.1.3(@hazeljs/core@2.1.3)(@hazeljs/prompts@2.1.3)(cheerio@1.2.0))(@hazeljs/resilience@2.1.3(@hazeljs/core@2.1.3))(@opentelemetry/api@1.10.0)(@prisma/client@7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3))':
     dependencies:
-      '@hazeljs/core': 2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)
-      '@hazeljs/prompts': 2.0.13
-      '@hazeljs/rag': 2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/prompts@2.0.13)(cheerio@1.2.0)
-      '@hazeljs/resilience': 2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))
+      '@hazeljs/core': 2.1.3
+      '@hazeljs/prompts': 2.1.3
+      '@hazeljs/rag': 2.1.3(@hazeljs/core@2.1.3)(@hazeljs/prompts@2.1.3)(cheerio@1.2.0)
+      '@hazeljs/resilience': 2.1.3(@hazeljs/core@2.1.3)
       yaml: 2.9.1
-      zod: 3.25.76
-      zod-to-json-schema: 3.25.2(zod@3.25.76)
+      zod: 4.6.7
     optionalDependencies:
-      '@hazeljs/eval': 2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))
+      '@hazeljs/eval': 2.1.3(@hazeljs/core@2.1.3)
       '@opentelemetry/api': 1.10.0
       '@prisma/client': 7.10.1(prisma@7.10.1(@types/node@26.6.6)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.1(react@19.3.1))(react@19.3.1)(typescript@6.0.3))(typescript@6.0.3)
 
-  '@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)':
+  '@hazeljs/core@2.1.3':
     dependencies:
       chalk: 4.1.2
       class-transformer: 0.5.1
@@ -5092,23 +5083,23 @@ snapshots:
       reflect-metadata: 0.2.2
       winston: 3.19.0
 
-  '@hazeljs/eval@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))':
+  '@hazeljs/eval@2.1.3(@hazeljs/core@2.1.3)':
     dependencies:
-      '@hazeljs/core': 2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)
-      zod: 3.25.76
+      '@hazeljs/core': 2.1.3
+      zod: 4.6.7
 
-  '@hazeljs/prompts@2.0.13': {}
+  '@hazeljs/prompts@2.1.3': {}
 
-  '@hazeljs/rag@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))(@hazeljs/prompts@2.0.13)(cheerio@1.2.0)':
+  '@hazeljs/rag@2.1.3(@hazeljs/core@2.1.3)(@hazeljs/prompts@2.1.3)(cheerio@1.2.0)':
     dependencies:
-      '@hazeljs/core': 2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)
+      '@hazeljs/core': 2.1.3
     optionalDependencies:
-      '@hazeljs/prompts': 2.0.13
+      '@hazeljs/prompts': 2.1.3
       cheerio: 1.2.0
 
-  '@hazeljs/resilience@2.0.13(@hazeljs/core@2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9))':
+  '@hazeljs/resilience@2.1.3(@hazeljs/core@2.1.3)':
     dependencies:
-      '@hazeljs/core': 2.0.13(patch_hash=fb67fd815cff395628e2d2649517b248197e35bea70b81df4104e10e427488e9)
+      '@hazeljs/core': 2.1.3
       reflect-metadata: 0.2.2
 
   '@humanfs/core@0.19.2':
@@ -8803,11 +8794,5 @@ snapshots:
     dependencies:
       grammex: 3.1.13
       graphmatch: 1.1.1
-
-  zod-to-json-schema@3.25.2(zod@3.25.76):
-    dependencies:
-      zod: 3.25.76
-
-  zod@3.25.76: {}
 
   zod@4.6.7: {}

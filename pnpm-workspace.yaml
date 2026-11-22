@@ -13,5 +13,10 @@ allowBuilds:
   esbuild: false
   prisma: false
 
-patchedDependencies:
-  '@hazeljs/core@2.0.13': patches/@hazeljs__core@2.0.13.patch
+minimumReleaseAgeExclude:
+  - '@hazeljs/agent@2.1.3'
+  - '@hazeljs/core@2.1.3'
+  - '@hazeljs/eval@2.1.3'
+  - '@hazeljs/prompts@2.1.3'
+  - '@hazeljs/rag@2.1.3'
+  - '@hazeljs/resilience@2.1.3'
