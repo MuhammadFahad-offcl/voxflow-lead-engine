@@ -1,9 +1,11 @@
 /**
- * Seeds the one organization, its settings, the dental-clinic niche profile and the service catalog.
+ * Seeds the one organization, its settings, the dental-clinic niche profile and the service catalog,
+ * and embeds every service that has no vector yet.
  *
  * Serves: FR-4 (niche profile), FR-13 (review labels), FR-15 (score thresholds), FR-16 (catalog
- * rows; embeddings follow in C2-01), FR-20, FR-26, FR-33 and ADR-0006 (settings defaults).
- * Used by: apps/api/src/seed.ts (`pnpm db:seed`), apps/api/test/seed.int.spec.ts.
+ * rows and their embeddings, #17), FR-20, FR-26, FR-33 and ADR-0006 (settings defaults).
+ * Used by: apps/api/src/seed.ts (`pnpm db:seed`), apps/api/test/seed.int.spec.ts,
+ * apps/api/test/catalog.int.spec.ts; other integration tests call `seed` only.
  */
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -18,6 +20,10 @@ import {
   SpendCaps,
 } from '@voxflow/shared';
 import type { PrismaClient } from '../generated/prisma/client.js';
+import type { Logger } from '../logging/logger.js';
+import type { EmbeddingPort } from '../ports/embedding.port.js';
+import { CatalogRepository } from './catalog.repository.js';
+import { toStoredUsd } from './stored-usd.js';
 
 /** Fixed id, because `Organization` has no other unique field to upsert on; v1 has one organization. */
 export const SEED_ORGANIZATION_ID = 'org_voxflow';
@@ -27,6 +33,16 @@ const CATALOG_FILE = 'catalog/services.json';
 
 const readJson = async (path: string): Promise<unknown> =>
   JSON.parse(await readFile(path, 'utf8')) as unknown;
+
+/** What {@link embedMissingServices} needs besides the database. */
+export interface EmbedDeps {
+  /** `env.DEMO_MODE`, so the log line says which embedder DI bound without checking classes. */
+  demoMode: boolean;
+  /** Embeds the services that have no vector; the fake in demo mode. */
+  embedder: EmbeddingPort;
+  /** Gets one line before any embedding request. */
+  logger: Pick<Logger, 'info'>;
+}
 
 /** The niche version a seed run found in the niche file. */
 export interface SeededNiche {
@@ -42,7 +58,8 @@ export interface SeededNiche {
  * Does not overwrite a row that already exists, so a second run changes nothing and settings
  * edited later on the dashboard survive a re-seed. To change a niche, raise its `version` in the
  * file: the new version is added next to the old one, which campaigns may still use.
- * Does not write `Service.embedding`: it stays NULL until C2-01.
+ * Does not write `Service.embedding`: {@link embedMissingServices} does, right after this in
+ * `pnpm db:seed`.
  * `reviewLabels` got its column in #13, `tiers` in #14 and `defaultAreas` in #16 (niche v5).
  * @param prisma - Client connected to the database to seed.
  * @param configDir - The repo's `config/` folder.
@@ -144,4 +161,56 @@ export async function seed(prisma: PrismaClient, configDir: string): Promise<See
     ),
   ]);
   return { slug: niche.slug, version: niche.version, added: stored === null };
+}
+
+/**
+ * Embeds, in one request, every seeded service whose `embedding` is NULL (name, problem and
+ * expected result), and records one `CostRecord(PERPLEXITY_EMBEDDINGS)`: the exact token count in
+ * `units`, the cost rounded up to 5 decimals so it is never stored as $0.
+ *
+ * Does not re-embed a service that has a vector, so a second run sends no request.
+ * @param prisma - Client connected to the seeded database.
+ * @param deps - The embedder and the logger.
+ * @param deps.demoMode - `env.DEMO_MODE`: true means the fake embedder is bound.
+ * @param deps.embedder - The bound embedder; the fake in demo mode.
+ * @param deps.logger - Gets one line, before the request, naming the embedder and the count.
+ * @returns How many services it embedded; 0 when none was missing.
+ * @throws EmbeddingError when embedding fails: no vector and no cost is written (a billed failure
+ * goes unrecorded), and the next run retries;
+ * Prisma errors from the database.
+ */
+export async function embedMissingServices(
+  prisma: PrismaClient,
+  { demoMode, embedder, logger }: EmbedDeps,
+): Promise<number> {
+  const organizationId = SEED_ORGANIZATION_ID;
+  const catalog = new CatalogRepository(prisma);
+  const missing = await catalog.withoutEmbedding(organizationId);
+  if (missing.length === 0) return 0;
+  // Before the request, so a real (billed) run in the wrong mode shows at once.
+  const mode = demoMode ? 'fake' : 'real';
+  logger.info(
+    { services: missing.length, adapter: embedder.constructor.name, mode },
+    `embedding ${String(missing.length)} services with the ${mode} embedder (${embedder.constructor.name})`,
+  );
+  const { vectors, tokens, costUsd } = await embedder.embed(
+    missing.map((service) => [service.name, service.problem, service.expectedResult].join('\n')),
+  );
+  await prisma.$transaction([
+    ...missing.map((service, index) => {
+      const vector = vectors[index];
+      // The port promises one vector per text; a short answer must not store a partial catalog.
+      if (vector === undefined) throw new Error('Embedder returned fewer vectors than texts');
+      return catalog.setEmbedding(service.id, vector);
+    }),
+    prisma.costRecord.create({
+      data: {
+        organizationId,
+        service: 'PERPLEXITY_EMBEDDINGS',
+        amountUsd: toStoredUsd(costUsd),
+        units: tokens,
+      },
+    }),
+  ]);
+  return missing.length;
 }

@@ -92,6 +92,11 @@ Side exits: `FILTERED_OUT` (ideal-client filter), `NO_STRONG_SIGNAL` (no evidenc
 - A row with `points = 0` is a note that explains a missing score (today only `reviews_unreplied` with fewer stored reviews than the niche's `minReviews`). It is not evidence for anything: the solution step (FR-17) must accept only signals with `points > 0`.
 - The points come from the campaign's niche version (`NicheProfile.signalWeights`) and the tier from its `tiers`, so an old campaign keeps scoring by the rules it was created with.
 
+## Service embeddings
+
+- `pnpm db:seed` embeds every service whose `Service.embedding` is NULL (name, problem and expected result) and never re-embeds one that has a vector (#17, FR-16). In `DEMO_MODE=true` the vectors come from the fake bag-of-words embedder; they are not comparable with Perplexity's. To switch from demo to real vectors, run `UPDATE "Service" SET embedding = NULL;` and re-run the seed with `DEMO_MODE=false`.
+- Each embedding run writes one `CostRecord` (service `PERPLEXITY_EMBEDDINGS`): `units` is the exact token count, and `amountUsd` is rounded **up** to 5 decimals (the LLM gate's rule, `db/stored-usd.ts`), so a batch costing a few millionths of a dollar is stored as $0.00001, never $0.
+
 ## Retention (NFR-6)
 
 The daily retention loop clears `CallAttempt.transcript` and `recordingUrl` after `Settings.retentionDays` (default 90). The result, reason code and remarks stay.
