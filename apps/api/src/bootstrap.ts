@@ -6,6 +6,8 @@
  */
 import { Container, HazelApp } from '@hazeljs/core';
 import { bindAdapter } from './adapters/bind.js';
+import { FakeEmbeddingAdapter } from './adapters/embedding/fake.adapter.js';
+import { PerplexityEmbeddingAdapter } from './adapters/embedding/perplexity.adapter.js';
 import { AnthropicLlmAdapter } from './adapters/llm/anthropic.adapter.js';
 import { FakeLlmAdapter } from './adapters/llm/fake.adapter.js';
 import { ApifyLeadSourceAdapter } from './adapters/lead-source/apify.adapter.js';
@@ -18,6 +20,7 @@ import { AppModule } from './app.module.js';
 import { ENV, InvalidEnvError, loadEnv, type Env } from './config/env.js';
 import { PrismaProvider } from './db/prisma.provider.js';
 import { createLogger, LOGGER } from './logging/logger.js';
+import { EMBEDDING, type EmbeddingPort } from './ports/embedding.port.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
 import { LLM, type LlmPort } from './ports/llm.port.js';
 import { WEB_CONTEXT, type WebContextPort } from './ports/web-context.port.js';
@@ -80,6 +83,10 @@ export async function createApp(env: Env): Promise<HazelApp> {
     fake: FakeWebContextAdapter,
   });
   bindAdapter<LlmPort>(container, env, LLM, { real: AnthropicLlmAdapter, fake: FakeLlmAdapter });
+  bindAdapter<EmbeddingPort>(container, env, EMBEDDING, {
+    real: PerplexityEmbeddingAdapter,
+    fake: FakeEmbeddingAdapter,
+  });
   // Every body this API takes today is a few kilobytes (a campaign is under 3 KB); HazelJS's
   // default is 1 MiB. A larger body is answered 413 before it is parsed (NFR-5, T-1 audit).
   // /webhooks/vapi (#28) will need more: an end-of-call report carries the transcript and often
