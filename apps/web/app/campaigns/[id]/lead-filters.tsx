@@ -10,8 +10,16 @@
 import { toSearch, type LeadQuery } from '../../../lib/lead-query';
 
 const TIERS = ['HOT', 'WARM', 'COLD'];
-// The statuses a Cycle 1 lead can have; later ones (calls) come with Cycle 3.
-const STATUSES = ['DISCOVERED', 'ENRICHED', 'SCORED', 'FAILED', 'FILTERED_OUT'];
+// The statuses a lead can have before calling: enrichment, scoring and the solution step's exits.
+const STATUSES = [
+  'DISCOVERED',
+  'ENRICHED',
+  'SCORED',
+  'NO_STRONG_SIGNAL',
+  'NEEDS_REVIEW',
+  'FAILED',
+  'FILTERED_OUT',
+];
 
 /**
  * Renders the filter form and the CSV link.
