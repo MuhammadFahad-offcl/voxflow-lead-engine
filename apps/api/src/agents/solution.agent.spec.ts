@@ -88,9 +88,12 @@ const SCENARIOS: Record<string, LlmReply[]> = {
   'schema broken then valid': [TOOL, BROKEN, BROKEN, TOOL, VALID],
   // The cap refuses before any answer is used.
   'cap reached': [],
-  // The model gives up after the failed search; the outage must still fail the run.
+  // A second answer is scripted but must never be asked for: a failed search ends the run.
   'search fails': [TOOL, WEAK],
 };
+
+// Model calls of the current case, including any the gate would refuse to pay for.
+let modelCalls = 0;
 
 // A fresh runtime, gate and catalog per case; `run(scenario)` replays that scenario's answers.
 const createContext = () => {
@@ -100,6 +103,7 @@ const createContext = () => {
   const toolCalls: string[] = [];
   const port: LlmPort = {
     complete: () => {
+      modelCalls += 1;
       const next = replies.shift();
       if (next === undefined) throw new Error('No scripted answer left');
       return Promise.resolve(next);
@@ -133,6 +137,7 @@ const createContext = () => {
     agentName: SOLUTION_AGENT,
     run: async (name: string) => {
       scenario = name;
+      modelCalls = 0;
       replies = [...(SCENARIOS[name] ?? [])];
       const started = Date.now();
       const outcome = await runSolutionAgent(runtime, LEAD);
@@ -227,6 +232,8 @@ const suite = describeAgent('solution agent', ({ test }) => {
     run,
   }) => {
     await expect(run('search fails')).rejects.toThrow('database is down');
+    // Only the turn that called the tool: no paid turn after it failed (e.g. a refused cap).
+    expect(modelCalls).toBe(1);
   });
 });
 

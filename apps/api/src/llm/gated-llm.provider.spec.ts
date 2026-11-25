@@ -10,7 +10,12 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import type { LLMChatRequest } from '@hazeljs/agent';
 import { z } from 'zod';
 import { Prisma } from '../generated/prisma/client.js';
-import { GatedLlmProvider, newAgentLlmScope, runInAgentLlmScope } from './gated-llm.provider.js';
+import {
+  GatedLlmProvider,
+  newAgentLlmScope,
+  runInAgentLlmScope,
+  stopAgentLlmScope,
+} from './gated-llm.provider.js';
 import type { LlmCall, LlmResult } from './llm.service.js';
 
 const Answer = z.object({ pick: z.string() });
@@ -145,6 +150,20 @@ describe('GatedLlmProvider', () => {
         new GatedLlmProvider(gate([])).chat({ ...request(), tools: [withParameters] }),
       ),
     ).rejects.toThrow('takes parameters');
+  });
+
+  it('sends nothing more once a tool stopped the run, and throws the tool’s error', async () => {
+    const llm = gate([{ action: 'tool', name: 'searchCatalog', answer: null }]);
+    const refused = new Error('Catalog search failed');
+
+    const second = runInAgentLlmScope(scope(), async () => {
+      await new GatedLlmProvider(llm).chat(request());
+      stopAgentLlmScope(refused);
+      return new GatedLlmProvider(llm).chat(request());
+    });
+
+    await expect(second).rejects.toBe(refused);
+    expect(llm.calls).toHaveLength(1);
   });
 
   it('keeps the first gate error on the scope, so the runner can rethrow it unwrapped', async () => {

@@ -66,6 +66,19 @@ export const newAgentLlmScope = (
 ): AgentLlmScope => ({ ...settings, models: [], costUsd: new Prisma.Decimal(0), failure: null });
 
 /**
+ * Stops the current agent run's model calls: the next call in this scope throws `error` instead of
+ * reaching the model. For a tool's error, which HazelJS hands back to the model as text, so the
+ * model would otherwise keep taking paid turns (e.g. after the catalog search failed).
+ *
+ * Does nothing outside a scope, and keeps an earlier error when there is one.
+ * @param error - Why the run must stop; the runner rethrows it unwrapped.
+ */
+export const stopAgentLlmScope = (error: unknown): void => {
+  const scope = storage.getStore();
+  if (scope !== undefined) scope.failure ??= error;
+};
+
+/**
  * Runs `fn` with `scope` as the current agent LLM scope, including everything it awaits.
  * @param scope - From {@link newAgentLlmScope}.
  * @param fn - Usually a call to `AgentRuntime.execute`.
@@ -105,13 +118,18 @@ export class GatedLlmProvider implements LLMProvider {
    * @param request - The messages and tools HazelJS sends.
    * @returns `tool_calls` with one call, or the final answer as JSON text.
    * @throws Error when called outside {@link runInAgentLlmScope} or for a tool with parameters,
-   * before anything is sent; whatever `LlmService.complete` throws (cap reached, invalid twice, LLM
-   * error), also kept on the scope.
+   * before anything is sent; the scope's error, unsent, once {@link stopAgentLlmScope} or an earlier
+   * call set it; whatever `LlmService.complete` throws (cap reached, invalid twice, LLM error), also
+   * kept on the scope.
    */
   async chat(request: LLMChatRequest): Promise<LLMChatResponse> {
     const scope = storage.getStore();
     if (scope === undefined) {
       throw new Error('Agent LLM call outside an agent LLM scope: refused, it would skip the cap');
+    }
+    // A failed tool or call ends the run: no further paid turn.
+    if (scope.failure !== null) {
+      throw scope.failure instanceof Error ? scope.failure : new Error('Agent run already stopped');
     }
     const tools = request.tools ?? [];
     const withParameters = tools.find(
