@@ -184,6 +184,8 @@ Checked before every `placeCall` (FR-21). Each denial is stored on the attempt a
 | `health`            | database, worker and tunnel all healthy                                           | —                                                         |
 | `campaign-approved` | campaign status is `CALLING`                                                      | —                                                         |
 
+**Agent tools outside the call path.** The solution agent's `searchCatalog` (#19) is read-only: it embeds the lead's own evidence and reads the active catalog; it takes no model input, contacts no business and writes only its own cost record. Its cost is held by the spend caps instead (the LLM gate for the agent's turns, the Perplexity daily cap for the query embedding). Gatekeeper does not wrap agent tools yet; when it does (default deny), `searchCatalog` needs an explicit allow rule.
+
 ## 8. Adapters (ports and adapters, ADR-0007)
 
 | Port             | Real adapter                                                                 | Fake adapter (demo + tests)                                          | Used by                |

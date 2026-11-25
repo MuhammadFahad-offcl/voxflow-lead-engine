@@ -6,18 +6,16 @@
  * Used by: apps/api/src/bootstrap.ts, through `bindAdapter`, when DEMO_MODE=true; tests.
  */
 import { Injectable } from '@hazeljs/core';
-import { Prisma } from '../../generated/prisma/client.js';
 import {
   EMBEDDING_DIMENSIONS,
   EMBEDDING_MAX_TEXTS,
+  EMBEDDING_USD_PER_TOKEN,
   EmbeddingError,
   type EmbeddingPort,
   type EmbeddingResult,
 } from '../../ports/embedding.port.js';
 import { toUnitVector } from './unit-vector.js';
 
-// pplx-embed-v1-0.6b's rate, $0.004 per million tokens, so demo costs have the right size.
-const USD_PER_TOKEN = new Prisma.Decimal('0.004').dividedBy(1_000_000);
 // Letters and digits in any script. Urdu diacritics (zer, zabar) split a word; still deterministic.
 const WORD = /[\p{L}\p{N}]+/gu;
 
@@ -66,7 +64,11 @@ export class FakeEmbeddingAdapter implements EmbeddingPort {
         throw new EmbeddingError('Cannot embed a text with no words', false);
       }
       const tokens = wordLists.reduce((sum, words) => sum + words.length, 0);
-      return { vectors: wordLists.map(countWords), tokens, costUsd: USD_PER_TOKEN.times(tokens) };
+      return {
+        vectors: wordLists.map(countWords),
+        tokens,
+        costUsd: EMBEDDING_USD_PER_TOKEN.times(tokens),
+      };
     });
   }
 }

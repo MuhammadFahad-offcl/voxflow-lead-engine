@@ -2,7 +2,8 @@
  * The one rounding rule for amounts written to `CostRecord.amountUsd`, which keeps 5 decimals.
  *
  * Serves: FR-33 (spend caps), ADR-0006 (LLM and embeddings spend); issue #13, issue #17.
- * Used by: apps/api/src/llm/llm.service.ts, apps/api/src/db/seed.ts.
+ * Used by: apps/api/src/llm/llm.service.ts, apps/api/src/db/seed.ts,
+ * apps/api/src/pipeline/query-embedding.ts.
  */
 import { Prisma } from '../generated/prisma/client.js';
 

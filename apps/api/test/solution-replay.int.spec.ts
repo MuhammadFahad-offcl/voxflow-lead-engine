@@ -17,8 +17,10 @@ import {
   runSolutionAgent,
 } from '../src/agents/solution.agent.js';
 import { CatalogRepository } from '../src/db/catalog.repository.js';
+import { LeadContextRepository } from '../src/db/lead-context.repository.js';
 import { LlmSpendRepository } from '../src/db/llm-spend.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
+import { SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import { SolutionRepository } from '../src/db/solution.repository.js';
 import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from '../src/llm/gated-llm.provider.js';
 import { LlmService } from '../src/llm/llm.service.js';
@@ -60,7 +62,18 @@ describe('solution agent on the recorded demo answers', () => {
       logLevel: LogLevel.ERROR,
       enableMetrics: false,
     });
-    registerSolutionAgent(runtime, createCatalogSearch(embedder, new CatalogRepository(prisma)));
+    // With the real cap check and cost record, as the lead graph will use them (the recorder alone
+    // passes null: its leads live in a scratch database).
+    const spend = { leads: new LeadContextRepository(prisma), now: () => new Date() };
+    registerSolutionAgent(
+      runtime,
+      createCatalogSearch(embedder, new CatalogRepository(prisma), spend),
+    );
+    const embeddings = () =>
+      prisma.costRecord.count({
+        where: { organizationId: SEED_ORGANIZATION_ID, service: 'PERPLEXITY_EMBEDDINGS' },
+      });
+    const before = await embeddings();
     const solutions = new SolutionRepository(prisma);
     const outcomes: Record<string, string> = {};
     for (const { id, placeId } of warm) {
@@ -81,5 +94,8 @@ describe('solution agent on the recorded demo answers', () => {
       'fictional-place-p10': 'online-booking-page [no_online_booking, working_website]',
       'fictional-place-p11': 'online-booking-page [no_online_booking, working_website]',
     });
+    // One query embedding per agent run, each with a cost record: six clinics, and p03 runs twice
+    // (its first pick was rejected).
+    expect((await embeddings()) - before).toBe(7);
   }, 120_000);
 });

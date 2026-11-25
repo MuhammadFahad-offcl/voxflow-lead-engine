@@ -162,7 +162,10 @@ async function main(args: readonly string[]): Promise<void> {
       logLevel: LogLevel.ERROR,
       enableMetrics: false,
     });
-    registerSolutionAgent(runtime, createCatalogSearch(embedder, new CatalogRepository(scratch)));
+    // No spend: the fake embedder's query costs nothing real, and the scratch leads are not in the
+    // database that holds the caps.
+    const search = createCatalogSearch(embedder, new CatalogRepository(scratch), null);
+    registerSolutionAgent(runtime, search);
     const solutions = new SolutionRepository(scratch);
     for (const { id, placeId } of warm) {
       // No lead or campaign: they exist only in the scratch database, not where the cost is stored.
