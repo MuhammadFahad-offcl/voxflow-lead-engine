@@ -34,7 +34,10 @@ export interface AgentLlmScope {
   models: string[];
   /** Filled in: what the calls cost together, in US dollars. */
   costUsd: Prisma.Decimal;
-  /** Filled in: the first error the gate threw (HazelJS wraps it), or null. */
+  /**
+   * Filled in: the first error the gate threw (HazelJS wraps it) or a tool stopped the run with,
+   * or null. Once set, {@link GatedLlmProvider.chat} refuses every further call in the scope.
+   */
   failure: unknown;
 }
 
@@ -64,6 +67,19 @@ interface GateAnswer {
 export const newAgentLlmScope = (
   settings: Omit<AgentLlmScope, 'models' | 'costUsd' | 'failure'>,
 ): AgentLlmScope => ({ ...settings, models: [], costUsd: new Prisma.Decimal(0), failure: null });
+
+/**
+ * Stops the current agent run's model calls: the next call in this scope throws `error` instead of
+ * reaching the model. For a tool's error, which HazelJS hands back to the model as text, so the
+ * model would otherwise keep taking paid turns (e.g. after the catalog search failed).
+ *
+ * Does nothing outside a scope, and keeps an earlier error when there is one.
+ * @param error - Why the run must stop; the runner rethrows it unwrapped.
+ */
+export const stopAgentLlmScope = (error: Error): void => {
+  const scope = storage.getStore();
+  if (scope !== undefined) scope.failure ??= error;
+};
 
 /**
  * Runs `fn` with `scope` as the current agent LLM scope, including everything it awaits.
@@ -105,13 +121,18 @@ export class GatedLlmProvider implements LLMProvider {
    * @param request - The messages and tools HazelJS sends.
    * @returns `tool_calls` with one call, or the final answer as JSON text.
    * @throws Error when called outside {@link runInAgentLlmScope} or for a tool with parameters,
-   * before anything is sent; whatever `LlmService.complete` throws (cap reached, invalid twice, LLM
-   * error), also kept on the scope.
+   * before anything is sent; the scope's error, unsent, once {@link stopAgentLlmScope} or an earlier
+   * call set it; whatever `LlmService.complete` throws (cap reached, invalid twice, LLM error), also
+   * kept on the scope.
    */
   async chat(request: LLMChatRequest): Promise<LLMChatResponse> {
     const scope = storage.getStore();
     if (scope === undefined) {
       throw new Error('Agent LLM call outside an agent LLM scope: refused, it would skip the cap');
+    }
+    // A failed tool or call ends the run: no further paid turn.
+    if (scope.failure !== null) {
+      throw scope.failure instanceof Error ? scope.failure : new Error('Agent run already stopped');
     }
     const tools = request.tools ?? [];
     const withParameters = tools.find(

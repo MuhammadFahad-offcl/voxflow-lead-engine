@@ -88,9 +88,14 @@ const SCENARIOS: Record<string, LlmReply[]> = {
   'schema broken then valid': [TOOL, BROKEN, BROKEN, TOOL, VALID],
   // The cap refuses before any answer is used.
   'cap reached': [],
-  // The model gives up after the failed search; the outage must still fail the run.
+  // A second answer is scripted but must never be asked for: a failed search ends the run.
   'search fails': [TOOL, WEAK],
+  // The model asks for the tool twice; the second call reuses the first search (no second embedding).
+  'tool twice': [TOOL, TOOL, VALID],
 };
+
+// Answers the model was asked for in the current case: calls that reached the LlmPort.
+let modelCalls = 0;
 
 // A fresh runtime, gate and catalog per case; `run(scenario)` replays that scenario's answers.
 const createContext = () => {
@@ -100,6 +105,7 @@ const createContext = () => {
   const toolCalls: string[] = [];
   const port: LlmPort = {
     complete: () => {
+      modelCalls += 1;
       const next = replies.shift();
       if (next === undefined) throw new Error('No scripted answer left');
       return Promise.resolve(next);
@@ -133,6 +139,7 @@ const createContext = () => {
     agentName: SOLUTION_AGENT,
     run: async (name: string) => {
       scenario = name;
+      modelCalls = 0;
       replies = [...(SCENARIOS[name] ?? [])];
       const started = Date.now();
       const outcome = await runSolutionAgent(runtime, LEAD);
@@ -227,6 +234,16 @@ const suite = describeAgent('solution agent', ({ test }) => {
     run,
   }) => {
     await expect(run('search fails')).rejects.toThrow('database is down');
+    // Only the turn that called the tool: no second paid turn after the search failed.
+    expect(modelCalls).toBe(1);
+  });
+
+  test('searches once per run when the model calls the tool twice', async ({ run }) => {
+    const result = await run('tool twice');
+    const { outcome } = details(result.metadata);
+
+    expectTools(result, ['searchCatalog']);
+    expect(outcome).toMatchObject({ kind: 'pick', serviceSlug: 'ai-voice-receptionist' });
   });
 });
 

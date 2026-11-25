@@ -17,7 +17,11 @@ import { SolutionAnswer } from '@voxflow/shared';
 import { z } from 'zod';
 import type { CatalogRepository } from '../db/catalog.repository.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { newAgentLlmScope, runInAgentLlmScope } from '../llm/gated-llm.provider.js';
+import {
+  newAgentLlmScope,
+  runInAgentLlmScope,
+  stopAgentLlmScope,
+} from '../llm/gated-llm.provider.js';
 import { LlmOutputInvalidError } from '../llm/llm.service.js';
 import { embedWithinCap, type QueryEmbeddingSpend } from '../pipeline/query-embedding.js';
 import type { EmbeddingPort } from '../ports/embedding.port.js';
@@ -125,6 +129,8 @@ export type SolutionOutcome =
 // What the tool needs and records during one agent run; HazelJS passes the tool only its input.
 interface SolutionRun {
   lead: SolutionLead;
+  /** The search's result, kept so a second tool call in the run does not search (and pay) again. */
+  matches: CatalogMatch[] | null;
   retrievedSlugs: string[];
   /** The tool's own error: HazelJS catches tool errors and lets the model carry on. */
   failure: Error | null;
@@ -151,7 +157,8 @@ class SolutionAgent {
    * steer the search away from what the reviews and website show.
    * @returns The 5 closest active services; their slugs are kept for checking the pick.
    * @throws Error when called outside {@link runSolutionAgent}; errors from the embedder or database,
-   * also kept on the run so the runner rethrows them (HazelJS would swallow them).
+   * also kept on the run so the runner rethrows them (HazelJS would swallow them); a failed search
+   * also stops the run's further model calls (`stopAgentLlmScope`).
    */
   @Tool({
     name: 'searchCatalog',
@@ -169,11 +176,13 @@ class SolutionAgent {
       .map(({ evidence: text }) => text)
       .join('\n');
     try {
-      const matches = await this.search(evidence, SERVICES_RETURNED, run.lead);
+      const matches = (run.matches ??= await this.search(evidence, SERVICES_RETURNED, run.lead));
       run.retrievedSlugs = matches.map(({ slug }) => slug);
       return matches;
     } catch (error) {
       run.failure ??= error instanceof Error ? error : new Error(String(error));
+      // Ends the run's model calls: otherwise the model takes paid turns after a failed search.
+      stopAgentLlmScope(run.failure);
       throw error;
     }
   }
@@ -231,7 +240,7 @@ const attempt = async (
     answer: SolutionAnswer,
     maxTokens: MAX_TOKENS,
   });
-  const run: SolutionRun = { lead, retrievedSlugs: [], failure: null };
+  const run: SolutionRun = { lead, matches: null, retrievedSlugs: [], failure: null };
   let response: string | undefined;
   let stepsExceeded = false;
   try {
