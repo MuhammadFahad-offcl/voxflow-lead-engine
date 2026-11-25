@@ -139,8 +139,8 @@ export class LeadContextRepository {
    * Records what one query embedding cost, against its lead and campaign.
    * @param owner - Whose spend it is.
    * @param owner.organizationId - Owner of the spend.
-   * @param owner.campaignId - The campaign the cost belongs to.
-   * @param owner.leadId - The lead the query was for.
+   * @param owner.campaignId - The campaign the cost belongs to; null for a run with no campaign.
+   * @param owner.leadId - The lead the query was for; null for a run with no lead (a replay test).
    * @param costUsd - What it cost, or its worst case when it may have been billed but failed, in US
    * dollars; already rounded for storage.
    * @param tokens - The tokens it used; 0 when unknown.

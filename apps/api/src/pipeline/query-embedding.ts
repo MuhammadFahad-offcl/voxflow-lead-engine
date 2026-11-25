@@ -9,7 +9,6 @@
  * Serves: FR-33, NFR-4 (cost per lead), FR-16; issue #19.
  * Used by: apps/api/src/agents/solution.agent.ts (createCatalogSearch), query-embedding.spec.ts.
  */
-import type { SolutionLead } from '../agents/solution.agent.js';
 import type { LeadContextRepository } from '../db/lead-context.repository.js';
 import { toStoredUsd } from '../db/stored-usd.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -24,6 +23,13 @@ import { karachiDayStart, wouldPassCap } from './spend-cap.js';
 
 // Tokens a request may add around the text (start and end markers): headroom for the worst case.
 const EXTRA_TOKENS = 16;
+
+/** Whose spend a query embedding is; null ids for a run with no lead or campaign. */
+interface SpendOwner {
+  organizationId: string;
+  campaignId: string | null;
+  leadId: string | null;
+}
 
 /** Where a query embedding's cap is read and its cost recorded. */
 export interface QueryEmbeddingSpend {
@@ -51,12 +57,13 @@ const queryEmbeddingMaxUsd = (text: string): Prisma.Decimal =>
  * @param lead - Whose spend it is.
  * @returns The embedder's result.
  * @throws SpendCapReachedError, before any request, when the embedding could pass the cap; the
- * embedder's errors, after recording a possibly billed one.
+ * embedder's errors, after recording a possibly billed one; Prisma or Zod errors from reading the
+ * cap or writing the cost record.
  */
 export async function embedWithinCap(
   deps: QueryEmbeddingSpend & { embedder: EmbeddingPort },
   text: string,
-  lead: Pick<SolutionLead, 'organizationId' | 'campaignId' | 'leadId'>,
+  lead: SpendOwner,
 ): Promise<EmbeddingResult> {
   const { leads, now, embedder } = deps;
   const owner = {
@@ -67,9 +74,11 @@ export async function embedWithinCap(
   const maxUsd = queryEmbeddingMaxUsd(text);
   const { capUsd, spentUsd } = await leads.dailyCap(lead.organizationId, karachiDayStart(now()));
   if (wouldPassCap(spentUsd, maxUsd, capUsd)) {
-    const [spent, next, cap] = [spentUsd, maxUsd, capUsd].map((usd) => usd.toFixed(5));
+    // The search step's 3 decimals for the day's totals; 5 for the embedding, a fraction of a cent.
+    const [spent, cap] = [spentUsd, capUsd].map((usd) => usd.toFixed(3));
+    const next = maxUsd.toFixed(5);
     throw new SpendCapReachedError(
-      `Perplexity daily cap: $${String(spent)} spent today, the next query embedding may cost $${String(next)}, the cap is $${String(cap)}`,
+      `Perplexity daily cap: $${String(spent)} spent today, the next query embedding may cost $${next}, the cap is $${String(cap)}`,
     );
   }
   let result: EmbeddingResult;

@@ -28,7 +28,10 @@ import {
 // One retry: a second bad answer is unlikely to become good on a third try, and each try is paid.
 const MAX_ATTEMPTS = 2;
 
-/** A call refused because its worst case could take the month's LLM spend past the cap. */
+/**
+ * A call refused because its worst case could take a spend cap past its limit: the month's LLM
+ * spend, or the day's Perplexity spend for a query embedding. `reason` names which.
+ */
 export class SpendCapReachedError extends Error {
   /**
    * Builds the error.

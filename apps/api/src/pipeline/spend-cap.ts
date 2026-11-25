@@ -7,7 +7,7 @@
  * Used by: apps/api/src/pipeline/discover.step.ts, apps/api/src/db/discovery.repository.ts,
  * apps/api/src/db/review.repository.ts, apps/api/src/pipeline/enrich-reviews.step.ts,
  * apps/api/src/pipeline/enrich-context.step.ts, apps/api/src/llm/llm.service.ts,
- * apps/api/src/pipeline/spend-cap.spec.ts.
+ * apps/api/src/pipeline/query-embedding.ts, apps/api/src/pipeline/spend-cap.spec.ts.
  */
 import type { Prisma } from '../generated/prisma/client.js';
 
@@ -48,7 +48,7 @@ export function spendLockName(organizationId: string): string {
 }
 
 /**
- * Decides whether the next charge (an Apify run, a search or an LLM call) could take the period's
+ * Decides whether the next charge (an Apify run, a search, a query embedding or an LLM call) could take the period's
  * spend past the cap.
  *
  * Does not wait for the cap to be reached: the charge's limit counts as spent, so the last charge

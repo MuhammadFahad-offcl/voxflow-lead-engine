@@ -4,7 +4,8 @@
  * `GatedLlmProvider`, so the monthly cap, cost records and demo replay apply. The runner checks
  * the pick, retries once with the problems, and otherwise reports NEEDS_REVIEW.
  *
- * Serves: FR-17, US-5, NFR-9, ADR-0001 (HazelJS agents), ADR-0006; issue #19.
+ * Serves: FR-17, US-5, NFR-9, FR-33 (the query embedding's cap), ADR-0001 (HazelJS agents),
+ * ADR-0006; issue #19.
  * Used by: apps/api/src/llm-record-solution.ts, apps/api/src/db/solution.repository.ts,
  * apps/api/test/solution-replay.int.spec.ts, solution.agent.spec.ts; the lead graph in #19 part 2.
  */
@@ -66,7 +67,7 @@ export type CatalogSearch = (
  * @returns The search the agent's `searchCatalog` tool calls.
  * @throws SpendCapReachedError (from the returned search) when the embedding could pass the
  * Perplexity daily cap; Error when the embedder returns no vector; the embedder's and the
- * database's errors.
+ * database's errors, including Prisma or Zod errors from reading the cap or writing the cost.
  */
 export const createCatalogSearch =
   (

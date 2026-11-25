@@ -12,7 +12,6 @@ import { EmbeddingError, type EmbeddingPort } from '../ports/embedding.port.js';
 import { embedWithinCap, type QueryEmbeddingSpend } from './query-embedding.js';
 
 const lead = { organizationId: 'org_voxflow', campaignId: 'campaign_1', leadId: 'lead_1' };
-const owner = lead;
 const text = 'Patients say the phone is never answered.';
 
 // A cap of `capUsd` with `spentUsd` spent today; records what is written; an embedder answering
@@ -57,7 +56,7 @@ describe('embedWithinCap', () => {
     expect(days).toEqual([new Date('2026-11-22T19:00:00Z')]);
     expect(embed).toHaveBeenCalledWith([text]);
     expect(recorded.map(([who, usd, tokens]) => [who, String(usd), tokens])).toEqual([
-      [owner, '0.00001', 9],
+      [lead, '0.00001', 9],
     ]);
   });
 
@@ -68,10 +67,21 @@ describe('embedWithinCap', () => {
 
     await expect(refused).rejects.toThrow(SpendCapReachedError);
     await expect(refused).rejects.toThrow(
-      'Perplexity daily cap: $2.00000 spent today, the next query embedding may cost $0.00001, the cap is $2.00000',
+      'Perplexity daily cap: $2.000 spent today, the next query embedding may cost $0.00001, the cap is $2.000',
     );
     expect(embed).not.toHaveBeenCalled();
     expect(recorded).toEqual([]);
+  });
+
+  it('prices the worst case by UTF-8 bytes, not characters, so Urdu text is not undercounted', async () => {
+    // 1,250 Urdu letters are 2,500 bytes: (2,500 + 16) tokens cost $0.00001006, stored as $0.00002.
+    // Counting characters (1,266 tokens) would give $0.00001.
+    const { deps, embed } = setup('2.00', '2.00');
+
+    await expect(embedWithinCap(deps, 'ب'.repeat(1250), lead)).rejects.toThrow(
+      'the next query embedding may cost $0.00002,',
+    );
+    expect(embed).not.toHaveBeenCalled();
   });
 
   it('records the worst case for a failure that may have been billed, then throws', async () => {
@@ -79,7 +89,7 @@ describe('embedWithinCap', () => {
 
     await expect(embedWithinCap(deps, text, lead)).rejects.toThrow('Timed out');
     expect(recorded.map(([who, usd, tokens]) => [who, String(usd), tokens])).toEqual([
-      [owner, '0.00001', 0],
+      [lead, '0.00001', 0],
     ]);
   });
 

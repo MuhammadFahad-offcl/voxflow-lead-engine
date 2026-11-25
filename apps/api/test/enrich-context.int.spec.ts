@@ -281,8 +281,10 @@ describe('Perplexity daily total', () => {
   it('adds the day’s query embeddings to the search spend', async () => {
     await record('PERPLEXITY_SEARCH', '0.005');
     await record('PERPLEXITY_EMBEDDINGS', '0.00002');
+    // The day starts inclusive: a row at the very first instant counts.
+    await record('PERPLEXITY_EMBEDDINGS', '0.00003', dayStart);
     await record('PERPLEXITY_EMBEDDINGS', '0.00001', new Date(dayStart.getTime() - 1));
 
-    expect(await spentToday()).toBe('0.00502');
+    expect(await spentToday()).toBe('0.00505');
   });
 });
