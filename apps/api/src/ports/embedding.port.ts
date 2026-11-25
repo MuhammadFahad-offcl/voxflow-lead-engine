@@ -2,15 +2,22 @@
  * The port that turns texts into vectors for the service catalog's similarity search.
  *
  * Serves: FR-16 (catalog search), ADR-0006 (pplx-embed-v1-0.6b, 1024 dimensions), ADR-0007; issue #17.
- * Used by: apps/api/src/adapters/embedding/ and apps/api/src/bootstrap.ts.
+ * Used by: apps/api/src/adapters/embedding/, apps/api/src/bootstrap.ts,
+ * apps/api/src/pipeline/query-embedding.ts.
  */
-import type { Prisma } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 
 /** DI token of {@link EmbeddingPort}. */
 export const EMBEDDING = 'EmbeddingPort';
 
 /** Length of every vector: the size of `Service.embedding` (`vector(1024)`). */
 export const EMBEDDING_DIMENSIONS = 1024;
+
+/**
+ * What pplx-embed-v1-0.6b costs per token, in US dollars ($0.004 per million, ADR-0006). The real
+ * adapter reads each request's cost from Perplexity; this prices a worst case before a request.
+ */
+export const EMBEDDING_USD_PER_TOKEN = new Prisma.Decimal('0.004').dividedBy(1_000_000);
 
 /** Most texts one {@link EmbeddingPort.embed} call takes: Perplexity's limit per request. */
 export const EMBEDDING_MAX_TEXTS = 512;

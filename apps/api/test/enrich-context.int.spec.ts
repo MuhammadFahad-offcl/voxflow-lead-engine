@@ -11,10 +11,12 @@ import type { HazelApp } from '@hazeljs/core';
 import { BusinessContext } from '@voxflow/shared';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { LeadContextRepository } from '../src/db/lead-context.repository.js';
+import type { CostService } from '../src/generated/prisma/client.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
 import { enrichContext, type EnrichContextDeps } from '../src/pipeline/enrich-context.step.js';
+import { karachiDayStart } from '../src/pipeline/spend-cap.js';
 import {
   WEB_CONTEXT,
   WebContextError,
@@ -242,5 +244,47 @@ describe('enrichContext failure', () => {
     const row = await prisma.lead.findUniqueOrThrow({ where: { id: lead.id } });
     expect(row.businessContext).toBeNull();
     expect(await costs()).toHaveLength(1);
+  });
+});
+
+// Proves the shared Perplexity cap (#19): search spend counts exactly as before, and the day's
+// query embeddings are added to it; other services and other days never count.
+describe('Perplexity daily total', () => {
+  // A day no other test writes on, so only this block's rows are in it (Asia/Karachi).
+  const day = new Date('2030-01-15T08:00:00Z');
+  const dayStart = karachiDayStart(day);
+  const record = (service: CostService, amountUsd: string, at = day) =>
+    prisma.costRecord.create({
+      data: { organizationId: SEED_ORGANIZATION_ID, service, amountUsd, at },
+    });
+  const spentToday = async () =>
+    (
+      await new LeadContextRepository(prisma).dailyCap(SEED_ORGANIZATION_ID, dayStart)
+    ).spentUsd.toString();
+
+  beforeEach(async () => {
+    await prisma.costRecord.deleteMany({
+      where: { at: { gte: new Date('2030-01-01T00:00:00Z') } },
+    });
+  });
+
+  it('counts search-only spend exactly as before', async () => {
+    await record('PERPLEXITY_SEARCH', '0.005');
+    await record('PERPLEXITY_SEARCH', '0.003');
+    await record('LLM', '0.5');
+    await record('APIFY', '1.0');
+    await record('PERPLEXITY_SEARCH', '0.009', new Date(dayStart.getTime() - 1));
+
+    expect(await spentToday()).toBe('0.008');
+  });
+
+  it('adds the day’s query embeddings to the search spend', async () => {
+    await record('PERPLEXITY_SEARCH', '0.005');
+    await record('PERPLEXITY_EMBEDDINGS', '0.00002');
+    // The day starts inclusive: a row at the very first instant counts.
+    await record('PERPLEXITY_EMBEDDINGS', '0.00003', dayStart);
+    await record('PERPLEXITY_EMBEDDINGS', '0.00001', new Date(dayStart.getTime() - 1));
+
+    expect(await spentToday()).toBe('0.00505');
   });
 });
