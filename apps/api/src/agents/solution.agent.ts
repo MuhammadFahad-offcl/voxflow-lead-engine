@@ -139,7 +139,8 @@ class SolutionAgent {
    * steer the search away from what the reviews and website show.
    * @returns The 5 closest active services; their slugs are kept for checking the pick.
    * @throws Error when called outside {@link runSolutionAgent}; errors from the embedder or database,
-   * also kept on the run so the runner rethrows them (HazelJS would swallow them).
+   * also kept on the run so the runner rethrows them (HazelJS would swallow them); a failed search
+   * also stops the run's further model calls (`stopAgentLlmScope`).
    */
   @Tool({
     name: 'searchCatalog',

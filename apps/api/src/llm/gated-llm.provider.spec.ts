@@ -166,6 +166,25 @@ describe('GatedLlmProvider', () => {
     expect(llm.calls).toHaveLength(1);
   });
 
+  it('refuses a second call after the gate itself failed, without calling the model again', async () => {
+    const capReached = new Error('cap reached');
+    let completes = 0;
+    const failing = {
+      complete: (): Promise<never> => {
+        completes += 1;
+        return Promise.reject(capReached);
+      },
+    };
+
+    const second = runInAgentLlmScope(scope(), async () => {
+      await new GatedLlmProvider(failing).chat(request()).catch(() => undefined);
+      return new GatedLlmProvider(failing).chat(request());
+    });
+
+    await expect(second).rejects.toBe(capReached);
+    expect(completes).toBe(1);
+  });
+
   it('keeps the first gate error on the scope, so the runner can rethrow it unwrapped', async () => {
     const failing = {
       complete: (): Promise<never> => Promise.reject(new Error('cap reached')),

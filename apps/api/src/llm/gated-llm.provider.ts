@@ -34,7 +34,10 @@ export interface AgentLlmScope {
   models: string[];
   /** Filled in: what the calls cost together, in US dollars. */
   costUsd: Prisma.Decimal;
-  /** Filled in: the first error the gate threw (HazelJS wraps it), or null. */
+  /**
+   * Filled in: the first error the gate threw (HazelJS wraps it) or a tool stopped the run with,
+   * or null. Once set, {@link GatedLlmProvider.chat} refuses every further call in the scope.
+   */
   failure: unknown;
 }
 
@@ -73,7 +76,7 @@ export const newAgentLlmScope = (
  * Does nothing outside a scope, and keeps an earlier error when there is one.
  * @param error - Why the run must stop; the runner rethrows it unwrapped.
  */
-export const stopAgentLlmScope = (error: unknown): void => {
+export const stopAgentLlmScope = (error: Error): void => {
   const scope = storage.getStore();
   if (scope !== undefined) scope.failure ??= error;
 };
