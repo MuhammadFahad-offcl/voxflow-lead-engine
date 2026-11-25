@@ -60,7 +60,11 @@ describe('solution agent on the recorded demo answers', () => {
       logLevel: LogLevel.ERROR,
       enableMetrics: false,
     });
-    registerSolutionAgent(runtime, createCatalogSearch(embedder, new CatalogRepository(prisma)));
+    // No spend: like the recorder, the replayed leads have no lead or campaign to charge.
+    registerSolutionAgent(
+      runtime,
+      createCatalogSearch(embedder, new CatalogRepository(prisma), null),
+    );
     const solutions = new SolutionRepository(prisma);
     const outcomes: Record<string, string> = {};
     for (const { id, placeId } of warm) {

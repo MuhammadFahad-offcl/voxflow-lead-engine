@@ -1,9 +1,11 @@
 /**
  * Database access for the web context part of enrichment: what a lead needs for its search, the
- * Perplexity spend so far today, and storing the context with its cost.
+ * Perplexity spend so far today (searches and embeddings share one daily cap), and storing the
+ * context with its cost. Also records the cost of the solution agent's query embeddings.
  *
- * Serves: FR-12, FR-33, NFR-4; issue #12.
- * Used by: apps/api/src/pipeline/enrich-context.step.ts, apps/api/test/enrich-context.int.spec.ts.
+ * Serves: FR-12, FR-33, NFR-4; issues #12, #19.
+ * Used by: apps/api/src/pipeline/enrich-context.step.ts, apps/api/src/pipeline/query-embedding.ts,
+ * apps/api/test/enrich-context.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { BusinessContext, SpendCaps } from '@voxflow/shared';
@@ -56,7 +58,8 @@ export class LeadContextRepository {
   }
 
   /**
-   * Gives the organization's daily Perplexity cap and what it has spent since a moment.
+   * Gives the organization's daily Perplexity cap and what it has spent since a moment: web
+   * searches and embeddings together, since both are paid to Perplexity under the one cap.
    * @param organizationId - Owner of the spend.
    * @param since - Start of the capped day.
    * @returns The cap and the spend, in US dollars.
@@ -72,7 +75,11 @@ export class LeadContextRepository {
       select: { spendCaps: true },
     });
     const { _sum: sum } = await this.prisma.costRecord.aggregate({
-      where: { organizationId, service: 'PERPLEXITY_SEARCH', at: { gte: since } },
+      where: {
+        organizationId,
+        service: { in: ['PERPLEXITY_SEARCH', 'PERPLEXITY_EMBEDDINGS'] },
+        at: { gte: since },
+      },
       _sum: { amountUsd: true },
     });
     return {
@@ -126,6 +133,26 @@ export class LeadContextRepository {
     costUsd: Prisma.Decimal,
   ): Promise<void> {
     await this.spendRecord(lead, costUsd, 0);
+  }
+
+  /**
+   * Records what one query embedding cost, against its lead and campaign.
+   * @param owner - Whose spend it is.
+   * @param owner.organizationId - Owner of the spend.
+   * @param owner.campaignId - The campaign the cost belongs to.
+   * @param owner.leadId - The lead the query was for.
+   * @param costUsd - What it cost, or its worst case when it may have been billed but failed, in US
+   * dollars; already rounded for storage.
+   * @param tokens - The tokens it used; 0 when unknown.
+   */
+  async recordEmbedding(
+    owner: { organizationId: string; campaignId: string | null; leadId: string | null },
+    costUsd: Prisma.Decimal,
+    tokens: number,
+  ): Promise<void> {
+    await this.prisma.costRecord.create({
+      data: { ...owner, service: 'PERPLEXITY_EMBEDDINGS', amountUsd: costUsd, units: tokens },
+    });
   }
 
   private spendRecord(

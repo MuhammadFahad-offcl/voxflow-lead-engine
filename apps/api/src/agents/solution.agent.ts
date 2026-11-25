@@ -18,6 +18,7 @@ import type { CatalogRepository } from '../db/catalog.repository.js';
 import type { Prisma } from '../generated/prisma/client.js';
 import { newAgentLlmScope, runInAgentLlmScope } from '../llm/gated-llm.provider.js';
 import { LlmOutputInvalidError } from '../llm/llm.service.js';
+import { embedWithinCap, type QueryEmbeddingSpend } from '../pipeline/query-embedding.js';
 import type { EmbeddingPort } from '../ports/embedding.port.js';
 import { checkSolutionPick } from './solution-validation.js';
 
@@ -46,23 +47,39 @@ export interface CatalogMatch {
   fittingSignals: string[];
 }
 
-/** Finds the active catalog services closest to a text, closest first. */
-export type CatalogSearch = (text: string, k: number) => Promise<CatalogMatch[]>;
+/** Finds the active catalog services closest to a lead's text, closest first. */
+export type CatalogSearch = (
+  text: string,
+  k: number,
+  lead: SolutionLead,
+) => Promise<CatalogMatch[]>;
 
 /**
  * Builds the tool's catalog search: embed the text, then the closest active services in pgvector.
  *
- * Does not record the embedding's cost: the query is a few dozen tokens (a fraction of a cent).
+ * With `spend`, the query embedding is checked against the Perplexity daily cap first and its cost
+ * recorded against the lead (FR-33); without it nothing is checked or recorded, which only the
+ * recorder does (the fake embedder, a scratch database).
  * @param embedder - The bound embedder; the fake in demo mode, matching the seeded vectors.
  * @param catalog - The repository of the database to search.
+ * @param spend - Where the embedding's cost is checked and recorded, or null for the recorder.
  * @returns The search the agent's `searchCatalog` tool calls.
- * @throws Error (from the returned search) when the embedder returns no vector; the embedder's and
- * the database's errors.
+ * @throws SpendCapReachedError (from the returned search) when the embedding could pass the
+ * Perplexity daily cap; Error when the embedder returns no vector; the embedder's and the
+ * database's errors.
  */
 export const createCatalogSearch =
-  (embedder: EmbeddingPort, catalog: Pick<CatalogRepository, 'searchSimilar'>): CatalogSearch =>
-  async (text, k) => {
-    const [vector] = (await embedder.embed([text])).vectors;
+  (
+    embedder: EmbeddingPort,
+    catalog: Pick<CatalogRepository, 'searchSimilar'>,
+    spend: QueryEmbeddingSpend | null,
+  ): CatalogSearch =>
+  async (text, k, lead) => {
+    const embedded =
+      spend === null
+        ? await embedder.embed([text])
+        : await embedWithinCap({ ...spend, embedder }, text, lead);
+    const [vector] = embedded.vectors;
     if (vector === undefined) throw new Error('The embedder returned no vector');
     const services = await catalog.searchSimilar(vector, k);
     return services.map(({ slug, name, problem, fittingSignals }) => ({
@@ -151,7 +168,7 @@ class SolutionAgent {
       .map(({ evidence: text }) => text)
       .join('\n');
     try {
-      const matches = await this.search(evidence, SERVICES_RETURNED);
+      const matches = await this.search(evidence, SERVICES_RETURNED, run.lead);
       run.retrievedSlugs = matches.map(({ slug }) => slug);
       return matches;
     } catch (error) {
