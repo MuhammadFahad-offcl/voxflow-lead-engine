@@ -35,8 +35,9 @@ export type SolutionStepOutcome =
  * @param deps - What the step needs.
  * @param leadId - `Lead.id`.
  * @returns What was stored; CAP_REACHED when a spend cap stopped the agent, with nothing stored.
- * @throws Prisma errors; the agent's errors other than a reached cap (an LLM or embedder outage),
- * which fail the lead (FR-32).
+ * @throws Prisma errors; Error from `forSolution` for a lead with no score; the agent's errors
+ * other than a reached cap (an LLM or embedder outage), which the lead graph turns into a FAILED
+ * lead at SOLUTION (FR-32, wired with the graph node).
  */
 export async function solveLead(
   deps: SolutionStepDeps,
@@ -60,12 +61,20 @@ export async function solveLead(
   const costUsd = outcome.costUsd.toFixed(5);
   if (outcome.kind === 'pick') {
     const { serviceSlug, reason, signalKeys, model } = outcome;
-    await solutions.saveOutcome(lead, { kind: 'pick', serviceSlug, reason, signalKeys, model });
+    const stored = { kind: 'pick' as const, serviceSlug, reason, signalKeys, model };
+    // A run that overlapped another may find the Solution already stored: report what is there.
+    if (!(await solutions.saveOutcome(lead, stored))) {
+      return { status: 'SKIPPED', reason: 'ALREADY_SOLVED' };
+    }
     logger.info({ leadId, serviceSlug, costUsd }, 'solution stored');
     return { status: 'SOLVED', serviceSlug };
   }
   const exit = outcome.kind === 'noStrongSignal' ? 'NO_STRONG_SIGNAL' : 'NEEDS_REVIEW';
-  await solutions.saveOutcome(lead, { kind: 'exit', status: exit });
-  logger.info({ leadId, status: exit, costUsd }, 'solution step ended without a pick');
+  if (!(await solutions.saveOutcome(lead, { kind: 'exit', status: exit }))) {
+    return { status: 'SKIPPED', reason: 'NOT_ELIGIBLE' };
+  }
+  // The checker's problems are fixed sentences with signal keys and slugs only, no lead data.
+  const problems = outcome.kind === 'needsReview' ? outcome.problems : undefined;
+  logger.info({ leadId, status: exit, problems, costUsd }, 'solution step ended without a pick');
   return { status: exit };
 }

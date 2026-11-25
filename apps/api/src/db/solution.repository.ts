@@ -4,11 +4,12 @@
  *
  * Serves: FR-17 (signals that cite evidence; NEEDS_REVIEW, NO_STRONG_SIGNAL), FR-36 (demo prompts
  * that replay); issue #19.
- * Used by: apps/api/src/pipeline/solution.step.ts, apps/api/src/llm-record-solution.ts.
+ * Used by: apps/api/src/pipeline/solution.step.ts, apps/api/src/llm-record-solution.ts,
+ * apps/api/test/solution-replay.int.spec.ts, apps/api/test/solution-repository.int.spec.ts.
  */
 import { Inject, Injectable } from '@hazeljs/core';
 import type { SolutionLead } from '../agents/solution.agent.js';
-import type { PrismaClient } from '../generated/prisma/client.js';
+import type { LeadStatus, PrismaClient } from '../generated/prisma/client.js';
 import { PrismaProvider } from './prisma.provider.js';
 
 /** A lead read from the database: its ids are always there, unlike the recorder's scratch leads. */
@@ -45,7 +46,7 @@ export class SolutionRepository {
    */
   async forSolution(
     leadId: string,
-  ): Promise<StoredSolutionLead & { status: string; solved: boolean }> {
+  ): Promise<StoredSolutionLead & { status: LeadStatus; solved: boolean }> {
     const lead = await this.prisma.lead.findUniqueOrThrow({
       where: { id: leadId },
       select: {
@@ -79,19 +80,20 @@ export class SolutionRepository {
    * script, #20), or the exit status.
    *
    * Safe to repeat after a crash: a second Solution for the lead is skipped, and the status only
-   * changes while the lead is still SCORED.
+   * changes while the lead is still SCORED with no Solution.
    * @param lead - The lead, with its signals as {@link forSolution} read them.
    * @param outcome - What to store; the pick's slug and signal keys were checked by the agent.
+   * @returns False when nothing was stored: the lead already had a Solution, or had left SCORED.
    * @throws Prisma's not-found error when the picked service is not in the lead's catalog; Error
    * when a cited key is not one of the lead's signals (the agent's check rules both out).
    */
-  async saveOutcome(lead: StoredSolutionLead, outcome: StoredOutcome): Promise<void> {
+  async saveOutcome(lead: StoredSolutionLead, outcome: StoredOutcome): Promise<boolean> {
     if (outcome.kind === 'exit') {
-      await this.prisma.lead.updateMany({
-        where: { id: lead.leadId, status: 'SCORED' },
+      const { count } = await this.prisma.lead.updateMany({
+        where: { id: lead.leadId, status: 'SCORED', solution: { is: null } },
         data: { status: outcome.status },
       });
-      return;
+      return count > 0;
     }
     const service = await this.prisma.service.findUniqueOrThrow({
       where: {
@@ -105,7 +107,7 @@ export class SolutionRepository {
       return signal.id;
     });
     // `leadId` is unique: a repeat after a crash adds nothing.
-    await this.prisma.solution.createMany({
+    const { count } = await this.prisma.solution.createMany({
       data: {
         leadId: lead.leadId,
         serviceId: service.id,
@@ -115,5 +117,6 @@ export class SolutionRepository {
       },
       skipDuplicates: true,
     });
+    return count > 0;
   }
 }

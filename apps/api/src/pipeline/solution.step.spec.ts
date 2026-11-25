@@ -8,7 +8,7 @@
 import { describe, expect, it, jest } from '@jest/globals';
 import type { SolutionOutcome } from '../agents/solution.agent.js';
 import type { StoredOutcome, StoredSolutionLead } from '../db/solution.repository.js';
-import { Prisma } from '../generated/prisma/client.js';
+import { Prisma, type LeadStatus } from '../generated/prisma/client.js';
 import { SpendCapReachedError } from '../llm/llm.service.js';
 import type { Logger } from '../logging/logger.js';
 import { solveLead, type SolutionStepDeps } from './solution.step.js';
@@ -28,10 +28,12 @@ const lead: StoredSolutionLead = {
   ],
 };
 
-// A step whose agent answers `outcome` (or throws it); records what was stored.
+// A step whose agent answers `outcome` (or throws it); records what was stored. `stores: false`
+// is a save that found the lead already done (an overlapping run).
 const stepWith = (
   outcome: SolutionOutcome | Error,
-  read: { status?: string; solved?: boolean; tier?: string } = {},
+  read: { status?: LeadStatus; solved?: boolean; tier?: string } = {},
+  stores = true,
 ) => {
   const saved: StoredOutcome[] = [];
   const solve = jest.fn<SolutionStepDeps['solve']>(() =>
@@ -48,7 +50,7 @@ const stepWith = (
         }),
       saveOutcome: (_lead, stored) => {
         saved.push(stored);
-        return Promise.resolve();
+        return Promise.resolve(stores);
       },
     },
     solve,
@@ -95,15 +97,45 @@ describe('solveLead', () => {
     ]);
   });
 
-  it.each<[SolutionOutcome, string]>([
-    [{ kind: 'noStrongSignal', reason: 'r', model: 'm', costUsd }, 'NO_STRONG_SIGNAL'],
-    [{ kind: 'needsReview', problems: ['p'], costUsd }, 'NEEDS_REVIEW'],
-  ])('ends the lead with its exit status for %o', async (outcome, status) => {
+  it.each<[string, SolutionOutcome, string]>([
+    [
+      'no strong signal',
+      { kind: 'noStrongSignal', reason: 'r', model: 'm', costUsd },
+      'NO_STRONG_SIGNAL',
+    ],
+    ['needs review', { kind: 'needsReview', problems: ['p'], costUsd }, 'NEEDS_REVIEW'],
+  ])('ends the lead with its exit status for %s', async (_what, outcome, status) => {
     const { deps, saved } = stepWith(outcome);
 
     await expect(solveLead(deps, 'lead_1')).resolves.toEqual({ status });
     expect(saved).toEqual([{ kind: 'exit', status }]);
   });
+
+  it('runs the agent for a HOT lead too', async () => {
+    const { deps, solve } = stepWith(
+      { kind: 'noStrongSignal', reason: 'r', model: 'm', costUsd },
+      { tier: 'HOT' },
+    );
+
+    await expect(solveLead(deps, 'lead_1')).resolves.toEqual({ status: 'NO_STRONG_SIGNAL' });
+    expect(solve).toHaveBeenCalledTimes(1);
+  });
+
+  it.each<[string, SolutionOutcome, string]>([
+    [
+      'pick',
+      { kind: 'pick', serviceSlug: 's', reason: 'r', signalKeys: [], model: 'm', costUsd },
+      'ALREADY_SOLVED',
+    ],
+    ['exit', { kind: 'noStrongSignal', reason: 'r', model: 'm', costUsd }, 'NOT_ELIGIBLE'],
+  ])(
+    'reports a skip when an overlapping run stored the %s first',
+    async (_what, outcome, reason) => {
+      const { deps } = stepWith(outcome, {}, false);
+
+      await expect(solveLead(deps, 'lead_1')).resolves.toEqual({ status: 'SKIPPED', reason });
+    },
+  );
 
   it('pauses on a reached spend cap and stores nothing', async () => {
     const { deps, saved } = stepWith(new SpendCapReachedError('LLM monthly cap reached'));
@@ -122,7 +154,7 @@ describe('solveLead', () => {
     expect(saved).toEqual([]);
   });
 
-  it.each([
+  it.each<[string, Parameters<typeof stepWith>[1], string]>([
     ['already has a Solution', { solved: true }, 'ALREADY_SOLVED'],
     ['has left SCORED', { status: 'NO_STRONG_SIGNAL' }, 'NOT_ELIGIBLE'],
     ['is COLD', { tier: 'COLD' }, 'NOT_ELIGIBLE'],
