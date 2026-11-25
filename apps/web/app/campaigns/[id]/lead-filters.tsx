@@ -3,15 +3,23 @@
  * server renders the filtered page. Empty fields mean "any". The CSV link exports exactly the same
  * filters.
  *
- * Serves: FR-30 (filter by tier, status, area and score range; CSV of the filtered rows), US-14;
- * issue #16.
+ * Serves: FR-30 (filter by tier, status, area and score range; CSV of the filtered rows), US-14,
+ * FR-17 (the solution step's exit statuses); issues #16, #19.
  * Used by: apps/web/app/campaigns/[id]/page.tsx.
  */
 import { toSearch, type LeadQuery } from '../../../lib/lead-query';
 
 const TIERS = ['HOT', 'WARM', 'COLD'];
-// The statuses a Cycle 1 lead can have; later ones (calls) come with Cycle 3.
-const STATUSES = ['DISCOVERED', 'ENRICHED', 'SCORED', 'FAILED', 'FILTERED_OUT'];
+// The statuses a lead can reach so far; READY_TO_CALL comes with the script step (#20).
+const STATUSES = [
+  'DISCOVERED',
+  'ENRICHED',
+  'SCORED',
+  'NO_STRONG_SIGNAL',
+  'NEEDS_REVIEW',
+  'FAILED',
+  'FILTERED_OUT',
+];
 
 /**
  * Renders the filter form and the CSV link.
