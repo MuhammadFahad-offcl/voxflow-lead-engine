@@ -47,7 +47,7 @@ Lint note: a header directly above an export counts as that export's block, so `
 - One issue → one branch → one PR. Branch names: `feat/<issue>-<slug>`, `fix/<issue>-<slug>`, `chore/<issue>-<slug>`, `docs/<issue>-<slug>`.
 - Conventional commits, enforced by commitlint: `feat:`, `fix:`, `test:`, `docs:`, `refactor:`, `chore:`, `ci:`. Subject in the imperative, ≤ 72 characters.
 - Squash-merge; the squash message is the PR title in conventional form.
-- Tags: `v0.1.0` end of Cycle 1, `v0.2.0` Cycle 2, `v0.3.0` Cycle 3 (HazelJS submission), `v1.0.0` Cycle 4.
+- Tags: `v0.1.0` end of Cycle 1, `v0.2.0` slim Cycle 2 (HazelJS submission), `v0.3.0` script and approval agents (#20, #23), `v1.0.0` Cycle 4.
 
 ## 3. Testing
 
@@ -55,7 +55,7 @@ Lint note: a header directly above an export counts as that export's block, so `
 - Test behaviour through public functions, not internals. Arrange–act–assert.
 - Fake only ports (adapters). Never mock the database in integration tests — use the Docker Postgres.
 - Coverage ≥ 80% lines on `scoring/`, `policies/` and `adapters/`.
-- Agent changes run the eval set (`evals/`).
+- Agent changes run the eval set in `evals/` once it exists: the folder is planned in #21 and not in the repo yet.
 - Test data is fictional. Never commit real business data, phone numbers, recordings or transcripts.
 
 ## 4. Pull requests
