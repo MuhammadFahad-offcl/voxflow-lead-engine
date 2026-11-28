@@ -11,6 +11,23 @@
 
 This document says **how** v1 is built. The PRD says **what** and **why**. If the two disagree, stop and fix one of them through the change process in [`CONTRIBUTING.md`](../CONTRIBUTING.md) before writing code.
 
+## What is on `main` (29 Nov 2026)
+
+This document describes the whole v1 design. Only part of it is built; the rest is roadmap and is marked where it appears.
+
+| Part                                                                              | State                                             |
+| --------------------------------------------------------------------------------- | ------------------------------------------------- |
+| Campaign stage (§5.1), lead graph enrich → score → solution (§5.2)                | Built: the solution agent (#19) is the only agent |
+| Dashboard: campaigns, lead table with CSV export, lead page                       | Built (#16, #24)                                  |
+| Ports: lead source, web reader, web context, LLM, embedding (§8)                  | Built, each with a real and a fake adapter        |
+| Worker loops `campaign-runner`, `lead-runner` (§9)                                | Built; a finished campaign stays at `SCORING`     |
+| `GET /ready` (§13)                                                                | Built with the database check only                |
+| Script agent (§5.2, §6)                                                           | Roadmap, #20 (`v0.3.0` milestone)                 |
+| Campaign approval with durable suspend (§5.3)                                     | Roadmap, #23 (`v0.3.0` milestone)                 |
+| Settings page, Gatekeeper policies, calls, webhooks, reconciliation (§7, §9, §10) | Roadmap, #25–#29                                  |
+| Booking, tunnel, backups, retention, funnel and costs pages, alerts               | Roadmap, #33–#38                                  |
+| Run timeline (FR-35), eval set in CI (`evals/`)                                   | Roadmap, #30, #21                                 |
+
 ---
 
 ## 1. System context
@@ -33,7 +50,7 @@ flowchart LR
   CF -->|3 allowed paths only| API
 ```
 
-Everything except the outside services runs on the founder's Windows laptop (ADR-0003).
+Everything except the outside services runs on the founder's Windows laptop (ADR-0003). Vapi, Google Calendar and the Cloudflare Tunnel are roadmap; nothing connects to them yet.
 
 ## 2. Containers and processes
 
@@ -128,6 +145,8 @@ sequenceDiagram
   A->>D: store transcript; outcome agent → result, reason, remarks
 ```
 
+Built today: steps 1–5, except the script agent at the end of step 5. Approval (step 6) and everything after it are roadmap.
+
 ## 5. Pipeline design
 
 ### 5.1 Campaign stage (function code, no LLM)
@@ -145,6 +164,8 @@ enrich (function) → score (function + LLM labelling) → route
          tier WARM/HOT → solution (agent) → script (agent) → END
 ```
 
+Built: enrich, score and the solution agent. The script agent is roadmap (#20), so today a WARM or HOT lead's run ends after the solution.
+
 One graph run per lead means one lead's failure never touches another (FR-32, NFR-1). The run ID is stored on the lead; the run timeline (FR-35) is read from HazelJS's timeline store.
 
 **Enrich** (FR-9–FR-12): `WebReaderPort.read(url)` tries plain fetch (Cheerio parse); if visible text is under a threshold (default 200 characters) it retries through Lightpanda; on 403, challenge page or error it marks `websiteStatus = UNREADABLE`. Reads homepage + one contact page, respects robots.txt for each origin it reaches (RFC 9309: a missing file allows everything, a 5xx disallows everything), one in-flight request per domain, 3 retries on network errors only. The enrich step stores `websiteStatus`, emails, `wa.me` and `api.whatsapp.com` links, social profile links, the booking and chat flags (null when unreadable) and the first doctor named as `decisionMakerName`. Perplexity context runs only for leads that passed the filter.
@@ -153,7 +174,9 @@ One graph run per lead means one lead's failure never touches another (FR-32, NF
 
 **Score** (FR-13–FR-15): the LLM (via `LlmService`, task `REVIEW_LABELLING`, one call per lead) labels the unlabelled reviews among the 30 newest; the answer is validated by Zod against the ids sent and the niche's `reviewLabels`, and star-only reviews get `OTHER` without a call. Demo mode replays the answers `pnpm llm:record` saved; a prompt change needs a new recording. Plain code in `scoring/` turns labels + enrichment facts into `Signal` rows using the niche profile's weights. Score = sum of signal points. Tier thresholds: hot ≥ 70, warm 45–69, cold < 45.
 
-### 5.3 Campaign approval (FR-19)
+### 5.3 Campaign approval (FR-19) — roadmap, #23
+
+Not built. `approveAndResume` in `@hazeljs/agent` 2.1.3 runs the approved tool again when it is called a second time on the same run (README → Contributions to HazelJS), so #23 needs its own guard.
 
 When every lead in a campaign has finished its lead graph, the worker sets `AWAITING_APPROVAL` and runs the **approval agent**, whose single tool `queueCampaignCalls` has `requiresApproval: true`. With `durableSuspend` and the SQL run store, the pending approval lives in Postgres and survives restarts (NFR-2). The dashboard's approve/reject calls `AgentOS.approve` / `reject`. On approve, the tool creates attempt-1 `CallAttempt` rows for every `READY_TO_CALL` lead, scheduled across the next calling windows.
 
@@ -167,11 +190,13 @@ When every lead in a campaign has finished its lead graph, the worker sets `AWAI
 | `caller-agent`   | none               | `placeCall` (Gatekeeper-checked)        | —                                                                                                                                                                                | FR-21–FR-23  |
 | `outcome-agent`  | `OUTCOME`          | none                                    | `{ result, reasonCode?, remarks, callbackAt?, decisionMakerName? }`                                                                                                              | FR-28, FR-29 |
 
+Only `solution-agent` is built (#19); the script, approval, caller and outcome agents are roadmap (#20, #23, #27, #28).
+
 The model for each task key comes from `Settings.llmModels` (default `claude-haiku-5-5` for all; Cycle 2 compares against `gpt-6-luna` for `SCRIPT`, ADR-0006). All LLM calls go through `LlmService` (`apps/api/src/llm/`), the gate above `LlmPort`: it takes the model from Settings, refuses a call whose worst case could pass the monthly LLM cap (Asia/Karachi month), records a `CostRecord` for every attempt, and validates the answer with the task's Zod schema, retrying once (FR-13, FR-33).
 
 The live call's conversation model is configured in Vapi, not here, and is billed with the call.
 
-## 7. Policies (Gatekeeper, default deny)
+## 7. Policies (Gatekeeper, default deny) — roadmap, #26
 
 Checked before every `placeCall` (FR-21). Each denial is stored on the attempt as `deniedBy`.
 
@@ -198,7 +223,7 @@ Checked before every `placeCall` (FR-21). Each denial is stored on the attempt a
 | `VoicePort`      | Vapi REST (create call, get call)                                            | simulated call that posts a fixture webhook to the API after a delay | caller, reconciliation |
 | `CalendarPort`   | Google Calendar API (free/busy, insert event with Meet)                      | in-memory calendar                                                   | booking                |
 
-`DEMO_MODE=true` binds every port to its fake. Selection happens once, in the DI module, never with `if (demo)` inside business code.
+`VoicePort` and `CalendarPort` are roadmap (#27, #33); the other five ports are built. `DEMO_MODE=true` binds every port to its fake. Selection happens once, in the DI module, never with `if (demo)` inside business code.
 
 ## 9. Worker loops
 
@@ -211,9 +236,11 @@ Checked before every `placeCall` (FR-21). Each denial is stored on the attempt a
 | `retention`       | daily 03:00 PKT   | Clears transcript + recording URL older than `retentionDays` (default 90)                          | NFR-6       |
 | `backup`          | daily 02:00 PKT   | `pg_dump` to `BACKUP_DIR` (a Google Drive–synced folder)                                           | NFR-12      |
 
-Every loop is idempotent: running it twice does nothing extra (NFR-1). Locking uses `UPDATE … WHERE status = X RETURNING` claims so a restart never double-dials (NFR-2).
+Built: `campaign-runner` (without the completion → approval step) and `lead-runner`. The other four loops are roadmap (#27–#29, #36). Every loop is idempotent: running it twice does nothing extra (NFR-1). Locking uses `UPDATE … WHERE status = X RETURNING` claims so a restart never double-dials (NFR-2).
 
-## 10. Calls, booking and webhooks
+## 10. Calls, booking and webhooks — roadmap, #27, #28, #33
+
+None of this section is built; no business has been called.
 
 **Placing a call.** `VoicePort.createCall({ assistantId, phoneNumberId, customer: { number }, variableValues, metadata: { attemptId } })` with `idempotencyKey = attemptId`. Attempt moves `SCHEDULED → DIALING`.
 
@@ -244,15 +271,15 @@ pgvector: the first migration runs `CREATE EXTENSION IF NOT EXISTS vector;` and 
 
 ## 12. Configuration and secrets
 
-All configuration is read once from environment variables, validated by a Zod schema in `apps/api/src/config/`; the process refuses to start if a required value is missing. Full list: [`.env.example`](../.env.example). Operator settings that change at runtime (calling hours, caps, booking rules, models, retention) live in the `Settings` table and are edited on the dashboard.
+All configuration is read once from environment variables, validated by a Zod schema in `apps/api/src/config/`; the process refuses to start if a required value is missing. Full list: [`.env.example`](../.env.example). Operator settings that change at runtime (calling hours, caps, booking rules, models, retention) live in the `Settings` table and will be edited on the dashboard (Settings page, #25; today only the seed writes them).
 
 ## 13. Errors, logging, observability
 
 - Outside calls: 3 retries, exponential backoff with jitter, timeout per adapter (NFR-1).
 - Lead failures store `failedStep` + `error`; the dashboard shows a retry button (FR-32).
 - Structured JSON logs with `campaignId`, `leadId`, `attemptId` on every line (NFR-10). Logger: pino, JSON lines, phones masked to the last 4 digits ([ADR-0014](adr/0014-pino-logger-env-before-di.md)).
-- `GET /health` is HazelJS's built-in liveness probe (`{ status: "alive", timestamp }`) and is never extended. Database, worker heartbeat (written each loop), tunnel reachability and Lightpanda are registered as HazelJS health checks with `app.registerHealthCheck({ name, check, critical })` and reported by `GET /ready` (NFR-10). `/ready` answers 200 only when its overall status is `healthy`: any `degraded` check — including HazelJS's built-in `memory` (heap > 500 MB) and `eventLoop` (lag > 100 ms) checks — or an unhealthy critical check gives 503. The `health` policy therefore reads the individual `db`, `worker` and `tunnel` results, not the status code.
-- Run timeline per campaign from HazelJS's timeline store (FR-35).
+- `GET /health` is HazelJS's built-in liveness probe (`{ status: "alive", timestamp }`) and is never extended. Database, worker heartbeat (written each loop), tunnel reachability and Lightpanda are registered as HazelJS health checks with `app.registerHealthCheck({ name, check, critical })` and reported by `GET /ready` (NFR-10). `/ready` answers 200 only when its overall status is `healthy`: any `degraded` check — including HazelJS's built-in `memory` (heap > 500 MB) and `eventLoop` (lag > 100 ms) checks — or an unhealthy critical check gives 503. The `health` policy therefore reads the individual `db`, `worker` and `tunnel` results, not the status code. Built today: the `db` check only; the worker, tunnel and Lightpanda checks come with the call path.
+- Run timeline per campaign from HazelJS's timeline store (FR-35; roadmap, #30).
 
 ## 14. Security
 
@@ -272,6 +299,8 @@ All configuration is read once from environment variables, validated by a Zod sc
 | Eval        | `evals/` runner                    | 10 fictional clinics: catalog-only solutions, no invented evidence    | Every PR touching agents or prompts          |
 | End-to-end  | Demo mode script                   | One campaign from create to logged call result                        | End of every cycle                           |
 
+Built today: unit, integration and agent tests (91 suites, 1,062 tests on 28 Nov 2026). The eval set is roadmap (#21), and the end-to-end demo run is manual and ends at the solution (README quick start).
+
 ## 16. HazelJS features used (for the submission)
 
 The four direct HazelJS packages are pinned at 2.1.3 in `apps/api/package.json` (ADR-0001).
@@ -286,7 +315,7 @@ The four direct HazelJS packages are pinned at 2.1.3 in `apps/api/package.json` 
 
 **Planned, not built:**
 
-- Durable HITL approval with `requiresApproval`, durable suspend and `approveAndResume`, part of `@hazeljs/agent` (#23).
+- Durable HITL approval with `requiresApproval`, durable suspend and `approveAndResume`, part of `@hazeljs/agent` (#23, `v0.3.0` milestone; see §5.3 for the repeated-call problem).
 - `@hazeljs/agent-gatekeeper` and `PolicyEngine` for the call policies in section 7 (#26); not installed.
 - The run timeline view (FR-35, #30).
 - `@hazeljs/rag`, only if the Cycle 2 spike picks its pgvector store over our repository (#18); today it is only an unused peer (above).
