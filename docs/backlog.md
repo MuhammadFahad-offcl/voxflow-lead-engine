@@ -19,18 +19,19 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 13. feat: lead `AgentGraph` (enrich → score) with per-lead status, error, retry — FR-32
 14. feat: dashboard — campaigns list, new campaign form, lead table with filters + CSV export — FR-30 (part), US-14
 
-## Cycle 2 — Solutions and scripts (14–20 Nov)
+## Cycle 2 — Solutions and scripts (14–20 Nov); HazelJS submission `v0.2.0` (29 Nov)
 
 1. feat: catalog CRUD + embeddings (`EmbeddingPort`) + pgvector search; seed from `config/catalog/services.json` — FR-16. v1 slim ships a read-only `GET /services`; create, edit, retire, re-embed on edit and the `/catalog` page are deferred (#163).
 2. spike: `@hazeljs/rag` pgvector store vs own repository; ADR — FR-16
 3. feat: solution agent with catalog/signal validation, retry, `NEEDS_REVIEW`, `NO_STRONG_SIGNAL` — FR-17
-4. feat: script agent filling the niche template — FR-18
+4. feat: script agent filling the niche template — FR-18. Moved to the `v0.3.0` milestone (#20).
 5. test: eval set of 10 fictional clinics in CI — NFR-9
 6. experiment: Haiku 5.5 vs gpt-6-luna on 10 Urdu scripts; record result in ADR-0006 follow-up — FR-18
-7. feat: approval agent with durable suspend + approve/reject API + approval screen — FR-19
+7. feat: approval agent with durable suspend + approve/reject API + approval screen — FR-19. Moved to the `v0.3.0` milestone (#23).
 8. feat: lead detail page (evidence, score breakdown, solution, script) — FR-30 (part)
+9. docs: README, screenshots, demo video; fresh-clone test; tag `v0.2.0`; submit (#32)
 
-## Cycle 3 — AI calls, HazelJS submission (21–27 Nov)
+## Cycle 3 — AI calls (21–27 Nov)
 
 1. feat: Settings (calling hours, caps, models, retention) API + page — FR-20, FR-26 (settings part), FR-33
 2. feat: Gatekeeper policies (hours, DNC, attempt limit, spend cap, health, campaign approved) — FR-21, FR-23
@@ -39,7 +40,6 @@ Create one GitHub issue per line (use the Feature template). Each names the FR/N
 5. feat: reconciliation loop — FR-28, ADR-0009
 6. feat: calls-today page and run timeline view — FR-30, FR-35
 7. test: 10 real test calls to own phones; pick transcriber + voice — risk mitigation
-8. docs: README, screenshots, demo video; fresh-clone test; tag `v0.3.0`; submit
 
 ## Cycle 4 — Booking and operations, v1.0 (28 Nov–4 Dec)
 

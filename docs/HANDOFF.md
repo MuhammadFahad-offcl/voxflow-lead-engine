@@ -1,14 +1,15 @@
 # AI Handoff — VoxFlow Lead Engine
 
-> Last updated: 2026-11-12. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md`.
+> Last updated: 2026-11-28. For the full project context read `CLAUDE.md`, then `docs/prd.md` and `docs/architecture.md` (its "What is on `main`" table). The decision sections below are a log; each is dated.
 
-## Cycle 1 status
+## Current status (28 Nov 2026)
 
-Cycle 1 (due **13 Nov 2026**): all 14 planned issues (#3–#16) are closed. The S-8 cycle close is in progress: the retro draft is `docs/retros/cycle-1.md`, and **`v0.1.0` is not tagged until Fahad approves**.
-
-Still open in the milestone: **#125** (flaky DB tests / knip crash on the first run after an install). Moving it to a later milestone is Fahad's call.
-
-Next is Cycle 2 (`docs/prompts/cycle-2-solutions-scripts.md`).
+- **Cycle 1** closed; `v0.1.0` tagged.
+- **Slim Cycle 2** for the HazelJS submission (29 Nov 2026, #32): on `main` are the catalog with embeddings (#17), the solution agent in the lead graph (#19) and the lead detail page (#24, PRs #174 and #175). `v0.2.0` is tagged by Fahad after the #32 docs pass merges, not before.
+- **Roadmap after the submission:** the script agent (#20) and the approval agent (#23) are in the `v0.3.0` milestone. Start #20 from the agreed design in the comment on #20; #23 needs a guard against `approveAndResume` running a tool twice (README → Contributions to HazelJS).
+- **Still open in the Cycle 2 milestone:** #18, #21, #22 and chores #125, #150, #151, #156. Moving them is Fahad's call.
+- **Upstream:** three HazelJS 2.1.3 problems are reproduced; the issue drafts and outputs are in a comment on #32 and in the #32 PR description, to be filed by Fahad. hazel-js/hazeljs#35 and #36 were filed earlier and fixed by the HazelJS team in 2.0.14.
+- **Fresh clone** of the README quick start on Windows: about 2½ minutes with cached images and packages; clone into a short path.
 
 ## Keys still needed
 
@@ -42,7 +43,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 - Apify: $2.00/day (Asia/Karachi day), stored in `Organization.apifyDailyUsd`.
 - Monthly LLM: $10, stored in `Settings.llmMonthlyBudgetUsd`.
-- Cycle 1 real-service total budget: $5. Spent so far: about $1.382 ($0.66 spike in #9 + $0.7208 DHA run in #10 + $0.00204 Claude in #13; #12 made no real calls). About **$3.62 remaining**.
+- Cycle 1 real-service total budget: $5. Spent as of 12 Nov: about $1.382 ($0.66 spike in #9 + $0.7208 DHA run in #10 + $0.00204 Claude in #13; #12 made no real calls). About **$3.62 remaining**.
 
 ### PR size
 
@@ -78,7 +79,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 - **Failures:** a node error marks the lead FAILED with `failedStep` and a stored sentence (never a library's message). A failed web search does **not** fail the lead (FR-12 is "should", #12).
 - **Spend caps wait:** the lead keeps its status, its run is SUSPENDED and it keeps its claim; the runner claims no new lead for one lease (15 min).
 - **A reviews run that may exist without a saved id** pauses the campaign ("Check the Apify console; resuming starts a new reviews run") and abandons that reservation.
-- **Campaign:** ENRICHING → SCORING when no lead is DISCOVERED or ENRICHED; it stays SCORING until Cycle 2.
+- **Campaign:** ENRICHING → SCORING when no lead is DISCOVERED or ENRICHED; it stays SCORING until the script agent (#20) exists.
 - **Retry:** `POST /leads/:id/retry` puts a FAILED lead back at ENRICHED (labelling or scoring failed) or DISCOVERED (otherwise).
 - **`LEAD_RUNNER_CONCURRENCY`** (env, 1–10, default 3) is the number of leads per pass.
 - **`pnpm dev` starts the worker too, and its first pass runs within a second.** To send an API request without the worker (e.g. to pause a campaign), start only the API: `pnpm --filter @voxflow/shared build && pnpm --filter api build && pnpm --filter api dev:start`.
@@ -96,7 +97,7 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 ## The workflow (every issue)
 
-1. Read the issue prompt in `docs/prompts/cycle-1-scored-leads.md` and the FRs it names in `docs/prd.md`.
+1. Read the issue prompt in `docs/prompts/` and the FRs it names in `docs/prd.md`.
 2. Restate your plan in ≤ 5 bullets. **If the plan is unambiguous and stays inside the prompt, start without waiting.** If anything needs Fahad's input, stop and ask.
 3. Branch: `feat/<issue>-<slug>`.
 4. Write tests first for rules and adapters, then the code.
@@ -108,7 +109,8 @@ All stored reviews of a place (up to the 30 newest) are labelled by the LLM in o
 
 ### Checkpoints
 
-- **Cycle 1 close (S-8):** run on 2026-11-12. Tag `v0.1.0` only after Fahad approves the retro.
+- **Cycle 1 close (S-8):** run on 2026-11-12; `v0.1.0` tagged.
+- **Submission (#32):** `v0.2.0` only on Fahad's word, after the docs pass merges.
 
 ## What "stop and ask" means
 

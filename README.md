@@ -2,11 +2,11 @@
 
 [![CI](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml)
 
-An AI agent system that finds local businesses, scores how much they need AI automation (with evidence) and picks the one catalog service that fits each warm or hot lead (or marks the lead as having no strong signal or needing review), all from one dashboard. Writing an Urdu call script, calling the business with a Vapi voice agent and booking a video call with the founder are on the [roadmap](#roadmap); they are not built yet.
+An AI agent system that finds local businesses, scores how much they need AI automation (with evidence) and picks the one catalog service that fits each warm or hot lead (or marks the lead as having no strong signal or needing review), all from one dashboard with a page per lead. Writing an Urdu call script, calling the business with a Vapi voice agent and booking a video call with the founder are on the [roadmap](#roadmap); they are not built yet.
 
 Built by [VoxFlow AI Solutions](https://voxflow.agency) with [HazelJS](https://hazeljs.ai) agents. First niche: dental clinics in Lahore.
 
-> **Status:** in development. Cycle 1 (scored leads) shipped as `v0.1.0`. Cycle 2 (solutions and scripts, planned for 14–20 Nov 2026) is still open: the solution step is on `main`, the script and approval steps are not. Cycles 3 and 4 (calls, booking) have not started, so the plan of v1 by 4 Dec 2026 has slipped. No business has been called. See [`docs/backlog.md`](docs/backlog.md).
+> **Status:** in development. Cycle 1 (scored leads) shipped as `v0.1.0`. From Cycle 2, `main` has the catalog with embeddings (#17), the solution agent (#19) and the lead detail page (#24). The script agent (#20) and the approval agent (#23) are not built; they are in the `v0.3.0` milestone. Calls and booking (Cycles 3 and 4) have not started, so the plan of v1 by 4 Dec 2026 has slipped. No business has been called. See [`docs/backlog.md`](docs/backlog.md).
 
 ## How it works
 
@@ -23,7 +23,7 @@ Campaign (niche, city, areas)
   → Log        call result, reason and English remarks on the dashboard   Roadmap (#28, #30)
 ```
 
-What runs today: the dashboard creates a campaign, the worker discovers and enriches its leads, scores them, and runs the solution agent on the warm and hot ones. The dashboard lists campaigns and shows each campaign's lead table with filters and a CSV export.
+What runs today: the dashboard creates a campaign, the worker discovers and enriches its leads, scores them, and runs the solution agent on the warm and hot ones. The dashboard lists campaigns, shows each campaign's lead table with filters and a CSV export, and has a lead page with the score evidence, the chosen service and the reviews.
 
 Read [`docs/architecture.md`](docs/architecture.md) for diagrams and [`docs/adr/`](docs/adr/) for why each choice was made. The architecture document describes the full v1 design, including the parts still on the roadmap.
 
@@ -36,7 +36,7 @@ Only what runs on `main` (HazelJS 2.1.3):
 - **`@Agent` / `@Tool` on `AgentRuntime`**: the solution agent, with one tool, `searchCatalog`. [`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)
 - **A custom `LLMProvider`**: the agent's model calls go through the monthly LLM spend cap. [`gated-llm.provider.ts`](apps/api/src/llm/gated-llm.provider.ts)
 - **`@hazeljs/testing`**: `describeAgent` and `bindAgentSuite` run the real runtime, agent and tool against scripted fictional answers. [`solution.agent.spec.ts`](apps/api/src/agents/solution.agent.spec.ts)
-- **`@hazeljs/core`**: modules, DI and controllers ([`app.module.ts`](apps/api/src/app.module.ts)); the `/health` and `/ready` probes are built into `HazelApp` ([`bootstrap.ts`](apps/api/src/bootstrap.ts)).
+- **`@hazeljs/core`**: modules, DI and controllers ([`app.module.ts`](apps/api/src/app.module.ts)); the `/health` and `/ready` probes are built into `HazelApp` ([`bootstrap.ts`](apps/api/src/bootstrap.ts)), with the database check registered in [`server.ts`](apps/api/src/server.ts).
 
 Details in [`docs/hazeljs-submission.md`](docs/hazeljs-submission.md).
 
@@ -54,11 +54,14 @@ docker compose up -d          # Postgres + pgvector, Lightpanda
 pnpm install                  # the first install also generates the Prisma client
 pnpm db:migrate
 DEMO_MODE=true pnpm db:seed   # organization, settings, dental niche, catalog (fake embeddings)
-pnpm dev                      # dashboard http://localhost:3000, API http://127.0.0.1:4000, worker
+pnpm dev                      # dashboard http://127.0.0.1:3000, API http://127.0.0.1:4000, worker
 ```
+
+`pnpm db:migrate` may print a Prisma "major update available" box; ignore it, the project pins Prisma 7.
 
 **Windows PowerShell:**
 
+- Clone into a short path such as `C:\code`. In a deeply nested folder, `pnpm dev` fails with "The system cannot find the path specified", because a file pnpm writes under `node_modules` passes the Windows 260-character path limit.
 - `cp .env.example .env` works in PowerShell (`cp` is `Copy-Item`). Edit `.env` with any editor.
 - Set a variable for the rest of that window: `$env:DEMO_MODE = "true"; pnpm db:seed`. The `DEMO_MODE=true pnpm …` form is bash only.
 - Windows PowerShell 5.1 has no `&&`; run the commands one per line, or use PowerShell 7.
@@ -67,10 +70,12 @@ pnpm dev                      # dashboard http://localhost:3000, API http://127.
 
 **Start a demo campaign:**
 
-1. Open http://localhost:3000 and choose **New campaign**.
-2. Niche: dental clinic. City: Lahore. Areas: **DHA** only. DHA is the area whose fictional clinics have recorded answers for every step; an area with no fixtures pauses the campaign.
-3. Create it. Within about a minute the worker discovers the clinics, then enriches, labels and scores them, and runs the solution agent on the WARM ones. The campaign page refreshes itself every 10 seconds while the worker runs.
-4. The chosen services are stored but not shown on the dashboard yet (lead detail page, #24). Open `pnpm db:studio` and look at the `Solution` table: five of the six WARM clinics get a row; the sixth shows `NO_STRONG_SIGNAL` as its status in the lead table.
+1. Open http://127.0.0.1:3000 and choose **New campaign**.
+2. Niche: dental clinic. City: Lahore. Areas: click the **DHA** chip only. DHA is the area whose fictional clinics have recorded answers for every step; an area with no fixtures pauses the campaign.
+3. Create it. Within about a minute the worker discovers the clinics, then enriches, labels and scores them, and runs the solution agent on the WARM ones. The campaign page refreshes itself every 10 seconds while the worker runs. Expect 12 found, 1 duplicate, 2 filtered out and 11 leads: 6 WARM, 3 COLD. The campaign then stays at **Scoring**: the next step, the script agent (#20), is not built, so "Scoring" is where a finished demo campaign stops.
+4. Click a lead's name to see its score breakdown, then **Open the lead page**. Fictional Bright Smile Dental (`p01.example.com`, 67, WARM) shows the chosen service, "Missed-call WhatsApp reply", with the two signals it cites highlighted. Fictional DHA Family Dentistry (`p03.example.com`, 47, WARM) has status `NO_STRONG_SIGNAL`: no pain signal, so no service is picked. Five of the six WARM clinics get a service. "Picked by claude-haiku-5-5" names the model whose answers were recorded; demo mode replays them and calls no model.
+
+A fresh clone on Windows (28 Nov 2026) took about 2½ minutes from `git clone` to the lead pages, with the Docker images and the pnpm store already on the machine; `pnpm install` was 74 s of it. A first install also downloads the images and packages.
 
 Each fictional clinic is stored once, so a second DHA campaign finds only duplicates. To run the demo again from empty, use option 2 under [Change the database password](#change-the-database-password) (it deletes all data), then the seed again.
 
@@ -128,7 +133,7 @@ After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` 
 
 - **Spend caps can be passed slightly.** The Perplexity daily cap (web searches and the solution agent's query embeddings, one shared total) and the monthly LLM cap check the spend, make the call, then record it. Leads running at the same time can each pass the check, so a day or month can end over its cap by the cost of the calls in flight. Tracked in #167. A seed that embeds the catalog with real vectors also counts toward that day's Perplexity cap.
 - **A lead graph run cannot resume.** `AgentGraph.execute()` (2.1.3) keeps its state in memory, so a resumed or retried lead starts a new run at its next step. A crash between a paid call and its save repeats that call. Accepted in ADR-0001; no issue.
-- **The chosen service is not on the dashboard.** It is stored in `Solution`; the lead detail page is #24.
+- **A finished campaign stays at Scoring.** Scripting, approval and calling come after it and are not built (#20, #23).
 - **The catalog is read-only.** `GET /services` only; create, edit, retire and the `/catalog` page are #163.
 - **Website phones are not extracted.** The `mobile_number` signal reads the listing phone only. #150.
 - **Transitive advisories in `basic-ftp`** (through `apify-client`): one high, two moderate in `pnpm audit --prod`. #151.
@@ -140,21 +145,23 @@ After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` 
 
 Not built yet, in backlog order:
 
-- **Script and approval (Cycle 2):** script agent filling the niche template (#20); Haiku 5.5 vs gpt-6-luna on 10 Urdu scripts (#22); eval set of 10 fictional clinics in CI (#21); approval agent with HazelJS durable suspend (`requiresApproval`, `approveAndResume`), approve/reject API and screen (#23); lead detail page (#24); `@hazeljs/rag` spike (#18).
+- **Script and approval (`v0.3.0` milestone):** script agent filling the niche template (#20); approval agent with HazelJS durable suspend (`requiresApproval`, `approveAndResume`), approve/reject API and screen (#23).
+- **Left from Cycle 2:** eval set of 10 fictional clinics in CI (#21); Haiku 5.5 vs gpt-6-luna on 10 Urdu scripts (#22); `@hazeljs/rag` spike (#18).
 - **Calls (Cycle 3):** Settings API and page (#25); Gatekeeper default-deny call policies (#26); `VoicePort` with Vapi and a simulated adapter, caller agent and dispatcher (#27); Vapi webhook, outcome agent, attempt 2 and do-not-call (#28); reconciliation loop (#29); calls-today page and run timeline (#30); 10 test calls to our own phones (#31).
 - **Booking and operations (Cycle 4):** `CalendarPort` with Google Calendar and a fake, `get-slots` and `book-slot` tool routes (#33); Send confirmation link (#34); Cloudflare Tunnel with 3 public paths (#35); backups and retention (#36); funnel and costs pages (#37); daily summary and alerts (#38); `v1.0.0` (#39).
 
 ## Contributions to HazelJS
 
-Problems found in HazelJS 2.1.3 while building this. The first two have workarounds here; the third affects the approval agent (#23). None is filed upstream yet.
+**Filed and fixed upstream** (found while building Cycle 1 on 2.0.13; the HazelJS team fixed both in 2.0.14):
 
-- **`@hazeljs/agent` cannot be imported without `@hazeljs/eval`.** It lists `@hazeljs/eval` as an optional peer, but `dist/index.js` re-exports `dist/evaluation/agent-eval.js`, which calls `require("@hazeljs/eval")` at the top level. Workaround: we install `@hazeljs/eval` 2.1.3 and use none of it (ADR-0001). _To be filed._
-- **`@Agent({ maxSteps })` is ignored.** `AgentRuntime.execute()` takes `options.maxSteps`, else the runtime's `defaultMaxSteps`, else 10; the decorator's value is never read. Workaround: the solution agent passes `maxSteps` to `execute()` ([`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)). _To be filed._
-- **`approveAndResume` can run an approved tool twice on the same run.** It never checks that the run is still suspended. Tested with the SQL run store (`durableSuspend: true`, a `requiresApproval` tool that inserts a row, `execute` until the run waits):
-  - calling `approveAndResume` a second time, one call after the other, ran the tool twice (2 rows);
-  - two approvals in parallel from two processes, with no run lease configured, both ran it (2 rows).
+- [hazel-js/hazeljs#35](https://github.com/hazel-js/hazeljs/issues/35): `HazelApp.listen()` could not bind to a specific host. We need 127.0.0.1 only (ADR-0003); we carried a local patch until the fix (ADR-0013, superseded).
+- [hazel-js/hazeljs#36](https://github.com/hazel-js/hazeljs/issues/36): `HealthCheckManager.runChecks` left timeout timers running after each check.
 
-  The source (`acquireRunLease` in `dist/runtime/agent.runtime.js`) suggests that a configured run lease would make the second parallel call fail; that was not tested. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
+**Found in 2.1.3, reproduced on 28 Nov 2026, to be filed.** Each was confirmed by a small script against the installed 2.1.3.
+
+- **`@hazeljs/agent` cannot be imported without `@hazeljs/eval`.** It lists `@hazeljs/eval` as an optional peer, but `dist/index.js` re-exports `dist/evaluation/agent-eval.js`, which calls `require("@hazeljs/eval")` at the top level. Installed alone, `require('@hazeljs/agent')` fails with `MODULE_NOT_FOUND: Cannot find module '@hazeljs/eval'`. Workaround: we install `@hazeljs/eval` 2.1.3 and use none of it (ADR-0001). _To be filed._
+- **`@Agent({ maxSteps, enableMemory })` are ignored.** `AgentRuntime.execute()` uses `options.maxSteps`, else the runtime's `defaultMaxSteps`, else 10, and reads memory unless `options.enableMemory` is `false`; the decorator's values are never read. An agent declared with `maxSteps: 2, enableMemory: false` ran 10 steps and read the memory manager. Workaround: the solution agent passes both to `execute()` ([`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)). _To be filed._
+- **`approveAndResume` runs an approved tool again on a repeated call.** It never checks that the run is still waiting for approval. With `durableSuspend: true` and a `requiresApproval` tool, a second `approveAndResume` on a run that had already completed ran the tool a second time, with both the file and the SQL run store; two calls in parallel in one process also both ran it. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
 
 ## Project docs
 

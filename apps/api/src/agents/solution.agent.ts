@@ -41,7 +41,9 @@ const MAX_TOKENS = 600;
 // The strongest signals' evidence, PAIN first, is what the catalog is searched with.
 const SEARCH_SIGNALS = 3;
 // A tool turn, then the answer; 4 leaves room for one extra tool call. Passed to execute(): the
-// runtime ignores the @Agent's own maxSteps (it uses the call's option, else 10).
+// runtime ignores the @Agent's own maxSteps (it uses the call's option, else the runtime's
+// defaultMaxSteps, else 10). It ignores the @Agent's enableMemory too, so execute() gets
+// enableMemory: false as well.
 const MAX_STEPS = 4;
 
 /** One catalog service as searchCatalog returns it: no database id, so prompts replay anywhere. */
