@@ -5,6 +5,8 @@
  *
  * Serves: FR-17, FR-32 (fail once, retry from the failed step), FR-33 and NFR-4 (cost per lead),
  * FR-36 (demo mode); issue #19.
+ * The cases share one demo database and run in order: each puts back the lead, campaign status or
+ * cap it needs first.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
@@ -69,6 +71,11 @@ const unsolve = async (place: string) => {
   await prisma.solution.deleteMany({ where: { leadId: lead.id } });
   return lead;
 };
+// The solution agent's model calls on a lead; its labelling call is a separate LLM cost record.
+const solutionCalls = (leadId: string) =>
+  prisma.costRecord.count({
+    where: { service: 'LLM', leadId, note: { contains: '"task":"SOLUTION"' } },
+  });
 const setPerplexityCap = async (usd: string) => {
   const { spendCaps } = await prisma.settings.findFirstOrThrow();
   await prisma.settings.updateMany({
@@ -124,13 +131,22 @@ describe('SOLUTION node on the demo campaign', () => {
         'online-booking-page [no_online_booking, working_website] by claude-haiku-5-5',
     });
     // Two turns per agent run (tool, answer); p03's rejected pick and retry make four.
-    const llmCalls = await prisma.costRecord.groupBy({
-      by: ['leadId'],
-      where: { service: 'LLM', leadId: { in: warm.map(({ id }) => id) } },
-      _count: true,
+    const agentTurns = Object.fromEntries(
+      await Promise.all(
+        warm.map(async ({ id, placeId }): Promise<[string, number]> => [
+          placeId,
+          await solutionCalls(id),
+        ]),
+      ),
+    );
+    expect(agentTurns).toEqual({
+      'fictional-place-p01': 2,
+      'fictional-place-p03': 4,
+      'fictional-place-p06': 2,
+      'fictional-place-p07': 2,
+      'fictional-place-p10': 2,
+      'fictional-place-p11': 2,
     });
-    expect(llmCalls.every(({ _count: calls }) => calls >= 2)).toBe(true);
-    expect(llmCalls).toHaveLength(warm.length);
     // Every model call of the run names its lead and campaign: the solution step never passes null.
     expect(
       await prisma.costRecord.count({
@@ -241,11 +257,14 @@ describe('the Perplexity cap on the solution step', () => {
     const embeddings = () =>
       prisma.costRecord.count({ where: { service: 'PERPLEXITY_EMBEDDINGS' } });
     const before = await embeddings();
+    const turnsBefore = await solutionCalls(lead.id);
 
     expect((await runLeadRunnerOnce(runner({ now: () => now }))).paused).toBe(1);
     expect(await leadAt('p07')).toMatchObject({ status: 'SCORED', failedStep: null });
     expect(await prisma.solution.count({ where: { leadId: lead.id } })).toBe(0);
     expect(await embeddings()).toBe(before);
+    // The agent's first turn (asking for the search) is paid before the search meets the cap.
+    expect(await solutionCalls(lead.id)).toBe(turnsBefore + 1);
 
     // Once the cap allows it and the paused claim has run out, the lead resumes at SOLUTION.
     await setPerplexityCap('2.00');
@@ -257,6 +276,8 @@ describe('the Perplexity cap on the solution step', () => {
         where: { service: 'PERPLEXITY_EMBEDDINGS', leadId: lead.id },
       }),
     ).toBeGreaterThan(0);
+    // The resumed run pays both turns again: a pause mid-agent repeats the turn already paid.
+    expect(await solutionCalls(lead.id)).toBe(turnsBefore + 3);
   });
 });
 

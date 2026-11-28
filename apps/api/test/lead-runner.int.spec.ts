@@ -4,8 +4,8 @@
  * lead through its graph at most LEAD_RUNNER_CONCURRENCY at a time, the campaign to SCORING; a
  * worker stopped mid-pass; a reviews run that needs an Apify check; a spend cap.
  *
- * Serves: FR-11, FR-32, FR-33, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED, FILTERED_OUT
- * or FAILED with one failing site, the campaign not FAILED; restart test; DEMO_MODE=true).
+ * Serves: FR-11, FR-17, FR-32, FR-33, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED,
+ * FILTERED_OUT, FAILED with one failing site, or since #19 an exit status of the solution step; the campaign not FAILED; restart test; DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, describe, expect, it, jest } from '@jest/globals';

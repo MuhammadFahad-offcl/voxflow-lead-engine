@@ -29,7 +29,8 @@ export type SolutionStepOutcome =
  * Picks the one catalog service for a scored WARM or HOT lead and stores the result.
  *
  * Safe to repeat: a lead that already has a Solution, or has left SCORED, is skipped, so a resumed
- * or retried run never pays twice for a stored answer. The agent gets the lead's own ids, so every
+ * or retried run never pays twice for a stored answer. A spend cap that stops the agent after a
+ * paid turn stores nothing, so the resumed run pays that turn again. The agent gets the lead's own ids, so every
  * model call's cost record names the lead and its campaign (FR-33, NFR-4).
  * Does not change a picked lead's status: it stays SCORED until its script (#20).
  * @param deps - What the step needs.

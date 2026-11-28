@@ -1,8 +1,8 @@
 /**
  * Use cases behind the lead routes: retrying a FAILED lead from its failed step.
  *
- * Serves: FR-32 (a failed lead shows a retry button; retry runs it again from the failed step);
- * issue #15.
+ * Serves: FR-32 (a failed lead shows a retry button; retry runs it again from the failed step),
+ * FR-17 (a failed solution step retries at SOLUTION); issues #15, #19.
  * Used by: apps/api/src/modules/leads/leads.controller.ts, apps/api/src/modules/leads/leads.module.ts.
  */
 import { ConflictError, Injectable, NotFoundError } from '@hazeljs/core';

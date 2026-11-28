@@ -7,14 +7,17 @@
  *
  * `AgentGraph.execute()` (2.1.3) keeps its state in memory and cannot resume, so a resumed or
  * retried lead starts a new run at its next step, chosen from the lead's status, and every step
- * skips the work already stored. A paid call is repeated only when a crash falls between the call
- * and its save (accepted in the context, labelling and solution steps). Each node first renews the
+ * skips the work already stored. A paid call is repeated when a crash falls between the call and
+ * its save (accepted in the context, labelling and solution steps), and when a spend cap stops the
+ * solution agent after a paid turn: the resumed run starts the agent again (at most a few tenths of
+ * a cent per pause). Each node first renews the
  * runner's claim, so no node starts, or pays, without holding the lead (ADR-0001, update of
  * 2026-11-12). The script node (#20) comes after solution.
  *
  * Serves: FR-9–FR-15 and FR-17 (runs the steps), FR-32 (per-lead status, error, never stops the
  * campaign), FR-33 (a spend cap pauses the step), NFR-1, NFR-2, ADR-0001; issues #15, #19.
- * Used by: apps/api/src/scheduler/lead-runner.ts, apps/api/test/lead-graph.int.spec.ts.
+ * Used by: apps/api/src/scheduler/lead-runner.ts, apps/api/test/lead-graph.int.spec.ts,
+ * apps/api/test/solution-node.int.spec.ts.
  */
 import { randomUUID } from 'node:crypto';
 import {
@@ -144,6 +147,9 @@ export function createLeadGraphRuntime(
     // Our pino logger reports runs; HazelJS's own console logger stays quiet below errors.
     logLevel: LogLevel.ERROR,
     enableMetrics: false,
+    // The lead run and its checkpoints are the record; HazelJS's own row per agent run would repeat
+    // the prompt (lead data) and stay RUNNING after a crash, since nothing closes it.
+    enableAgentRuns: false,
   });
   registerSolutionAgent(runtime, agents.search);
   return { runtime, store };

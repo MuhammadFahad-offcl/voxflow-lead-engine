@@ -4,17 +4,19 @@
  * failed web search that does not fail the lead, a resumed run that pays nothing twice, a lost
  * claim, and the LLM and Perplexity spend caps that pause.
  *
- * Serves: FR-32, FR-33, NFR-1, NFR-2, ADR-0001; issue #15 acceptance (each lead goes through
- * enrich → score; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
+ * Serves: FR-17, FR-32, FR-33, NFR-1, NFR-2, ADR-0001; issue #15 acceptance (each lead goes through
+ * enrich → score, then solution for WARM and HOT, #19; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { resolve } from 'node:path';
+import { FakeEmbeddingAdapter } from '../src/adapters/embedding/fake.adapter.js';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { createCatalogSearch, runSolutionAgent } from '../src/agents/solution.agent.js';
+import { CatalogRepository } from '../src/db/catalog.repository.js';
 import { LeadContextRepository } from '../src/db/lead-context.repository.js';
 import { LeadRunRepository, type ClaimedLead } from '../src/db/lead-run.repository.js';
 import { LeadWebsiteRepository } from '../src/db/lead-website.repository.js';
@@ -24,9 +26,7 @@ import { ReviewLabelRepository } from '../src/db/review-label.repository.js';
 import { ScoreRepository } from '../src/db/score.repository.js';
 import { embedMissingServices, seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import { SolutionRepository } from '../src/db/solution.repository.js';
-import { FakeEmbeddingAdapter } from '../src/adapters/embedding/fake.adapter.js';
-import { createCatalogSearch, runSolutionAgent } from '../src/agents/solution.agent.js';
-import { CatalogRepository } from '../src/db/catalog.repository.js';
+import { Prisma } from '../src/generated/prisma/client.js';
 import { LlmService } from '../src/llm/llm.service.js';
 import type { Logger } from '../src/logging/logger.js';
 import {

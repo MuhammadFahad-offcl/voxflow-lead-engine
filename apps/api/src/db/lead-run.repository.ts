@@ -4,10 +4,11 @@
  * makes (ENRICHING → SCORING, a pause for an Apify check). The run itself and its checkpoints live
  * in HazelJS's SQL durable run store, not here.
  *
- * Serves: FR-3, FR-32 (per-lead status and error), NFR-1, NFR-2, ADR-0001, ADR-0002; issue #15.
+ * Serves: FR-3, FR-17 (WARM and HOT scored leads wait for their solution), FR-32 (per-lead status
+ * and error), NFR-1, NFR-2, ADR-0001, ADR-0002; issues #15, #19.
  * Used by: apps/api/src/pipeline/lead.graph.ts, apps/api/src/scheduler/lead-runner.ts,
  * apps/api/test/lead-run.int.spec.ts, apps/api/test/lead-graph.int.spec.ts,
- * apps/api/test/lead-runner.int.spec.ts.
+ * apps/api/test/lead-runner.int.spec.ts, apps/api/test/solution-node.int.spec.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import type { Prisma, WebsiteStatus } from '../generated/prisma/client.js';
