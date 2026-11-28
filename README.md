@@ -150,7 +150,11 @@ Problems found in HazelJS 2.1.3 while building this. The first two have workarou
 
 - **`@hazeljs/agent` cannot be imported without `@hazeljs/eval`.** It lists `@hazeljs/eval` as an optional peer, but `dist/index.js` re-exports `dist/evaluation/agent-eval.js`, which calls `require("@hazeljs/eval")` at the top level. Workaround: we install `@hazeljs/eval` 2.1.3 and use none of it (ADR-0001). _To be filed._
 - **`@Agent({ maxSteps })` is ignored.** `AgentRuntime.execute()` takes `options.maxSteps`, else the runtime's `defaultMaxSteps`, else 10; the decorator's value is never read. Workaround: the solution agent passes `maxSteps` to `execute()` ([`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)). _To be filed._
-- **`approveAndResume` runs the tool again** when it is called a second time, or twice in parallel, on the same run: it never checks that the run is still suspended. Found with the SQL run store, and visible in `approveAndResume` in `dist/runtime/agent.runtime.js`. The parallel case applies when the runtime has no run lease configured; with one, the second call fails on the lease. Reproduction: `durableSuspend: true`, a `requiresApproval` tool that inserts a row, `execute` until the run waits, then `approveAndResume` twice gives 2 rows. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
+- **`approveAndResume` can run an approved tool twice on the same run.** It never checks that the run is still suspended. Tested with the SQL run store (`durableSuspend: true`, a `requiresApproval` tool that inserts a row, `execute` until the run waits):
+  - calling `approveAndResume` a second time, one call after the other, ran the tool twice (2 rows);
+  - two approvals in parallel from two processes, with no run lease configured, both ran it (2 rows).
+
+  The source (`acquireRunLease` in `dist/runtime/agent.runtime.js`) suggests that a configured run lease would make the second parallel call fail; that was not tested. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
 
 ## Project docs
 
@@ -168,4 +172,4 @@ What runs today reads only public data: Google Maps listings, public websites (r
 
 ## License
 
-MIT
+MIT — see [`LICENSE`](LICENSE).
