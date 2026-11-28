@@ -11,7 +11,22 @@ import { ApiError, apiGet } from '../../../lib/api';
 import { LeadDetailView } from './lead-detail';
 
 /**
- * Renders the lead, or Next.js's 404 page for an unknown or malformed id.
+ * Reads the lead, or shows Next.js's 404 page for an unknown or malformed id.
+ * @param id - Lead id from the URL.
+ * @returns The lead.
+ * @throws ApiError for any other API failure (Next.js shows its error page).
+ */
+async function readLead(id: string): Promise<LeadDetail> {
+  try {
+    return await apiGet(`/leads/${encodeURIComponent(id)}`, LeadDetail);
+  } catch (error) {
+    if (error instanceof ApiError && (error.status === 404 || error.status === 400)) notFound();
+    throw error;
+  }
+}
+
+/**
+ * Renders the lead page.
  * @param props - Next.js page props.
  * @param props.params - The route's `id`.
  * @returns The page.
@@ -20,13 +35,5 @@ import { LeadDetailView } from './lead-detail';
  */
 export default async function LeadPage({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   await connection();
-  const { id } = await params;
-  let lead: LeadDetail;
-  try {
-    lead = await apiGet(`/leads/${encodeURIComponent(id)}`, LeadDetail);
-  } catch (error) {
-    if (error instanceof ApiError && (error.status === 404 || error.status === 400)) notFound();
-    throw error;
-  }
-  return <LeadDetailView lead={lead} />;
+  return <LeadDetailView lead={await readLead((await params).id)} />;
 }

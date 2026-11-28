@@ -61,7 +61,8 @@ function Header({ lead }: Readonly<{ lead: LeadDetail }>) {
       </Link>
       <h1 className="text-2xl font-semibold">{lead.name}</h1>
       <p className="text-sm text-slate-600">
-        {lead.area ?? 'No area'} · {lead.phone ?? 'No phone'} ({lead.phoneType.toLowerCase()}) ·{' '}
+        {lead.area ?? 'No area'} ·{' '}
+        {lead.phone === null ? 'No phone' : `${lead.phone} (${lead.phoneType.toLowerCase()})`} ·{' '}
         {website === null ? (
           (lead.website ?? 'No website')
         ) : (
@@ -131,13 +132,15 @@ function noPickReason(lead: LeadDetail): string {
       return 'No service picked: the solution agent found no evidence-backed problem to pitch.';
     }
     case 'NEEDS_REVIEW': {
-      return 'No service picked: the solution agent’s answer failed the catalog and signal checks twice, so this lead needs your review.';
+      return 'No service picked: the solution agent’s answer was rejected twice, so this lead needs your review.';
     }
     case 'FILTERED_OUT': {
       return `No service picked: the ideal-client filter dropped this lead (${lead.filterReason ?? 'no reason stored'}).`;
     }
     case 'FAILED': {
-      return 'No service yet: a step failed before the solution agent ran (see the error above).';
+      return lead.failedStep === 'SOLUTION'
+        ? 'No service yet: the solution step failed (see the error above).'
+        : 'No service yet: a step failed before the solution agent ran (see the error above).';
     }
     default: {
       return lead.tier === 'COLD'

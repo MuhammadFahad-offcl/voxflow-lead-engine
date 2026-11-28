@@ -1,6 +1,6 @@
 /**
- * Component test of the lead table, rendered to HTML with react-dom/server: each lead's name
- * links to its lead page.
+ * Component test of the lead table, rendered to HTML with react-dom/server: each row's expanded
+ * part links to its lead page, outside `<summary>`.
  *
  * Serves: FR-30 (lead table rows open the lead page); issue #24.
  * Used by: `pnpm test`, through the `web` project in jest.config.mjs.
@@ -28,9 +28,9 @@ const lead: LeadRow = {
   signals: [],
 };
 
-// Proves FR-30's link from the table: the row's name goes to /leads/<id>.
+// Proves FR-30's link from the table: each row opens /leads/<id>, from outside <summary>.
 describe('LeadTable', () => {
-  it('links each lead name to its lead page', () => {
+  it('links each row to its lead page from the expanded part, not from <summary>', () => {
     const html = renderToStaticMarkup(
       <LeadTable
         campaignId="fictionalcampaign"
@@ -40,6 +40,7 @@ describe('LeadTable', () => {
     );
 
     expect(html).toContain('href="/leads/fictionallead1"');
-    expect(html).toContain('>Fictional Dental</a>');
+    expect(html).toContain('Open the lead page');
+    expect(html.indexOf('href="/leads/')).toBeGreaterThan(html.indexOf('</summary>'));
   });
 });

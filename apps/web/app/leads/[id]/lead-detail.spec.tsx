@@ -145,7 +145,24 @@ describe('a lead with no Solution', () => {
 
   it('NEEDS_REVIEW: says the answer failed the checks twice', () => {
     expect(textOf(unpicked({ status: 'NEEDS_REVIEW' }))).toContain(
-      'failed the catalog and signal checks twice, so this lead needs your review',
+      'the solution agent’s answer was rejected twice, so this lead needs your review',
+    );
+  });
+
+  it('FAILED: names the solution step when it failed there, and an earlier step otherwise', () => {
+    const failed = { status: 'FAILED' as const, error: 'Fictional error' };
+
+    expect(textOf(unpicked({ ...failed, failedStep: 'SOLUTION' }))).toContain(
+      'No service yet: the solution step failed (see the error above).',
+    );
+    expect(textOf(unpicked({ ...failed, failedStep: 'LABEL_REVIEWS' }))).toContain(
+      'No service yet: a step failed before the solution agent ran',
+    );
+  });
+
+  it('WARM and SCORED: says the solution agent has not run yet', () => {
+    expect(textOf(unpicked({ status: 'SCORED' }))).toContain(
+      'No service yet: the solution agent has not run on this lead.',
     );
   });
 
@@ -184,6 +201,10 @@ describe('the header and reviews', () => {
     expect(text).toContain('Score 61 · Tier WARM · Status READY_TO_CALL');
     expect(html(picked)).toContain('href="https://fictional.example/"');
     expect(html(picked)).toContain('href="/campaigns/fictional-campaign"');
+  });
+
+  it('shows no phone type when there is no phone', () => {
+    expect(textOf({ ...picked, phone: null, phoneType: 'UNKNOWN' })).toContain('DHA · No phone ·');
   });
 
   it('never links a javascript: website', () => {

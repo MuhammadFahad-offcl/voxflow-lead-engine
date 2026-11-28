@@ -58,9 +58,14 @@ export function LeadEvidence({
             // Only an http(s) source becomes a link: a scraped `javascript:` URL is not shown.
             const href = signal.sourceUrl === null ? null : safeHref(signal.sourceUrl);
             const isCited = cited.has(signal.key);
-            const tone = signal.points === 0 ? 'text-slate-500' : '';
+            const tone = [
+              signal.points === 0 ? 'text-slate-500' : '',
+              isCited ? 'bg-amber-100' : '',
+            ]
+              .filter(Boolean)
+              .join(' ');
             return (
-              <li key={signal.key} className={isCited ? `${tone} bg-amber-100` : tone}>
+              <li key={signal.key} className={tone}>
                 <span className="inline-block w-12 font-semibold">+{signal.points}</span>
                 <span className="mr-2 text-xs uppercase text-slate-500">{signal.key}</span>
                 {isCited ? (

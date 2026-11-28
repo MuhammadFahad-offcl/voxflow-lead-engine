@@ -1,11 +1,12 @@
 /**
  * The lead table of a campaign page: one row per lead, sortable column headings, and each row
  * expanding (native `<details>`, no client script) to its evidence. A FAILED row's Retry button is
- * in its expanded part: a form may not sit inside `<summary>`. Each lead's name links to its page.
+ * in its expanded part: a form may not sit inside `<summary>`. So is the link to the lead page: a
+ * link inside `<summary>` (a button to screen readers) may not be announced.
  *
  * Serves: FR-30 (lead table: sort, expand to evidence; link to the lead page), FR-14, FR-32
  * (retry); issues #16, #24.
- * Used by: apps/web/app/campaigns/[id]/page.tsx.
+ * Used by: apps/web/app/campaigns/[id]/page.tsx, ./lead-table.spec.tsx.
  */
 import type { LeadPage } from '@voxflow/shared';
 import Link from 'next/link';
@@ -66,13 +67,7 @@ export function LeadTable({
       {page.leads.map((lead) => (
         <details key={lead.id} className="border-b last:border-0">
           <summary className={`${COLUMNS} cursor-pointer hover:bg-slate-50`}>
-            <span className="font-medium">
-              <span className="sr-only">Name: </span>
-              {/* A link in <summary> navigates on click instead of toggling the row. */}
-              <Link href={`/leads/${lead.id}`} className="underline">
-                {lead.name}
-              </Link>
-            </span>
+            {cell('Name', lead.name, 'font-medium')}
             {cell('Area', lead.area ?? '—')}
             {cell('Phone', lead.phone ?? '—')}
             {cell('Reviews', lead.reviewCount ?? '—')}
@@ -80,6 +75,11 @@ export function LeadTable({
             {cell('Tier', lead.tier ?? '—', lead.tier === null ? '' : TIER_COLOURS[lead.tier])}
             {cell('Status', lead.status === 'FAILED' ? 'FAILED — open to retry' : lead.status)}
           </summary>
+          <p className="bg-slate-50 px-4 pt-3 text-sm">
+            <Link href={`/leads/${lead.id}`} className="underline">
+              Open the lead page<span className="sr-only"> of {lead.name}</span>
+            </Link>
+          </p>
           <LeadEvidence lead={lead} />
           {lead.status === 'FAILED' ? (
             <form
