@@ -4,17 +4,19 @@
  * failed web search that does not fail the lead, a resumed run that pays nothing twice, a lost
  * claim, and the LLM and Perplexity spend caps that pause.
  *
- * Serves: FR-32, FR-33, NFR-1, NFR-2, ADR-0001; issue #15 acceptance (each lead goes through
- * enrich → score; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
+ * Serves: FR-17, FR-32, FR-33, NFR-1, NFR-2, ADR-0001; issue #15 acceptance (each lead goes through
+ * enrich → score, then solution for WARM and HOT, #19; one lead's failure is stored and the others continue; works with DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, afterEach, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { resolve } from 'node:path';
+import { FakeEmbeddingAdapter } from '../src/adapters/embedding/fake.adapter.js';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
-import { Prisma } from '../src/generated/prisma/client.js';
+import { createCatalogSearch, runSolutionAgent } from '../src/agents/solution.agent.js';
+import { CatalogRepository } from '../src/db/catalog.repository.js';
 import { LeadContextRepository } from '../src/db/lead-context.repository.js';
 import { LeadRunRepository, type ClaimedLead } from '../src/db/lead-run.repository.js';
 import { LeadWebsiteRepository } from '../src/db/lead-website.repository.js';
@@ -22,7 +24,9 @@ import { LlmSpendRepository } from '../src/db/llm-spend.repository.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { ReviewLabelRepository } from '../src/db/review-label.repository.js';
 import { ScoreRepository } from '../src/db/score.repository.js';
-import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
+import { embedMissingServices, seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
+import { SolutionRepository } from '../src/db/solution.repository.js';
+import { Prisma } from '../src/generated/prisma/client.js';
 import { LlmService } from '../src/llm/llm.service.js';
 import type { Logger } from '../src/logging/logger.js';
 import {
@@ -77,8 +81,17 @@ beforeAll(async () => {
   const url = await createTestDatabase('voxflow_lead_graph_test');
   prisma = new PrismaProvider(testEnv({ DATABASE_URL: url }));
   await seed(prisma, resolve(import.meta.dirname, '../../../config'));
+  const embedder = new FakeEmbeddingAdapter();
+  await embedMissingServices(prisma, { demoMode: true, embedder, logger });
   campaignId = await discoverDemoCampaign(prisma, logger);
-  const { runtime, store } = createLeadGraphRuntime(prisma);
+  const llm = new LlmService(new LlmSpendRepository(prisma), new FakeLlmAdapter(), logger);
+  const { runtime, store } = createLeadGraphRuntime(prisma, {
+    llm,
+    search: createCatalogSearch(embedder, new CatalogRepository(prisma), {
+      leads: new LeadContextRepository(prisma),
+      now: () => new Date(),
+    }),
+  });
   deps = {
     runtime,
     store,
@@ -92,10 +105,15 @@ beforeAll(async () => {
     },
     label: {
       reviews: new ReviewLabelRepository(prisma),
-      llm: new LlmService(new LlmSpendRepository(prisma), new FakeLlmAdapter(), logger),
+      llm,
       logger,
     },
     score: { leads: new ScoreRepository(prisma), logger },
+    solution: {
+      solutions: new SolutionRepository(prisma),
+      solve: (lead) => runSolutionAgent(runtime, lead),
+      logger,
+    },
     logger,
     now: () => new Date(),
   };
@@ -166,7 +184,9 @@ describe('runLeadGraph on the demo campaign', () => {
       where: { id: { in: claimed.map((lead) => lead.id) } },
     });
     for (const lead of leads) {
-      // The library's own message is not stored: it could quote page data.
+      // The library's own message is not stored: it could quote page data. p03 is WARM with no
+      // PAIN evidence: the solution step ends it NO_STRONG_SIGNAL (#19); the rest stay SCORED.
+      const ended = lead.placeId === 'fictional-place-p03' ? 'NO_STRONG_SIGNAL' : 'SCORED';
       const expected =
         lead.id === broken.id
           ? {
@@ -174,7 +194,7 @@ describe('runLeadGraph on the demo campaign', () => {
               failedStep: LEAD_STEP.WEBSITE,
               error: 'Unexpected Error in this step',
             }
-          : { status: 'SCORED', failedStep: null };
+          : { status: ended, failedStep: null };
       expect({ place: lead.placeId, ...lead }).toMatchObject({ place: lead.placeId, ...expected });
       expect(lead.graphClaimedAt).toBeNull();
       expect(lead.graphRunId).toMatch(/^lead_/);
@@ -182,25 +202,30 @@ describe('runLeadGraph on the demo campaign', () => {
   });
 
   it('stores each run in the HazelJS run store, with a checkpoint per finished step', async () => {
-    // One with a website: a lead without one starts at the web context (nothing to read).
-    const scored = await prisma.lead.findFirstOrThrow({
-      where: { campaignId, status: 'SCORED', website: { not: null } },
-    });
+    // With a website: a lead without one starts at the web context (nothing to read). A COLD lead
+    // ends after score; a WARM one goes on to the solution (#19).
+    const withSite = { campaignId, status: 'SCORED' as const, website: { not: null } };
+    const cold = await prisma.lead.findFirstOrThrow({ where: { ...withSite, tier: 'COLD' } });
+    const warm = await prisma.lead.findFirstOrThrow({ where: { ...withSite, tier: 'WARM' } });
     const failed = await prisma.lead.findFirstOrThrow({ where: { campaignId, status: 'FAILED' } });
 
     const done = await prisma.agentRun.findUniqueOrThrow({
-      where: { id: scored.graphRunId ?? '' },
+      where: { id: cold.graphRunId ?? '' },
     });
     const broke = await prisma.agentRun.findUniqueOrThrow({
       where: { id: failed.graphRunId ?? '' },
     });
-    const checkpoints = await prisma.agentRunCheckpoint.findMany({
-      where: { runId: done.id },
-      orderBy: { step: 'asc' },
-    });
+    const steps = async (runId: string | null) =>
+      (
+        await prisma.agentRunCheckpoint.findMany({
+          where: { runId: runId ?? '' },
+          orderBy: { step: 'asc' },
+        })
+      ).map((checkpoint) => checkpoint.step);
 
     expect(done).toMatchObject({ agentName: 'lead-graph', status: 'completed' });
-    expect(checkpoints.map((checkpoint) => checkpoint.step)).toEqual([1, 2, 3, 4]);
+    expect(await steps(done.id)).toEqual([1, 2, 3, 4]);
+    expect(await steps(warm.graphRunId)).toEqual([1, 2, 3, 4, 5]);
     expect(broke).toMatchObject({
       status: 'failed',
       error: { message: 'Unexpected Error in this step' },

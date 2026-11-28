@@ -44,11 +44,11 @@ export class LeadsRepository {
    *
    * Does not touch the lead's stored enrichment, reviews or labels: the graph's steps skip them.
    * @param id - `Lead.id`.
-   * @param status - Where its next graph run starts: DISCOVERED or ENRICHED.
+   * @param status - Where its next graph run starts: DISCOVERED, ENRICHED or SCORED.
    * @returns False when the lead was no longer FAILED.
    * @throws Prisma errors when the database cannot be written.
    */
-  async requeue(id: string, status: 'DISCOVERED' | 'ENRICHED'): Promise<boolean> {
+  async requeue(id: string, status: 'DISCOVERED' | 'ENRICHED' | 'SCORED'): Promise<boolean> {
     const { count } = await this.prisma.lead.updateMany({
       where: { id, status: 'FAILED' },
       data: { status, failedStep: null, error: null, graphClaimedAt: null },

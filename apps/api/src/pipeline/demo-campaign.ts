@@ -2,10 +2,10 @@
  * A demo campaign on the fictional DHA clinics, discovered and with its pass-2 reviews
  * stored, all through the fake adapters. Its leads are ready for the lead graph.
  *
- * Serves: FR-36 (demo mode); issue #15 tests, issue #19 (the solution recorder and its replay).
+ * Serves: FR-36 (demo mode); issue #15 tests, issue #19 (the solution recorder and its test).
  * Used by: apps/api/src/llm-record-solution.ts; apps/api/test/lead-run.int.spec.ts,
  * apps/api/test/lead-graph.int.spec.ts, apps/api/test/lead-runner.int.spec.ts,
- * apps/api/test/log-privacy.int.spec.ts, apps/api/test/solution-replay.int.spec.ts.
+ * apps/api/test/log-privacy.int.spec.ts, apps/api/test/solution-node.int.spec.ts.
  */
 import { resolve } from 'node:path';
 import { FakeLeadSourceAdapter } from '../adapters/lead-source/fake.adapter.js';
@@ -76,19 +76,20 @@ export async function discoverDemoCampaign(
 }
 
 /**
- * Builds the scored DHA demo clinics from an empty database: seeds it, embeds the catalog, discovers
- * the demo campaign and runs every lead to SCORE with the fake adapters (labelling replays its
- * recorded answers).
+ * Runs the DHA demo clinics from an empty database: seeds it, embeds the catalog, discovers the
+ * demo campaign and runs every lead's graph with the fake adapters, the solution step included
+ * (labelling and solution replay their recorded answers).
  *
- * The solution recorder and its replay test both start here, so the prompts the test replays are
- * the ones that were recorded. Does not run the solution agent.
+ * The solution recorder and the solution acceptance test both start here, so the prompts the test
+ * replays are the ones that were recorded. When a recorded answer is missing (e.g. after a prompt
+ * change), that WARM lead ends FAILED at SOLUTION; the recorder then records it anew.
  * @param prisma - A client on an empty, migrated database (never the dev one).
  * @param logger - Usually a quiet logger: the demo pipeline logs every step.
  * @param embedder - The fake embedder; the agent's catalog search must use the same one.
  * @returns The WARM and HOT leads, sorted by place id.
  * @throws What seeding, embedding, discovery or the lead runner throw.
  */
-export async function scoreDemoClinics(
+export async function runDemoClinics(
   prisma: PrismaProvider,
   logger: Logger,
   embedder: EmbeddingPort,
@@ -102,12 +103,13 @@ export async function scoreDemoClinics(
     webReader: new FakeWebReaderAdapter(),
     webContext: new FakeWebContextAdapter(),
     llm: new FakeLlmAdapter(),
+    embedder,
     logger,
     now: () => new Date(),
     concurrency: 4,
     startGate: new PaidStartGate(),
   });
-  // Until no lead is left to claim: every lead then sits at its last step (SCORE or an exit).
+  // Until no lead is left to claim: every lead has then run its whole graph.
   while ((await runLeadRunnerOnce(deps)).leads > 0);
   return prisma.lead.findMany({
     where: { tier: { in: ['WARM', 'HOT'] } },

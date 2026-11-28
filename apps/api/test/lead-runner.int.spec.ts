@@ -4,19 +4,20 @@
  * lead through its graph at most LEAD_RUNNER_CONCURRENCY at a time, the campaign to SCORING; a
  * worker stopped mid-pass; a reviews run that needs an Apify check; a spend cap.
  *
- * Serves: FR-11, FR-32, FR-33, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED, FILTERED_OUT
- * or FAILED with one failing site, the campaign not FAILED; restart test; DEMO_MODE=true).
+ * Serves: FR-11, FR-17, FR-32, FR-33, NFR-1, NFR-2; issue #15 acceptance (each lead SCORED,
+ * FILTERED_OUT, FAILED with one failing site, or since #19 an exit status of the solution step; the campaign not FAILED; restart test; DEMO_MODE=true).
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, describe, expect, it, jest } from '@jest/globals';
 import { DEFAULT_SETTINGS } from '@voxflow/shared';
 import { resolve } from 'node:path';
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
+import { FakeEmbeddingAdapter } from '../src/adapters/embedding/fake.adapter.js';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
-import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
+import { embedMissingServices, seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
 import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 import { readReviewsRunNote } from '../src/pipeline/reviews-run-note.js';
@@ -45,6 +46,8 @@ const logger = {
   error: jest.fn(),
   debug: jest.fn(),
 } as unknown as Logger;
+// The demo catalog's vectors, so the solution step's search and replayed answers match #19's.
+const embedder = new FakeEmbeddingAdapter();
 const clients: PrismaProvider[] = [];
 
 afterAll(async () => {
@@ -60,6 +63,7 @@ const demoDatabase = async (name: string) => {
   const prisma = new PrismaProvider(testEnv({ DATABASE_URL: await createTestDatabase(name) }));
   clients.push(prisma);
   await seed(prisma, resolve(import.meta.dirname, '../../../config'));
+  await embedMissingServices(prisma, { demoMode: true, embedder, logger });
   return { prisma, campaignId: await discoverDemoCampaign(prisma, logger, false) };
 };
 
@@ -79,6 +83,7 @@ const runnerDeps = (prisma: PrismaProvider, swap: Partial<LeadRunnerParts> = {})
     webReader: fakeReader,
     webContext: fakeContext,
     llm: new FakeLlmAdapter(),
+    embedder,
     logger,
     now: () => new Date(),
     concurrency: CONCURRENCY,
@@ -134,7 +139,15 @@ describe('lead runner on a demo campaign', () => {
     expect(byStatus('FAILED').map((lead) => [lead.id, lead.failedStep])).toEqual([
       [broken.id, 'ENRICH_WEBSITE'],
     ]);
-    expect(byStatus('SCORED').length + byStatus('FILTERED_OUT').length).toBe(leads.length - 1);
+    // p03 is WARM with no PAIN evidence: the solution step ends it NO_STRONG_SIGNAL (#19).
+    expect(byStatus('NO_STRONG_SIGNAL').map((lead) => lead.placeId)).toEqual([
+      'fictional-place-p03',
+    ]);
+    expect(
+      byStatus('SCORED').length +
+        byStatus('FILTERED_OUT').length +
+        byStatus('NO_STRONG_SIGNAL').length,
+    ).toBe(leads.length - 1);
     expect(byStatus('SCORED').length).toBeGreaterThan(0);
     expect(await campaignStatus(prisma, campaignId)).toBe('SCORING');
   });
@@ -184,16 +197,31 @@ describe('lead runner after the worker stopped mid-pass', () => {
       where: { campaignId, status: { not: 'FILTERED_OUT' } },
       include: { costRecords: true },
     });
-    expect(leads.map((lead) => lead.status)).toEqual(leads.map(() => 'SCORED'));
+    // p03 is WARM with no PAIN evidence: the solution step ends it NO_STRONG_SIGNAL (#19).
+    expect(leads.map((lead) => lead.status)).toEqual(
+      leads.map(({ placeId }) =>
+        placeId === 'fictional-place-p03' ? 'NO_STRONG_SIGNAL' : 'SCORED',
+      ),
+    );
     for (const lead of leads) {
       const paid = (service: string) =>
         lead.costRecords.filter((record) => record.service === service).length;
-      // One web search each, ever; at most one labelling call (none when nothing has text).
+      // The gate notes each call's task; the solution's are counted apart from labelling's.
+      const solutionCalls = lead.costRecords.filter(
+        ({ service, note }) => service === 'LLM' && note?.includes('"task":"SOLUTION"') === true,
+      ).length;
+      // One web search each, ever; at most one labelling call (none when nothing has text); for a
+      // WARM lead one agent run (a tool turn and an answer), two for p03's rejected pick (#19).
       expect({ lead: lead.placeId, searches: paid('PERPLEXITY_SEARCH') }).toEqual({
         lead: lead.placeId,
         searches: 1,
       });
-      expect(paid('LLM')).toBeLessThanOrEqual(1);
+      expect(paid('LLM') - solutionCalls).toBeLessThanOrEqual(1);
+      const agentTurns = lead.placeId === 'fictional-place-p03' ? 4 : 2;
+      expect({ lead: lead.placeId, solutionCalls }).toEqual({
+        lead: lead.placeId,
+        solutionCalls: lead.tier === 'COLD' ? 0 : agentTurns,
+      });
     }
     // The interrupted runs are closed in the HazelJS run store, not left running.
     const oldRuns = await prisma.agentRun.findMany({

@@ -3,7 +3,7 @@
  * pick as a Solution, or its exit status (NO_STRONG_SIGNAL, NEEDS_REVIEW).
  *
  * Serves: FR-17, US-5, FR-33 (a spend cap pauses the step, the lead waits); issue #19.
- * Used by: solution.step.spec.ts; the lead graph's SOLUTION node (#19, the PR after this one).
+ * Used by: apps/api/src/pipeline/lead.graph.ts (the SOLUTION node), solution.step.spec.ts.
  */
 import type { SolutionOutcome } from '../agents/solution.agent.js';
 import type { SolutionRepository, StoredSolutionLead } from '../db/solution.repository.js';
@@ -29,7 +29,8 @@ export type SolutionStepOutcome =
  * Picks the one catalog service for a scored WARM or HOT lead and stores the result.
  *
  * Safe to repeat: a lead that already has a Solution, or has left SCORED, is skipped, so a resumed
- * or retried run never pays twice for a stored answer. The agent gets the lead's own ids, so every
+ * or retried run never pays twice for a stored answer. A spend cap that stops the agent after a
+ * paid turn stores nothing, so the resumed run pays that turn again. The agent gets the lead's own ids, so every
  * model call's cost record names the lead and its campaign (FR-33, NFR-4).
  * Does not change a picked lead's status: it stays SCORED until its script (#20).
  * @param deps - What the step needs.
@@ -37,7 +38,7 @@ export type SolutionStepOutcome =
  * @returns What was stored; CAP_REACHED when a spend cap stopped the agent, with nothing stored.
  * @throws Prisma errors; Error from `forSolution` for a lead with no score; the agent's errors
  * other than a reached cap (an LLM or embedder outage), which the lead graph turns into a FAILED
- * lead at SOLUTION (FR-32, wired with the graph node).
+ * lead at SOLUTION (FR-32).
  */
 export async function solveLead(
   deps: SolutionStepDeps,

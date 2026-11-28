@@ -5,7 +5,7 @@
  * Serves: FR-17 (signals that cite evidence; NEEDS_REVIEW, NO_STRONG_SIGNAL), FR-36 (demo prompts
  * that replay); issue #19.
  * Used by: apps/api/src/pipeline/solution.step.ts, apps/api/src/llm-record-solution.ts,
- * apps/api/test/solution-replay.int.spec.ts, apps/api/test/solution-repository.int.spec.ts.
+ * apps/api/test/solution-node.int.spec.ts, apps/api/test/solution-repository.int.spec.ts.
  */
 import { Inject, Injectable } from '@hazeljs/core';
 import type { SolutionLead } from '../agents/solution.agent.js';

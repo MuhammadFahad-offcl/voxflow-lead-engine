@@ -13,6 +13,7 @@ import { PrismaProvider } from './db/prisma.provider.js';
 import { LOGGER, type Logger } from './logging/logger.js';
 import { AREAS_DIR, loadAreaPolygons } from './pipeline/area-polygons.js';
 import { PaidStartGate } from './pipeline/paid-start-gate.js';
+import { EMBEDDING, type EmbeddingPort } from './ports/embedding.port.js';
 import { LEAD_SOURCE, type LeadSourcePort } from './ports/lead-source.port.js';
 import { LLM, type LlmPort } from './ports/llm.port.js';
 import { WEB_CONTEXT, type WebContextPort } from './ports/web-context.port.js';
@@ -53,6 +54,7 @@ const stopLeadRunner = startLeadRunner(
     webReader: container.resolve<WebReaderPort>(WEB_READER),
     webContext: container.resolve<WebContextPort>(WEB_CONTEXT),
     llm: container.resolve<LlmPort>(LLM),
+    embedder: container.resolve<EmbeddingPort>(EMBEDDING),
     logger,
     now,
     concurrency: env.LEAD_RUNNER_CONCURRENCY,
