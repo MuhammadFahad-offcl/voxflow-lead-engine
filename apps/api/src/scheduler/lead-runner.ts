@@ -1,20 +1,22 @@
 /**
  * The lead-runner loop: every 10 s, one pass. First the pass-2 reviews step for each ENRICHING
  * campaign (it pays once per lead for its reviews), then up to LEAD_RUNNER_CONCURRENCY claimed
- * leads through their lead graph, then every campaign with no lead left to run moves from
- * ENRICHING to SCORING.
+ * leads through their lead graph (to the solution, for WARM and HOT leads), then every campaign
+ * with no lead left to run moves from ENRICHING to SCORING.
  *
  * A pass ends before the next one starts. One worker normally runs this loop; the claims on leads and
  * on a campaign's reviews step keep a second worker from doing the same work twice. A lead's
  * failure never stops the pass or its campaign (FR-32). After a spend cap pauses a lead, the runner claims no new
  * lead for one lease, so it does not walk every lead into a cap it already knows about (FR-33).
  *
- * Serves: FR-11 (reviews), FR-32, FR-33, NFR-1, NFR-2, docs/architecture.md §9, ADR-0002,
- * ADR-0015; issue #15.
+ * Serves: FR-11 (reviews), FR-17 (solution), FR-32, FR-33, NFR-1, NFR-2, docs/architecture.md §9,
+ * ADR-0002, ADR-0015; issues #15, #19.
  * Used by: apps/api/src/worker.ts, apps/api/src/llm-record-solution.ts, lead-runner.spec.ts,
- * apps/api/test/lead-runner.int.spec.ts, apps/api/test/solution-replay.int.spec.ts.
+ * apps/api/test/lead-runner.int.spec.ts, apps/api/test/solution-node.int.spec.ts.
  */
 import type { HazelApp } from '@hazeljs/core';
+import { createCatalogSearch, runSolutionAgent } from '../agents/solution.agent.js';
+import { CatalogRepository } from '../db/catalog.repository.js';
 import { DiscoveryRepository } from '../db/discovery.repository.js';
 import { LeadContextRepository } from '../db/lead-context.repository.js';
 import { LeadRunRepository } from '../db/lead-run.repository.js';
@@ -24,6 +26,7 @@ import type { PrismaProvider } from '../db/prisma.provider.js';
 import { ReviewLabelRepository } from '../db/review-label.repository.js';
 import { ReviewRepository } from '../db/review.repository.js';
 import { ScoreRepository } from '../db/score.repository.js';
+import { SolutionRepository } from '../db/solution.repository.js';
 import { LlmService } from '../llm/llm.service.js';
 import { errorFields, type Logger } from '../logging/logger.js';
 import {
@@ -36,6 +39,7 @@ import {
   type LeadGraphDeps,
 } from '../pipeline/lead.graph.js';
 import type { PaidStartGate } from '../pipeline/paid-start-gate.js';
+import type { EmbeddingPort } from '../ports/embedding.port.js';
 import type { LeadSourcePort } from '../ports/lead-source.port.js';
 import type { LlmPort } from '../ports/llm.port.js';
 import type { WebContextPort } from '../ports/web-context.port.js';
@@ -104,6 +108,8 @@ export interface LeadRunnerParts {
   webReader: WebReaderPort;
   webContext: WebContextPort;
   llm: LlmPort;
+  /** Embeds the solution agent's catalog search query; the fake in demo mode. */
+  embedder: EmbeddingPort;
   logger: Logger;
   now: () => Date;
   concurrency: number;
@@ -111,15 +117,23 @@ export interface LeadRunnerParts {
 }
 
 /**
- * Builds a lead runner's dependencies: the repositories, the LLM gate and the lead graph's
- * HazelJS runtime and SQL durable run store. The worker passes the bound adapters; the tests pass
+ * Builds a lead runner's dependencies: the repositories, the LLM gate, and the lead graph's
+ * HazelJS runtime (with the solution agent, whose model calls go through the same gate) and SQL
+ * durable run store. The worker passes the bound adapters; the tests pass
  * fakes, so both run this same wiring.
  * @param parts - The database client, the ports and the settings.
  * @returns The dependencies of {@link runLeadRunnerOnce} and {@link startLeadRunner}.
  */
 export function buildLeadRunnerDeps(parts: LeadRunnerParts): LeadRunnerDeps {
   const { prisma, logger, now } = parts;
-  const { runtime, store } = createLeadGraphRuntime(prisma);
+  const llm = new LlmService(new LlmSpendRepository(prisma), parts.llm, logger);
+  const { runtime, store } = createLeadGraphRuntime(prisma, {
+    llm,
+    search: createCatalogSearch(parts.embedder, new CatalogRepository(prisma), {
+      leads: new LeadContextRepository(prisma),
+      now,
+    }),
+  });
   const leads = new LeadRunRepository(prisma);
   return {
     leads,
@@ -144,10 +158,15 @@ export function buildLeadRunnerDeps(parts: LeadRunnerParts): LeadRunnerDeps {
       },
       label: {
         reviews: new ReviewLabelRepository(prisma),
-        llm: new LlmService(new LlmSpendRepository(prisma), parts.llm, logger),
+        llm,
         logger,
       },
       score: { leads: new ScoreRepository(prisma), logger },
+      solution: {
+        solutions: new SolutionRepository(prisma),
+        solve: (lead) => runSolutionAgent(runtime, lead),
+        logger,
+      },
       logger,
       now,
     },

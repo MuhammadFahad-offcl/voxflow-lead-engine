@@ -6,11 +6,12 @@
  * Serves: FR-17, FR-36 (demo mode with recorded LLM answers), FR-33, ADR-0006, ADR-0007; issue #19.
  * Used by: the root package.json script `llm:record:solution`, which runs it through tsx with `.env`.
  *
- * The answers must replay exactly, so the clinics are built by `scoreDemoClinics`, as the replay
- * test builds them, not read from the dev database (its demo leads may come from an older niche
- * version). It creates the scratch database `voxflow_solution_record` next to the dev one, builds
- * the scored clinics there with every fake adapter, then runs the solution agent for the WARM
- * clinics with the real model.
+ * The answers must replay exactly, so the clinics are built by `runDemoClinics`, as the solution
+ * acceptance test builds them, not read from the dev database (its demo leads may come from an
+ * older niche version). It creates the scratch database `voxflow_solution_record` next to the dev
+ * one, runs the clinics' graphs there with every fake adapter (a WARM clinic whose answer is not
+ * recorded yet ends FAILED there, which changes nothing here), then runs the solution agent for the
+ * WARM clinics with the real model.
  *
  * Spend is counted where it matters: each call goes through the real LLM gate against the database
  * in DATABASE_URL, so it counts against the monthly LLM cap and leaves a CostRecord there (no lead,
@@ -44,7 +45,7 @@ import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from './llm/gated-llm.provide
 import { LlmService } from './llm/llm.service.js';
 import { RecordingLlm } from './llm/recording-llm.js';
 import { createLogger } from './logging/logger.js';
-import { scoreDemoClinics } from './pipeline/demo-campaign.js';
+import { runDemoClinics } from './pipeline/demo-campaign.js';
 import { karachiMonthStart } from './pipeline/spend-cap.js';
 import { LlmError, type LlmPort, type LlmReply, type LlmRequest } from './ports/llm.port.js';
 
@@ -149,7 +150,7 @@ async function main(args: readonly string[]): Promise<void> {
     const scratchUrl = await createScratchDatabase(env.DATABASE_URL, SCRATCH_DATABASE);
     scratch = new PrismaProvider({ ...env, DATABASE_URL: scratchUrl });
     const embedder = new FakeEmbeddingAdapter();
-    const warm = await scoreDemoClinics(scratch, quiet, embedder);
+    const warm = await runDemoClinics(scratch, quiet, embedder);
     const found = warm.map(({ placeId }) => placeId);
     if (found.join() !== WARM_CLINICS.join()) {
       throw new Error(`Expected the six WARM demo clinics, found: ${found.join(', ') || 'none'}`);

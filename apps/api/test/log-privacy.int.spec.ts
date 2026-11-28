@@ -11,11 +11,12 @@ import { afterAll, beforeAll, describe, expect, it, jest } from '@jest/globals';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { FakeLeadSourceAdapter } from '../src/adapters/lead-source/fake.adapter.js';
+import { FakeEmbeddingAdapter } from '../src/adapters/embedding/fake.adapter.js';
 import { FakeLlmAdapter } from '../src/adapters/llm/fake.adapter.js';
 import { FakeWebContextAdapter } from '../src/adapters/web-context/fake.adapter.js';
 import { FakeWebReaderAdapter } from '../src/adapters/web-reader/fake.adapter.js';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
-import { seed } from '../src/db/seed.js';
+import { embedMissingServices, seed } from '../src/db/seed.js';
 import type { Logger } from '../src/logging/logger.js';
 import { PaidStartGate } from '../src/pipeline/paid-start-gate.js';
 import { buildLeadRunnerDeps, runLeadRunnerOnce } from '../src/scheduler/lead-runner.js';
@@ -39,6 +40,8 @@ const logger = {
   error: record('error'),
   debug: record('debug'),
 } as unknown as Logger;
+// The demo catalog's vectors, so the solution step's search and replayed answers match #19's.
+const embedder = new FakeEmbeddingAdapter();
 
 let prisma: PrismaProvider;
 
@@ -47,6 +50,7 @@ beforeAll(async () => {
     testEnv({ DATABASE_URL: await createTestDatabase('voxflow_log_privacy_test') }),
   );
   await seed(prisma, resolve(import.meta.dirname, '../../../config'));
+  await embedMissingServices(prisma, { demoMode: true, embedder, logger });
   await discoverDemoCampaign(prisma, logger, false);
   const deps = buildLeadRunnerDeps({
     prisma,
@@ -54,6 +58,7 @@ beforeAll(async () => {
     webReader: new FakeWebReaderAdapter(),
     webContext: new FakeWebContextAdapter(),
     llm: new FakeLlmAdapter(),
+    embedder,
     logger,
     now: () => new Date(),
     concurrency: 3,

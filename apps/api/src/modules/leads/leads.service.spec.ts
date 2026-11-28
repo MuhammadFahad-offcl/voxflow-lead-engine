@@ -14,6 +14,8 @@ describe('retryStatusFor', () => {
     ['ENRICH_CONTEXT', 'DISCOVERED'],
     ['LABEL_REVIEWS', 'ENRICHED'],
     ['SCORE', 'ENRICHED'],
+    // Not from the beginning: the runner claims a SCORED WARM/HOT lead with no Solution at SOLUTION.
+    ['SOLUTION', 'SCORED'],
     // An unknown step starts from the beginning; the steps skip what is stored.
     ['ENRICH_REVIEWS', 'DISCOVERED'],
     [null, 'DISCOVERED'],

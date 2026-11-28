@@ -3,7 +3,7 @@
  * pick as a Solution, or its exit status (NO_STRONG_SIGNAL, NEEDS_REVIEW).
  *
  * Serves: FR-17, US-5, FR-33 (a spend cap pauses the step, the lead waits); issue #19.
- * Used by: solution.step.spec.ts; the lead graph's SOLUTION node (#19, the PR after this one).
+ * Used by: apps/api/src/pipeline/lead.graph.ts (the SOLUTION node), solution.step.spec.ts.
  */
 import type { SolutionOutcome } from '../agents/solution.agent.js';
 import type { SolutionRepository, StoredSolutionLead } from '../db/solution.repository.js';
@@ -37,7 +37,7 @@ export type SolutionStepOutcome =
  * @returns What was stored; CAP_REACHED when a spend cap stopped the agent, with nothing stored.
  * @throws Prisma errors; Error from `forSolution` for a lead with no score; the agent's errors
  * other than a reached cap (an LLM or embedder outage), which the lead graph turns into a FAILED
- * lead at SOLUTION (FR-32, wired with the graph node).
+ * lead at SOLUTION (FR-32).
  */
 export async function solveLead(
   deps: SolutionStepDeps,

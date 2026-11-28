@@ -1,18 +1,19 @@
 /**
- * The lead graph: one HazelJS `AgentGraph` run per lead, of function nodes
- * website → web context → review labels → score → END. Each run and its checkpoints are stored
- * through HazelJS's SQL durable run store (`agent_runs`, `agent_run_checkpoints`), and the run id
- * is kept on `Lead.graphRunId`.
+ * The lead graph: one HazelJS `AgentGraph` run per lead, of function nodes website → web context
+ * → review labels → score, then solution for WARM and HOT leads (COLD → END). The solution node
+ * runs the HazelJS solution agent (FR-17). Each run and its checkpoints are stored through
+ * HazelJS's SQL durable run store (`agent_runs`, `agent_run_checkpoints`), and the run id is kept
+ * on `Lead.graphRunId`.
  *
  * `AgentGraph.execute()` (2.1.3) keeps its state in memory and cannot resume, so a resumed or
  * retried lead starts a new run at its next step, chosen from the lead's status, and every step
  * skips the work already stored. A paid call is repeated only when a crash falls between the call
- * and its save (accepted in the context and labelling steps). Each node first renews the runner's
- * claim, so no node starts, or pays, without holding the lead (ADR-0001, update of 2026-11-12).
- * Cycle 2 adds the solution and script nodes after score, with the COLD → END edge.
+ * and its save (accepted in the context, labelling and solution steps). Each node first renews the
+ * runner's claim, so no node starts, or pays, without holding the lead (ADR-0001, update of
+ * 2026-11-12). The script node (#20) comes after solution.
  *
- * Serves: FR-9–FR-15 (runs the steps), FR-32 (per-lead status, error, never stops the campaign),
- * FR-33 (a spend cap pauses the step), NFR-1, NFR-2, ADR-0001; issue #15.
+ * Serves: FR-9–FR-15 and FR-17 (runs the steps), FR-32 (per-lead status, error, never stops the
+ * campaign), FR-33 (a spend cap pauses the step), NFR-1, NFR-2, ADR-0001; issues #15, #19.
  * Used by: apps/api/src/scheduler/lead-runner.ts, apps/api/test/lead-graph.int.spec.ts.
  */
 import { randomUUID } from 'node:crypto';
@@ -25,15 +26,20 @@ import {
   LogLevel,
   type DurableRunStore,
   type FunctionNodeConfig,
+  type GraphState,
   type PrismaAgentRunClientLike,
 } from '@hazeljs/agent';
+import { registerSolutionAgent, type CatalogSearch } from '../agents/solution.agent.js';
 import type { ClaimedLead, LeadRunRepository } from '../db/lead-run.repository.js';
 import type { PrismaProvider } from '../db/prisma.provider.js';
+import { GATED_RUNTIME_OPTIONS, GatedLlmProvider } from '../llm/gated-llm.provider.js';
+import type { LlmService } from '../llm/llm.service.js';
 import { errorFields, type Logger } from '../logging/logger.js';
 import { enrichContext, type EnrichContextDeps } from './enrich-context.step.js';
 import { enrichWebsite, type EnrichWebsiteDeps } from './enrich.step.js';
 import { labelReviews, type LabelReviewsDeps } from './label-reviews.step.js';
 import { scoreStoredLead, type ScoreDeps } from './score.step.js';
+import { solveLead, type SolutionStepDeps } from './solution.step.js';
 
 /** The graph's nodes; a FAILED lead's `failedStep` is one of these. */
 export const LEAD_STEP = {
@@ -41,6 +47,7 @@ export const LEAD_STEP = {
   CONTEXT: 'ENRICH_CONTEXT',
   LABEL: 'LABEL_REVIEWS',
   SCORE: 'SCORE',
+  SOLUTION: 'SOLUTION',
 } as const;
 type LeadStep = (typeof LEAD_STEP)[keyof typeof LEAD_STEP];
 const ORDER: readonly LeadStep[] = Object.values(LEAD_STEP);
@@ -94,6 +101,7 @@ export interface LeadGraphDeps {
   context: EnrichContextDeps;
   label: LabelReviewsDeps;
   score: ScoreDeps;
+  solution: SolutionStepDeps;
   logger: Logger;
   /** The clock for claim renewals. */
   now: () => Date;
@@ -108,13 +116,18 @@ export type LeadRunOutcome =
   | { status: 'CLAIM_LOST' };
 
 /**
- * Builds the HazelJS runtime and SQL durable run store the lead graph runs on.
- *
- * Does not register any agent: the lead graph has function nodes only (Cycle 2 adds agents).
+ * Builds the HazelJS runtime and SQL durable run store the lead graph runs on, with the solution
+ * agent registered and every agent model call sent through the LLM gate.
  * @param prisma - The process's Prisma client; it has the Agent OS models (`agentRun`, …).
- * @returns The runtime (graphs) and the store (runs, checkpoints), sharing one database.
+ * @param agents - What the solution agent needs.
+ * @param agents.llm - The LLM gate: monthly cap, cost records, demo replay (ADR-0006).
+ * @param agents.search - The agent's catalog search.
+ * @returns The runtime (graphs, agents) and the store (runs, checkpoints), sharing one database.
  */
-export function createLeadGraphRuntime(prisma: PrismaProvider): {
+export function createLeadGraphRuntime(
+  prisma: PrismaProvider,
+  agents: { llm: Pick<LlmService, 'complete'>; search: CatalogSearch },
+): {
   runtime: AgentRuntime;
   store: DurableRunStore;
 } {
@@ -126,20 +139,25 @@ export function createLeadGraphRuntime(prisma: PrismaProvider): {
     runRepository: store.runRepository,
     checkpointService: store.checkpointService,
     humanTaskService: store.humanTaskService,
+    llmProvider: new GatedLlmProvider(agents.llm),
+    ...GATED_RUNTIME_OPTIONS,
     // Our pino logger reports runs; HazelJS's own console logger stays quiet below errors.
     logLevel: LogLevel.ERROR,
     enableMetrics: false,
   });
+  registerSolutionAgent(runtime, agents.search);
   return { runtime, store };
 }
 
 /**
  * Picks the node a lead's run starts at, from what is already stored.
  * @param lead - The claimed lead.
- * @returns ENRICHED leads start at labelling; a DISCOVERED lead whose site was read, or that has
- * none (discover stores NONE), starts at the web context; any other at the website.
+ * @returns SCORED leads (WARM or HOT with no Solution yet) start at the solution; ENRICHED leads
+ * at labelling; a DISCOVERED lead whose site was read, or that has none (discover stores NONE), at
+ * the web context; any other at the website.
  */
 const entryFor = (lead: ClaimedLead): LeadStep => {
+  if (lead.status === 'SCORED') return LEAD_STEP.SOLUTION;
   if (lead.status === 'ENRICHED') return LEAD_STEP.LABEL;
   return lead.websiteStatus === 'PENDING' ? LEAD_STEP.WEBSITE : LEAD_STEP.CONTEXT;
 };
@@ -163,14 +181,29 @@ const steps = (deps: LeadGraphDeps): Record<LeadStep, (leadId: string) => Promis
     return outcome;
   },
   [LEAD_STEP.SCORE]: (leadId) => scoreStoredLead(deps.score, leadId),
+  [LEAD_STEP.SOLUTION]: async (leadId) => {
+    const outcome = await solveLead(deps.solution, leadId);
+    if (outcome.status === 'CAP_REACHED') throw new StepPausedError(outcome.reason);
+    return outcome;
+  },
 });
 
 /**
- * Builds one lead's graph: function nodes in a line, entering at `entry`.
+ * Routes a lead after scoring: WARM and HOT go on to the solution, COLD and skipped leads end.
+ * @param state - The run's state; the score node's result is under its step name.
+ * @returns The next node, or END.
+ */
+const afterScore = (state: GraphState): LeadStep | typeof END => {
+  const scored = state.data[LEAD_STEP.SCORE];
+  const tier = typeof scored === 'object' && scored !== null && 'tier' in scored && scored.tier;
+  return tier === 'WARM' || tier === 'HOT' ? LEAD_STEP.SOLUTION : END;
+};
+
+/**
+ * Builds one lead's graph: function nodes in a line, entering at `entry`, with one branch after
+ * score (FR-15: COLD leads stop there).
  *
  * Every node renews the claim first and throws {@link ClaimLostError} when it cannot.
- * Does not add a conditional edge after score: with no node after it yet, both branches would end
- * the run. Cycle 2 adds it with the solution node.
  * @param deps - What the steps need.
  * @param claim - The lead and the lease value this pass holds; each renewal updates it.
  * @param runId - The `AgentRun` id each node's checkpoint is saved under.
@@ -197,10 +230,12 @@ const buildLeadGraph = (deps: LeadGraphDeps, claim: HeldClaim, runId: string, en
     .addNode(LEAD_STEP.CONTEXT, node(LEAD_STEP.CONTEXT))
     .addNode(LEAD_STEP.LABEL, node(LEAD_STEP.LABEL))
     .addNode(LEAD_STEP.SCORE, node(LEAD_STEP.SCORE))
+    .addNode(LEAD_STEP.SOLUTION, node(LEAD_STEP.SOLUTION))
     .addEdge(LEAD_STEP.WEBSITE, LEAD_STEP.CONTEXT)
     .addEdge(LEAD_STEP.CONTEXT, LEAD_STEP.LABEL)
     .addEdge(LEAD_STEP.LABEL, LEAD_STEP.SCORE)
-    .addEdge(LEAD_STEP.SCORE, END)
+    .addConditionalEdge(LEAD_STEP.SCORE, afterScore)
+    .addEdge(LEAD_STEP.SOLUTION, END)
     .setEntryPoint(entry)
     .compile();
 };

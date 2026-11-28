@@ -7,7 +7,7 @@
  * Serves: FR-17, US-5, NFR-9, FR-33 (the query embedding's cap), ADR-0001 (HazelJS agents),
  * ADR-0006; issue #19.
  * Used by: apps/api/src/llm-record-solution.ts, apps/api/src/db/solution.repository.ts,
- * apps/api/test/solution-replay.int.spec.ts, solution.agent.spec.ts; the lead graph in #19 part 2.
+ * apps/api/src/pipeline/lead.graph.ts, apps/api/test/solution-node.int.spec.ts, solution.agent.spec.ts.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile } from 'node:fs/promises';

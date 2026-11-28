@@ -13,16 +13,18 @@ import { LeadsRepository } from './leads.repository.js';
 export interface RetriedLead {
   id: string;
   /** Where its next graph run starts. */
-  status: 'DISCOVERED' | 'ENRICHED';
+  status: 'DISCOVERED' | 'ENRICHED' | 'SCORED';
 }
 
 /**
  * Picks the status a retried lead goes back to, so its next run starts at the failed step.
  * @param failedStep - `Lead.failedStep`.
- * @returns ENRICHED for a failure in labelling or scoring; DISCOVERED for enrichment or an
- * unknown step (a run from the start skips what is stored).
+ * @returns SCORED for a failure in the solution step (the runner starts it there again);
+ * ENRICHED for labelling or scoring; DISCOVERED for enrichment or an unknown step (a run from the
+ * start skips what is stored).
  */
 export function retryStatusFor(failedStep: string | null): RetriedLead['status'] {
+  if (failedStep === LEAD_STEP.SOLUTION) return 'SCORED';
   return failedStep === LEAD_STEP.LABEL || failedStep === LEAD_STEP.SCORE
     ? 'ENRICHED'
     : 'DISCOVERED';

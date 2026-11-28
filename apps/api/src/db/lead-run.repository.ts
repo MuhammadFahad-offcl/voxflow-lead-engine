@@ -18,8 +18,11 @@ import { PrismaProvider } from './prisma.provider.js';
 export interface ClaimedLead {
   id: string;
   campaignId: string;
-  /** Where its graph starts: DISCOVERED still needs enrichment, ENRICHED goes to labelling. */
-  status: 'DISCOVERED' | 'ENRICHED';
+  /**
+   * Where its graph starts: DISCOVERED still needs enrichment, ENRICHED goes to labelling, SCORED
+   * (WARM or HOT, no Solution yet) to the solution.
+   */
+  status: 'DISCOVERED' | 'ENRICHED' | 'SCORED';
   /** PENDING until the website step ran, so a resumed lead does not read its site twice. */
   websiteStatus: WebsiteStatus;
   /** The HazelJS run of its previous graph run, if any. */
@@ -29,6 +32,15 @@ export interface ClaimedLead {
 
 const RUNNABLE = ['DISCOVERED', 'ENRICHED'] as const;
 
+// A lead with graph work left: not enriched and scored yet, or WARM/HOT and scored with no Solution
+// (paused at a cap, retried, or stopped by a crash after score). An exit status or FAILED is done.
+const HAS_WORK_LEFT = {
+  OR: [
+    { status: { in: [...RUNNABLE] } },
+    { status: 'SCORED', tier: { in: ['WARM', 'HOT'] }, solution: { is: null } },
+  ],
+} satisfies Prisma.LeadWhereInput;
+
 /**
  * Which leads a runner may claim at `now`.
  * @param now - The claim time.
@@ -37,10 +49,10 @@ const RUNNABLE = ['DISCOVERED', 'ENRICHED'] as const;
  */
 const claimable = (now: Date, leaseMs: number) =>
   ({
-    status: { in: [...RUNNABLE] },
     // PAUSED, DISCOVERING and later campaigns wait; SCORING still takes a retried lead.
     campaign: { status: { in: ['ENRICHING', 'SCORING'] } },
     AND: [
+      HAS_WORK_LEFT,
       {
         OR: [
           { graphClaimedAt: null },
@@ -57,7 +69,7 @@ const claimable = (now: Date, leaseMs: number) =>
   }) satisfies Prisma.LeadWhereInput;
 
 const isRunnable = (status: string): status is ClaimedLead['status'] =>
-  (RUNNABLE as readonly string[]).includes(status);
+  status === 'SCORED' || (RUNNABLE as readonly string[]).includes(status);
 
 /** Reads and writes what the lead graph needs. */
 @Injectable()
@@ -73,14 +85,15 @@ export class LeadRunRepository {
    *
    * The UPDATE repeats the condition, so when two passes pick the same lead Postgres makes the
    * second wait and re-check: it matches nothing, and the lead is claimed once.
-   * Does not claim a FILTERED_OUT, FAILED or SCORED lead, a lead whose campaign is paused, or a
-   * lead still waiting for its reviews.
+   * Does not claim a FILTERED_OUT or FAILED lead, a SCORED lead that is COLD or has its Solution,
+   * a lead with an exit status, a lead whose campaign is paused or past SCORING, or a lead still
+   * waiting for its reviews.
    * @param now - The lease time; it is also each claim's proof of ownership.
    * @param leaseMs - How old a claim must be to count as abandoned, in milliseconds.
    * @param limit - The most leads to claim; the runner's concurrency.
    * @returns The leads this pass now holds; empty when nothing is free.
    * @throws Prisma errors when the database cannot be read or written; Error when a claimed lead is
-   * not DISCOVERED or ENRICHED, which the condition rules out (a bug, not data).
+   * not DISCOVERED, ENRICHED or SCORED, which the condition rules out (a bug, not data).
    */
   async claimNext(now: Date, leaseMs: number, limit: number): Promise<ClaimedLead[]> {
     const where = claimable(now, leaseMs);
@@ -161,17 +174,18 @@ export class LeadRunRepository {
   }
 
   /**
-   * Moves every ENRICHING campaign with no lead left to run (none DISCOVERED or ENRICHED) to
-   * SCORING. One UPDATE, so a lead added meanwhile keeps its campaign ENRICHING.
+   * Moves every ENRICHING campaign with no lead left to run to SCORING: none DISCOVERED or
+   * ENRICHED, and every WARM/HOT lead has a Solution or an exit status (FAILED, NO_STRONG_SIGNAL,
+   * NEEDS_REVIEW). One UPDATE, so a lead added meanwhile keeps its campaign ENRICHING.
    *
-   * Does not move it further: it stays SCORING until Cycle 2 adds scripting. FAILED leads do not
-   * hold the campaign back (FR-32).
+   * Does not move it further: it stays SCORING until scripting (#20). FAILED leads do not hold the
+   * campaign back (FR-32).
    * @returns The `Campaign.id`s that moved.
    * @throws Prisma errors when the database cannot be written.
    */
   async finishEnrichment(): Promise<string[]> {
     const moved = await this.prisma.campaign.updateManyAndReturn({
-      where: { status: 'ENRICHING', leads: { none: { status: { in: [...RUNNABLE] } } } },
+      where: { status: 'ENRICHING', leads: { none: HAS_WORK_LEFT } },
       data: { status: 'SCORING' },
       select: { id: true },
     });
@@ -257,7 +271,8 @@ export class LeadRunRepository {
    * Marks a lead FAILED at a step with a stored error sentence, and ends the claim (FR-32).
    *
    * Does not mark a lead the score step already moved past enrichment and labelling: that one only
-   * loses the claim. Does nothing when the claim was lost.
+   * loses the claim. The solution step is the exception: it runs on a SCORED lead, which must end
+   * FAILED, or the runner would take it again every pass. Does nothing when the claim was lost.
    * @param lead - The claimed lead.
    * @param step - The graph node that failed, e.g. "ENRICH_WEBSITE".
    * @param error - The sentence shown on the dashboard; never raw error text from a library.
@@ -268,8 +283,19 @@ export class LeadRunRepository {
     step: string,
     error: string,
   ): Promise<void> {
+    // 'SOLUTION' is LEAD_STEP.SOLUTION in lead.graph.ts, which imports this file. A lead whose
+    // Solution is saved stays as it is: the failure came after its answer was stored.
+    const failable =
+      step === 'SOLUTION'
+        ? {
+            OR: [
+              { status: { in: [...RUNNABLE] } },
+              { status: 'SCORED' as const, solution: { is: null } },
+            ],
+          }
+        : { status: { in: [...RUNNABLE] } };
     const { count } = await this.prisma.lead.updateMany({
-      where: { id: lead.id, graphClaimedAt: lead.claimedAt, status: { in: [...RUNNABLE] } },
+      where: { id: lead.id, graphClaimedAt: lead.claimedAt, ...failable },
       data: { status: 'FAILED', failedStep: step, error, graphClaimedAt: null },
     });
     if (count === 0) await this.release(lead);
