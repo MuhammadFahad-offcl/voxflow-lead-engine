@@ -36,7 +36,7 @@ Only what runs on `main` (HazelJS 2.1.3):
 - **`@Agent` / `@Tool` on `AgentRuntime`**: the solution agent, with one tool, `searchCatalog`. [`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)
 - **A custom `LLMProvider`**: the agent's model calls go through the monthly LLM spend cap. [`gated-llm.provider.ts`](apps/api/src/llm/gated-llm.provider.ts)
 - **`@hazeljs/testing`**: `describeAgent` and `bindAgentSuite` run the real runtime, agent and tool against scripted fictional answers. [`solution.agent.spec.ts`](apps/api/src/agents/solution.agent.spec.ts)
-- **`@hazeljs/core`**: modules, DI and controllers ([`app.module.ts`](apps/api/src/app.module.ts)); the `/health` and `/ready` probes are built into `HazelApp` ([`bootstrap.ts`](apps/api/src/bootstrap.ts)).
+- **`@hazeljs/core`**: modules, DI and controllers ([`app.module.ts`](apps/api/src/app.module.ts)); the `/health` and `/ready` probes are built into `HazelApp` ([`bootstrap.ts`](apps/api/src/bootstrap.ts)), with the database check registered in [`server.ts`](apps/api/src/server.ts).
 
 Details in [`docs/hazeljs-submission.md`](docs/hazeljs-submission.md).
 
@@ -157,7 +157,7 @@ Not built yet, in backlog order:
 - [hazel-js/hazeljs#35](https://github.com/hazel-js/hazeljs/issues/35): `HazelApp.listen()` could not bind to a specific host. We need 127.0.0.1 only (ADR-0003); we carried a local patch until the fix (ADR-0013, superseded).
 - [hazel-js/hazeljs#36](https://github.com/hazel-js/hazeljs/issues/36): `HealthCheckManager.runChecks` left timeout timers running after each check.
 
-**Found in 2.1.3, reproduced on 28 Nov 2026, to be filed.** Each was confirmed by a small script against the installed 2.1.3; no duplicate is open upstream.
+**Found in 2.1.3, reproduced on 28 Nov 2026, to be filed.** Each was confirmed by a small script against the installed 2.1.3.
 
 - **`@hazeljs/agent` cannot be imported without `@hazeljs/eval`.** It lists `@hazeljs/eval` as an optional peer, but `dist/index.js` re-exports `dist/evaluation/agent-eval.js`, which calls `require("@hazeljs/eval")` at the top level. Installed alone, `require('@hazeljs/agent')` fails with `MODULE_NOT_FOUND: Cannot find module '@hazeljs/eval'`. Workaround: we install `@hazeljs/eval` 2.1.3 and use none of it (ADR-0001). _To be filed._
 - **`@Agent({ maxSteps, enableMemory })` are ignored.** `AgentRuntime.execute()` uses `options.maxSteps`, else the runtime's `defaultMaxSteps`, else 10, and reads memory unless `options.enableMemory` is `false`; the decorator's values are never read. An agent declared with `maxSteps: 2, enableMemory: false` ran 10 steps and read the memory manager. Workaround: the solution agent passes both to `execute()` ([`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)). _To be filed._
