@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/MuhammadFahad-offcl/voxflow-lead-engine/actions/workflows/ci.yml)
 
-An AI agent system that finds local businesses, scores how much they need AI automation (with evidence) and picks the one catalog service that fits each warm or hot lead, all from one dashboard. Writing an Urdu call script, calling the business with a Vapi voice agent and booking a video call with the founder are on the [roadmap](#roadmap); they are not built yet.
+An AI agent system that finds local businesses, scores how much they need AI automation (with evidence) and picks the one catalog service that fits each warm or hot lead (or marks the lead as having no strong signal or needing review), all from one dashboard. Writing an Urdu call script, calling the business with a Vapi voice agent and booking a video call with the founder are on the [roadmap](#roadmap); they are not built yet.
 
 Built by [VoxFlow AI Solutions](https://voxflow.agency) with [HazelJS](https://hazeljs.ai) agents. First niche: dental clinics in Lahore.
 
@@ -35,19 +35,21 @@ Only what runs on `main` (HazelJS 2.1.3):
 - **SQL durable run store**: `createSqlDurableRunStore` over Prisma records every graph run and its checkpoints (`agent_runs`, `agent_run_checkpoints`). `AgentGraph.execute()` cannot resume in 2.1.3, so a retried lead starts a new run at its next step. [`lead.graph.ts`](apps/api/src/pipeline/lead.graph.ts)
 - **`@Agent` / `@Tool` on `AgentRuntime`**: the solution agent, with one tool, `searchCatalog`. [`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)
 - **A custom `LLMProvider`**: the agent's model calls go through the monthly LLM spend cap. [`gated-llm.provider.ts`](apps/api/src/llm/gated-llm.provider.ts)
-- **`@hazeljs/testing`**: `describeAgent` and `bindAgentSuite` run the real runtime, agent and tool against recorded answers. [`solution.agent.spec.ts`](apps/api/src/agents/solution.agent.spec.ts)
-- **`@hazeljs/core`**: modules, DI, controllers and the `/health` and `/ready` probes. [`app.module.ts`](apps/api/src/app.module.ts)
+- **`@hazeljs/testing`**: `describeAgent` and `bindAgentSuite` run the real runtime, agent and tool against scripted fictional answers. [`solution.agent.spec.ts`](apps/api/src/agents/solution.agent.spec.ts)
+- **`@hazeljs/core`**: modules, DI and controllers ([`app.module.ts`](apps/api/src/app.module.ts)); the `/health` and `/ready` probes are built into `HazelApp` ([`bootstrap.ts`](apps/api/src/bootstrap.ts)).
 
 Details in [`docs/hazeljs-submission.md`](docs/hazeljs-submission.md).
 
 ## Quick start (demo mode, no API keys)
 
-Requirements: Git, Node 26, pnpm 12 (`corepack enable`), Docker Desktop running.
+Requirements: Git, Node 26, pnpm 12 (Node 26 no longer ships corepack: run `npm install -g corepack` then `corepack enable`, or see [pnpm.io/installation](https://pnpm.io/installation)), Docker Desktop running.
+
+Before `docker compose up -d`, put the same password in `POSTGRES_PASSWORD` and in `DATABASE_URL` in `.env`: Postgres reads it only when its volume is first created.
 
 ```bash
 git clone https://github.com/MuhammadFahad-offcl/voxflow-lead-engine.git
 cd voxflow-lead-engine
-cp .env.example .env          # DEMO_MODE=true is the default; set your own POSTGRES_PASSWORD
+cp .env.example .env          # DEMO_MODE=true is the default; set your password now (see above)
 docker compose up -d          # Postgres + pgvector, Lightpanda
 pnpm install                  # the first install also generates the Prisma client
 pnpm db:migrate
@@ -55,12 +57,10 @@ DEMO_MODE=true pnpm db:seed   # organization, settings, dental niche, catalog (f
 pnpm dev                      # dashboard http://localhost:3000, API http://127.0.0.1:4000, worker
 ```
 
-In `.env`, put the same password in `POSTGRES_PASSWORD` and in `DATABASE_URL`.
-
 **Windows PowerShell:**
 
 - `cp .env.example .env` works in PowerShell (`cp` is `Copy-Item`). Edit `.env` with any editor.
-- Set a variable for one command in two steps: `$env:DEMO_MODE = "true"; pnpm db:seed`. The `DEMO_MODE=true pnpm …` form is bash only. `$env:` lasts until you close that window.
+- Set a variable for the rest of that window: `$env:DEMO_MODE = "true"; pnpm db:seed`. The `DEMO_MODE=true pnpm …` form is bash only.
 - Windows PowerShell 5.1 has no `&&`; run the commands one per line, or use PowerShell 7.
 - Docker Desktop must be started before `docker compose up -d`.
 - If `pnpm knip` crashes with an `ArrayBuffer` error, run `$env:KNIP_DISABLE_RAW_TRANSFER = "1"; pnpm knip`.
@@ -69,12 +69,12 @@ In `.env`, put the same password in `POSTGRES_PASSWORD` and in `DATABASE_URL`.
 
 1. Open http://localhost:3000 and choose **New campaign**.
 2. Niche: dental clinic. City: Lahore. Areas: **DHA** only. DHA is the area whose fictional clinics have recorded answers for every step; an area with no fixtures pauses the campaign.
-3. Create it. Within about a minute the worker discovers the clinics, then enriches, labels and scores them, and runs the solution agent on the WARM ones. Refresh the campaign page to follow the lead table.
-4. The chosen services are stored but not shown on the dashboard yet (lead detail page, #24). Open `pnpm db:studio` and look at the `Solution` table.
+3. Create it. Within about a minute the worker discovers the clinics, then enriches, labels and scores them, and runs the solution agent on the WARM ones. The campaign page refreshes itself every 10 seconds while the worker runs.
+4. The chosen services are stored but not shown on the dashboard yet (lead detail page, #24). Open `pnpm db:studio` and look at the `Solution` table: five of the six WARM clinics get a row; the sixth shows `NO_STRONG_SIGNAL` as its status in the lead table.
 
-Each fictional clinic is stored once, so a second DHA campaign finds only duplicates. To run the demo again from empty, use option 2 under [Change the database password](#change-the-database-password) (it deletes all data), then `pnpm db:migrate` and the seed again.
+Each fictional clinic is stored once, so a second DHA campaign finds only duplicates. To run the demo again from empty, use option 2 under [Change the database password](#change-the-database-password) (it deletes all data), then the seed again.
 
-Demo mode replaces Apify, the website reader, Perplexity (search and embeddings) and the LLM with fake adapters. They use the fictional clinics in `fixtures/` and model answers recorded once, so discover → enrich → score → solution runs offline. There are no voice or calendar adapters yet, so nothing is called or booked, in demo mode or otherwise. The fake adapters still write fictional cost rows, so the spend shown on the dashboard moves; no money is spent. The demo has no HOT lead: the fictional clinics have too few reviews for the review signals.
+Demo mode replaces Apify, the website reader, Perplexity (search and embeddings) and the LLM with fake adapters. They use the fictional clinics in `fixtures/` and model answers recorded once, so discover → enrich → score → solution runs offline. There are no voice or calendar adapters yet, so nothing is called or booked, in demo mode or otherwise. The fake adapters still write fictional `CostRecord` rows, which count toward the spend caps and show in `pnpm db:studio`; no money is spent. The demo has no HOT lead: the fictional clinics have too few reviews for the review signals.
 
 To use real services, set `DEMO_MODE=false` and fill the keys in `.env` (see `.env.example`).
 
@@ -131,7 +131,7 @@ After `git pull`, run `pnpm install` and then `pnpm db:migrate`. `pnpm install` 
 - **The chosen service is not on the dashboard.** It is stored in `Solution`; the lead detail page is #24.
 - **The catalog is read-only.** `GET /services` only; create, edit, retire and the `/catalog` page are #163.
 - **Website phones are not extracted.** The `mobile_number` signal reads the listing phone only. #150.
-- **Two high transitive advisories**: `basic-ftp` (through `apify-client`) and `zod` 3 (through `@hazeljs/agent`). #151.
+- **Transitive advisories in `basic-ftp`** (through `apify-client`): one high, two moderate in `pnpm audit --prod`. #151.
 - **Lightpanda's outbound requests are not pinned** to the checked public addresses, so a DNS-rebinding site could reach the laptop. #94.
 - **Database integration tests can fail** on the first full run after an install; a second run passes. #125.
 - **Demo data is small.** Only DHA has fixtures for every step, a second DHA campaign is all duplicates, and there is no HOT lead (see the quick start). No issue.
@@ -146,11 +146,11 @@ Not built yet, in backlog order:
 
 ## Contributions to HazelJS
 
-Problems found in HazelJS 2.1.3 while building this. Each has a workaround here; none is filed upstream yet.
+Problems found in HazelJS 2.1.3 while building this. The first two have workarounds here; the third affects the approval agent (#23). None is filed upstream yet.
 
 - **`@hazeljs/agent` cannot be imported without `@hazeljs/eval`.** It lists `@hazeljs/eval` as an optional peer, but `dist/index.js` re-exports `dist/evaluation/agent-eval.js`, which calls `require("@hazeljs/eval")` at the top level. Workaround: we install `@hazeljs/eval` 2.1.3 and use none of it (ADR-0001). _To be filed._
 - **`@Agent({ maxSteps })` is ignored.** `AgentRuntime.execute()` takes `options.maxSteps`, else the runtime's `defaultMaxSteps`, else 10; the decorator's value is never read. Workaround: the solution agent passes `maxSteps` to `execute()` ([`solution.agent.ts`](apps/api/src/agents/solution.agent.ts)). _To be filed._
-- **`approveAndResume` runs the tool again** when it is called a second time, or twice in parallel, on the same run: it never checks that the run is still suspended. Seen with the SQL run store. Reproduction: `durableSuspend: true`, a `requiresApproval` tool that inserts a row, `execute` until the run waits, then `approveAndResume` twice gives 2 rows. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
+- **`approveAndResume` runs the tool again** when it is called a second time, or twice in parallel, on the same run: it never checks that the run is still suspended. Found with the SQL run store, and visible in `approveAndResume` in `dist/runtime/agent.runtime.js`. The parallel case applies when the runtime has no run lease configured; with one, the second call fails on the lease. Reproduction: `durableSuspend: true`, a `requiresApproval` tool that inserts a row, `execute` until the run waits, then `approveAndResume` twice gives 2 rows. We do not use approvals yet; the approval agent (#23) needs its own guard. _To be filed._
 
 ## Project docs
 
