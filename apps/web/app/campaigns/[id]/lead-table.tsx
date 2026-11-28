@@ -1,9 +1,10 @@
 /**
  * The lead table of a campaign page: one row per lead, sortable column headings, and each row
  * expanding (native `<details>`, no client script) to its evidence. A FAILED row's Retry button is
- * in its expanded part: a form may not sit inside `<summary>`.
+ * in its expanded part: a form may not sit inside `<summary>`. Each lead's name links to its page.
  *
- * Serves: FR-30 (lead table: sort, expand to evidence), FR-14, FR-32 (retry); issue #16.
+ * Serves: FR-30 (lead table: sort, expand to evidence; link to the lead page), FR-14, FR-32
+ * (retry); issues #16, #24.
  * Used by: apps/web/app/campaigns/[id]/page.tsx.
  */
 import type { LeadPage } from '@voxflow/shared';
@@ -65,7 +66,13 @@ export function LeadTable({
       {page.leads.map((lead) => (
         <details key={lead.id} className="border-b last:border-0">
           <summary className={`${COLUMNS} cursor-pointer hover:bg-slate-50`}>
-            {cell('Name', lead.name, 'font-medium')}
+            <span className="font-medium">
+              <span className="sr-only">Name: </span>
+              {/* A link in <summary> navigates on click instead of toggling the row. */}
+              <Link href={`/leads/${lead.id}`} className="underline">
+                {lead.name}
+              </Link>
+            </span>
             {cell('Area', lead.area ?? '—')}
             {cell('Phone', lead.phone ?? '—')}
             {cell('Reviews', lead.reviewCount ?? '—')}
