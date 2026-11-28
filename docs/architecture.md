@@ -274,7 +274,24 @@ All configuration is read once from environment variables, validated by a Zod sc
 
 ## 16. HazelJS features used (for the submission)
 
-`@hazeljs/core` (modules, DI, controllers) · `@hazeljs/agent` (`@Agent`, `@Tool`, `AgentGraph`, durable HITL with SQL run store, `PolicyEngine`, timeline) · `@hazeljs/agent-gatekeeper` · `@hazeljs/ai` (LLM providers) · `@hazeljs/rag` (if its pgvector store fits; otherwise our pgvector repository behind the same port — Cycle 2 spike, ADR) · `@hazeljs/testing`. Exact package versions are pinned in `package.json` in Cycle 1.
+The four direct HazelJS packages are pinned at 2.1.3 in `apps/api/package.json` (ADR-0001).
+
+**Installed and used:**
+
+- `@hazeljs/core`: modules, DI, controllers (`app.module.ts`, `modules/`); the `/health` and `/ready` probes built into `HazelApp` (`bootstrap.ts`).
+- `@hazeljs/agent`: `AgentGraph` with function nodes and `createSqlDurableRunStore` (`pipeline/lead.graph.ts`); `AgentRuntime`, `@Agent` and `@Tool` (`agents/solution.agent.ts`); the `LLMProvider` interface (`llm/gated-llm.provider.ts`).
+- `@hazeljs/testing`: `describeAgent`, `bindAgentSuite` (`agents/solution.agent.spec.ts`).
+
+**Installed, not used:** `@hazeljs/eval`, a direct dependency only because `@hazeljs/agent` cannot be imported without it (ADR-0001); `@hazeljs/rag`, `@hazeljs/prompts` and `@hazeljs/resilience`, installed automatically as peers of `@hazeljs/agent` and never imported.
+
+**Planned, not built:**
+
+- Durable HITL approval with `requiresApproval`, durable suspend and `approveAndResume`, part of `@hazeljs/agent` (#23).
+- `@hazeljs/agent-gatekeeper` and `PolicyEngine` for the call policies in section 7 (#26); not installed.
+- The run timeline view (FR-35, #30).
+- `@hazeljs/rag`, only if the Cycle 2 spike picks its pgvector store over our repository (#18); today it is only an unused peer (above).
+
+**Not used:** `@hazeljs/ai`. LLM calls go through `@anthropic-ai/sdk` behind `LlmPort` (ADR-0006).
 
 ## 17. Known unknowns (tracked as PRD open questions)
 
