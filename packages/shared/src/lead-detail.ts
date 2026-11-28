@@ -4,7 +4,7 @@
  *
  * Serves: FR-30 (lead detail), FR-14 (evidence per signal), FR-17 (the chosen service and the
  * signals it cites), FR-32 (status and error), US-5; issue #24.
- * Used by: apps/api/src/modules/leads/leads.service.ts, apps/web (the lead page, #24).
+ * Used by: apps/api/src/modules/leads/leads.service.ts, apps/api/test/leads.int.spec.ts.
  */
 import { z } from 'zod';
 import { LeadRow } from './leads.js';

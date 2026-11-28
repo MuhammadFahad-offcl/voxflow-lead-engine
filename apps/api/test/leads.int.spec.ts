@@ -161,6 +161,15 @@ describe('GET /leads/:id', () => {
         evidence: '2 of 3 reviews',
       },
     });
+    const note = await prisma.signal.create({
+      data: {
+        leadId: id,
+        dimension: 'PAIN',
+        key: 'reviews_unreplied',
+        points: 0,
+        evidence: 'Only 3 reviews stored',
+      },
+    });
     await prisma.review.createMany({
       data: [
         {
@@ -178,6 +187,7 @@ describe('GET /leads/:id', () => {
           publishedAt: new Date('2026-11-01T09:00:00Z'),
           labels: ['PHONE_UNANSWERED'],
         },
+        { leadId: id, author: 'Fictional Reviewer', text: 'Undated', rating: 5, publishedAt: null },
       ],
     });
     const service = await prisma.service.findFirstOrThrow({ orderBy: { slug: 'asc' } });
@@ -192,9 +202,9 @@ describe('GET /leads/:id', () => {
     });
 
     const response = await detail(id);
+    expect(response.status).toBe(200);
     const body = LeadDetail.parse(JSON.parse(response.text));
 
-    expect(response.status).toBe(200);
     expect(response.text).not.toContain('Fictional Reviewer');
     expect(response.text).not.toContain('author');
     expect(body).toMatchObject({
@@ -203,6 +213,7 @@ describe('GET /leads/:id', () => {
       status: 'READY_TO_CALL',
       tier: 'WARM',
       rating: 4.5,
+      breakdown: { pain: 25, fit: 16, reachability: 20, abilityToPay: 0 },
     });
     expect(body.signals).toEqual([
       {
@@ -213,10 +224,19 @@ describe('GET /leads/:id', () => {
         evidence: '2 of 3 reviews',
         sourceUrl: null,
       },
+      {
+        id: note.id,
+        key: 'reviews_unreplied',
+        dimension: 'PAIN',
+        points: 0,
+        evidence: 'Only 3 reviews stored',
+        sourceUrl: null,
+      },
     ]);
     expect(body.reviews.map((review) => [review.text, review.publishedAt, review.labels])).toEqual([
       ['Newer', '2026-11-01T09:00:00.000Z', ['PHONE_UNANSWERED']],
       ['Older', '2026-10-01T09:00:00.000Z', []],
+      ['Undated', null, []],
     ]);
     expect(body.solution).toEqual({
       serviceSlug: service.slug,
@@ -246,9 +266,12 @@ describe('GET /leads/:id', () => {
     expect(body.solution?.signalIds).toEqual(['fictional-deleted-signal']);
   });
 
-  it('returns no Solution for an exit status, and the filter reason of a FILTERED_OUT lead', async () => {
+  it('returns solution null when none is stored, the filter reason, and no malformed breakdown', async () => {
     const exit = await addLead('fictional-detail-exit', { status: 'SCORED' });
-    await prisma.lead.update({ where: { id: exit }, data: { status: 'NO_STRONG_SIGNAL' } });
+    await prisma.lead.update({
+      where: { id: exit },
+      data: { status: 'NO_STRONG_SIGNAL', scoreBreakdown: { pain: 'many' } },
+    });
     const filtered = await addLead('fictional-detail-filtered', { status: 'SCORED' });
     await prisma.lead.update({
       where: { id: filtered },
@@ -257,6 +280,7 @@ describe('GET /leads/:id', () => {
 
     expect(LeadDetail.parse(JSON.parse((await detail(exit)).text))).toMatchObject({
       status: 'NO_STRONG_SIGNAL',
+      breakdown: null,
       solution: null,
     });
     expect(LeadDetail.parse(JSON.parse((await detail(filtered)).text))).toMatchObject({
