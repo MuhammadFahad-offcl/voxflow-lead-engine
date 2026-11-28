@@ -11,7 +11,7 @@
 
 This document says **how** v1 is built. The PRD says **what** and **why**. If the two disagree, stop and fix one of them through the change process in [`CONTRIBUTING.md`](../CONTRIBUTING.md) before writing code.
 
-## What is on `main` (29 Nov 2026)
+## What is on `main` (28 Nov 2026)
 
 This document describes the whole v1 design. Only part of it is built; the rest is roadmap and is marked where it appears.
 
@@ -54,14 +54,14 @@ Everything except the outside services runs on the founder's Windows laptop (ADR
 
 ## 2. Containers and processes
 
-| Unit                                      | Runs as                                    | Port                     | Job                                                                                |
-| ----------------------------------------- | ------------------------------------------ | ------------------------ | ---------------------------------------------------------------------------------- |
-| `apps/web`                                | `pnpm --filter web dev` (Next.js)          | 3000, localhost only     | Dashboard pages (FR-30, FR-31)                                                     |
-| `apps/api` — API entry `src/main.ts`      | `pnpm --filter api dev`                    | 4000, bound to 127.0.0.1 | REST for the dashboard, Vapi webhook + tool routes, approvals, calendar slot cache |
-| `apps/api` — worker entry `src/worker.ts` | `pnpm --filter api worker`                 | none                     | Pipeline runs, call dispatcher, reconciliation, retention, backups                 |
-| `postgres`                                | Docker, image `pgvector/pgvector:pg17`     | 5432                     | All data, vectors, HazelJS durable runs                                            |
-| `lightpanda`                              | Docker, image `lightpanda/browser:nightly` | 9222 (CDP)               | Renders JavaScript-only websites (ADR-0004)                                        |
-| `cloudflared`                             | Windows service (Cycle 4)                  | —                        | Public HTTPS for 3 paths only (ADR-0003)                                           |
+| Unit                                      | Runs as                                    | Port                     | Job                                                                                         |
+| ----------------------------------------- | ------------------------------------------ | ------------------------ | ------------------------------------------------------------------------------------------- |
+| `apps/web`                                | `pnpm --filter web dev` (Next.js)          | 3000, localhost only     | Dashboard pages (FR-30, FR-31)                                                              |
+| `apps/api` — API entry `src/main.ts`      | `pnpm --filter api dev`                    | 4000, bound to 127.0.0.1 | REST for the dashboard; roadmap: Vapi webhook + tool routes, approvals, calendar slot cache |
+| `apps/api` — worker entry `src/worker.ts` | `pnpm --filter api worker`                 | none                     | Pipeline runs; roadmap: call dispatcher, reconciliation, retention, backups                 |
+| `postgres`                                | Docker, image `pgvector/pgvector:pg17`     | 5432                     | All data, vectors, HazelJS durable runs                                                     |
+| `lightpanda`                              | Docker, image `lightpanda/browser:nightly` | 9222 (CDP)               | Renders JavaScript-only websites (ADR-0004)                                                 |
+| `cloudflared`                             | Windows service (Cycle 4)                  | —                        | Public HTTPS for 3 paths only (ADR-0003)                                                    |
 
 There is **no Redis and no message broker** in v1 (ADR-0002). Database state is the queue: the worker polls for due work.
 
@@ -115,6 +115,8 @@ voxflow-lead-engine/
 ├── prisma.config.ts
 └── .env.example
 ```
+
+Not in the tree yet (roadmap): the `approvals/`, `calls/`, `booking/`, `webhooks/`, `settings/` and `health/` modules, `policies/` and `evals/`. `/ready` is registered in `src/server.ts` instead of a `health/` module.
 
 Rules: a module never imports another module's repository; it calls that module's service. Adapters are only reached through their port interface. `scoring/` imports nothing that does I/O.
 
@@ -190,7 +192,7 @@ When every lead in a campaign has finished its lead graph, the worker sets `AWAI
 | `caller-agent`   | none               | `placeCall` (Gatekeeper-checked)        | —                                                                                                                                                                                | FR-21–FR-23  |
 | `outcome-agent`  | `OUTCOME`          | none                                    | `{ result, reasonCode?, remarks, callbackAt?, decisionMakerName? }`                                                                                                              | FR-28, FR-29 |
 
-Only `solution-agent` is built (#19); the script, approval, caller and outcome agents are roadmap (#20, #23, #27, #28).
+Only the solution agent is built (#19; registered in the runtime as `solution`); the script, approval, caller and outcome agents are roadmap (#20, #23, #27, #28).
 
 The model for each task key comes from `Settings.llmModels` (default `claude-haiku-5-5` for all; Cycle 2 compares against `gpt-6-luna` for `SCRIPT`, ADR-0006). All LLM calls go through `LlmService` (`apps/api/src/llm/`), the gate above `LlmPort`: it takes the model from Settings, refuses a call whose worst case could pass the monthly LLM cap (Asia/Karachi month), records a `CostRecord` for every attempt, and validates the answer with the task's Zod schema, retrying once (FR-13, FR-33).
 
@@ -283,7 +285,7 @@ All configuration is read once from environment variables, validated by a Zod sc
 
 ## 14. Security
 
-- Dashboard and API bind to 127.0.0.1; only the tunnel's 3 paths are public, each verified by shared secret.
+- Dashboard and API bind to 127.0.0.1. Roadmap (#35, #28): only the tunnel's 3 paths will be public, each verified by shared secret; today nothing is public.
 - Secrets only in `.env` (git-ignored); Claude Code is denied reading it (`.claude/settings.json`).
 - No real lead data, recordings or transcripts in Git; fixtures are fictional.
 - CI runs gitleaks on every pull request.
@@ -307,7 +309,7 @@ The four direct HazelJS packages are pinned at 2.1.3 in `apps/api/package.json` 
 
 **Installed and used:**
 
-- `@hazeljs/core`: modules, DI, controllers (`app.module.ts`, `modules/`); the `/health` and `/ready` probes built into `HazelApp` (`bootstrap.ts`).
+- `@hazeljs/core`: modules, DI, controllers (`app.module.ts`, `modules/`); the `/health` and `/ready` probes built into `HazelApp` (`bootstrap.ts`), with the `db` check registered in `server.ts`.
 - `@hazeljs/agent`: `AgentGraph` with function nodes and `createSqlDurableRunStore` (`pipeline/lead.graph.ts`); `AgentRuntime`, `@Agent` and `@Tool` (`agents/solution.agent.ts`); the `LLMProvider` interface (`llm/gated-llm.provider.ts`).
 - `@hazeljs/testing`: `describeAgent`, `bindAgentSuite` (`agents/solution.agent.spec.ts`).
 

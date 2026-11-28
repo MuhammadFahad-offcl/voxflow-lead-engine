@@ -8,7 +8,7 @@
 - **Slim Cycle 2** for the HazelJS submission (29 Nov 2026, #32): on `main` are the catalog with embeddings (#17), the solution agent in the lead graph (#19) and the lead detail page (#24, PRs #174 and #175). `v0.2.0` is tagged by Fahad after the #32 docs pass merges, not before.
 - **Roadmap after the submission:** the script agent (#20) and the approval agent (#23) are in the `v0.3.0` milestone. Start #20 from the agreed design in the comment on #20; #23 needs a guard against `approveAndResume` running a tool twice (README → Contributions to HazelJS).
 - **Still open in the Cycle 2 milestone:** #18, #21, #22 and chores #125, #150, #151, #156. Moving them is Fahad's call.
-- **Upstream:** three HazelJS 2.1.3 problems are reproduced and drafted on #32, to be filed by Fahad. #35 and #36 were filed earlier and are fixed.
+- **Upstream:** three HazelJS 2.1.3 problems are reproduced; the issue drafts and outputs are in a comment on #32 and in the #32 PR description, to be filed by Fahad. hazel-js/hazeljs#35 and #36 were filed earlier and fixed by the HazelJS team in 2.0.14.
 - **Fresh clone** of the README quick start on Windows: about 2½ minutes with cached images and packages; clone into a short path.
 
 ## Keys still needed
