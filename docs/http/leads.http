@@ -1,4 +1,4 @@
-# Example requests for the leads API (FR-32), for the VS Code REST Client extension.
+# Example requests for the leads API (FR-32, FR-30), for the VS Code REST Client extension.
 # Start the API with `pnpm dev`. The API listens on 127.0.0.1 only (ADR-0003).
 # Copy a FAILED lead's id from Prisma Studio (`pnpm db:studio`) until the dashboard (#16) shows it.
 
@@ -13,6 +13,12 @@ POST {{base}}/leads/{{leadId}}/retry
 
 ### 404: unknown lead
 POST {{base}}/leads/no-such-lead/retry
+
+### One lead for its detail page (FR-30): facts, signals with ids, reviews (no authors), Solution or null
+GET {{base}}/leads/{{leadId}}
+
+### 404: unknown lead
+GET {{base}}/leads/no-such-lead
 
 ### A campaign's lead table: 50 per page, highest score first (FR-30)
 @campaignId = paste-a-campaign-id-here
