@@ -204,4 +204,11 @@ describe('the header and reviews', () => {
   it('says when no reviews are stored', () => {
     expect(textOf({ ...picked, reviews: [] })).toContain('No reviews stored.');
   });
+
+  it('says when a review has no text', () => {
+    const [first] = picked.reviews;
+    if (first === undefined) throw new Error('fixture lost its reviews');
+
+    expect(textOf({ ...picked, reviews: [{ ...first, text: '' }] })).toContain('No review text.');
+  });
 });

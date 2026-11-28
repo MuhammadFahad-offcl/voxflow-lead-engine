@@ -166,7 +166,12 @@ function ReviewList({ reviews }: Readonly<{ reviews: readonly Review[] }>) {
             {review.ownerReplied ? 'Owner replied' : 'No owner reply'}
             {review.labels.length === 0 ? null : ` · ${review.labels.join(', ')}`}
           </p>
-          <p>{review.text}</p>
+          {/* A rating-only review has no text; say so rather than leave a blank line. */}
+          {review.text === '' ? (
+            <p className="text-slate-500">No review text.</p>
+          ) : (
+            <p>{review.text}</p>
+          )}
         </li>
       ))}
     </ul>
