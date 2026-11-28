@@ -5,7 +5,8 @@
  *
  * Serves: NFR-5 (no script from outside data runs in the dashboard), FR-14 (evidence sources);
  * T-1 audit.
- * Used by: apps/web/app/campaigns/[id]/lead-evidence.tsx, apps/web/lib/safe-href.spec.ts.
+ * Used by: apps/web/app/campaigns/[id]/lead-evidence.tsx, apps/web/app/leads/[id]/lead-detail.tsx,
+ * apps/web/lib/safe-href.spec.ts.
  */
 
 /**

@@ -3,7 +3,8 @@
  * zone (NFR-13); rates as whole percents.
  *
  * Serves: NFR-13 (times stored in UTC, shown in Asia/Karachi), FR-30; issue #16.
- * Used by: apps/web/app/campaigns/**, apps/web/lib/format.spec.ts.
+ * Used by: apps/web/app/campaigns/**, apps/web/app/leads/[id]/lead-detail.tsx,
+ * apps/web/lib/format.spec.ts.
  */
 
 const KARACHI = new Intl.DateTimeFormat('en-GB', {
