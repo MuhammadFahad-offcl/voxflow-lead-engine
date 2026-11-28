@@ -1,13 +1,60 @@
 /**
- * Database access for lead routes: reading a lead's failure and putting it back in the lead
- * runner's queue.
+ * Database access for lead routes: reading one lead for its detail page, reading a lead's failure
+ * and putting it back in the lead runner's queue.
  *
- * Serves: FR-32 (retry a failed lead); issue #15.
+ * Serves: FR-32 (retry a failed lead), issue #15; FR-30 (lead detail), FR-17, issue #24.
  * Used by: apps/api/src/modules/leads/leads.service.ts, apps/api/src/modules/leads/leads.module.ts.
  */
 import { Injectable } from '@hazeljs/core';
 import { PrismaProvider } from '../../db/prisma.provider.js';
-import type { LeadStatus } from '../../generated/prisma/client.js';
+import type { LeadStatus, Prisma } from '../../generated/prisma/client.js';
+
+const DETAIL = {
+  id: true,
+  campaignId: true,
+  name: true,
+  area: true,
+  phone: true,
+  phoneType: true,
+  website: true,
+  rating: true,
+  reviewCount: true,
+  score: true,
+  tier: true,
+  status: true,
+  failedStep: true,
+  error: true,
+  filterReason: true,
+  scoreBreakdown: true,
+  signals: {
+    select: { id: true, key: true, dimension: true, points: true, evidence: true, sourceUrl: true },
+    // Highest points first, as in the lead table.
+    orderBy: [{ points: 'desc' }, { key: 'asc' }],
+  },
+  reviews: {
+    // No `author`: review authors never leave the database (CLAUDE.md).
+    select: {
+      id: true,
+      text: true,
+      rating: true,
+      publishedAt: true,
+      ownerReplied: true,
+      labels: true,
+    },
+    orderBy: [{ publishedAt: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+  },
+  solution: {
+    select: {
+      reason: true,
+      model: true,
+      signalIds: true,
+      service: { select: { slug: true, name: true } },
+    },
+  },
+} as const satisfies Prisma.LeadSelect;
+
+/** A lead as its detail page reads it. */
+export type LeadDetailRow = Prisma.LeadGetPayload<{ select: typeof DETAIL }>;
 
 /** What a retry needs to know about a lead. */
 export interface LeadFailure {
@@ -24,6 +71,16 @@ export class LeadsRepository {
    * @param prisma - The process's Prisma client.
    */
   constructor(private readonly prisma: PrismaProvider) {}
+
+  /**
+   * Reads one lead with its signals, reviews and Solution.
+   * @param id - `Lead.id`.
+   * @returns The lead, or null when there is no such lead.
+   * @throws Prisma errors when the database cannot be read.
+   */
+  findDetail(id: string): Promise<LeadDetailRow | null> {
+    return this.prisma.lead.findUnique({ where: { id }, select: DETAIL });
+  }
 
   /**
    * Reads a lead's status and failed step.

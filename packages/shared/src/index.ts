@@ -38,3 +38,4 @@ export { ServiceSummary } from './catalog.js';
 export { SolutionAnswer } from './solution.js';
 export { ScoreBreakdown } from './score.js';
 export { LEAD_PAGE_SIZE, LeadListQuery, LeadPage, LeadRow } from './leads.js';
+export { LeadDetail } from './lead-detail.js';

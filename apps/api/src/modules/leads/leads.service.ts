@@ -1,13 +1,16 @@
 /**
- * Use cases behind the lead routes: retrying a FAILED lead from its failed step.
+ * Use cases behind the lead routes: one lead for its detail page, and retrying a FAILED lead from
+ * its failed step.
  *
  * Serves: FR-32 (a failed lead shows a retry button; retry runs it again from the failed step),
- * FR-17 (a failed solution step retries at SOLUTION); issues #15, #19.
+ * FR-17 (a failed solution step retries at SOLUTION; the detail page shows the pick), FR-30 (lead
+ * detail); issues #15, #19, #24.
  * Used by: apps/api/src/modules/leads/leads.controller.ts, apps/api/src/modules/leads/leads.module.ts.
  */
 import { ConflictError, Injectable, NotFoundError } from '@hazeljs/core';
+import { ScoreBreakdown, type LeadDetail } from '@voxflow/shared';
 import { LEAD_STEP } from '../../pipeline/lead.graph.js';
-import { LeadsRepository } from './leads.repository.js';
+import { LeadsRepository, type LeadDetailRow } from './leads.repository.js';
 
 /** A re-queued lead, as the retry route returns it. */
 export interface RetriedLead {
@@ -30,6 +33,37 @@ export function retryStatusFor(failedStep: string | null): RetriedLead['status']
     : 'DISCOVERED';
 }
 
+/**
+ * Turns a stored lead into the detail page's shape.
+ * @param row - The lead as the repository reads it.
+ * @returns The wire shape: plain numbers, ISO dates, and the Solution flattened.
+ */
+function toDetail(row: LeadDetailRow): LeadDetail {
+  const { scoreBreakdown, rating, reviews, solution, ...lead } = row;
+  return {
+    ...lead,
+    // Decimal(2,1) in the database; a plain number on the wire, e.g. 4.6.
+    rating: rating === null ? null : rating.toNumber(),
+    // A breakdown of the wrong shape shows as none rather than failing the whole page.
+    breakdown: ScoreBreakdown.safeParse(scoreBreakdown).data ?? null,
+    reviews: reviews.map((review) => ({
+      ...review,
+      publishedAt: review.publishedAt === null ? null : review.publishedAt.toISOString(),
+    })),
+    solution:
+      solution === null
+        ? null
+        : {
+            serviceSlug: solution.service.slug,
+            serviceName: solution.service.name,
+            reason: solution.reason,
+            model: solution.model,
+            // As stored: an id the lead no longer has is the page's to explain, not an error here.
+            signalIds: solution.signalIds,
+          },
+  };
+}
+
 /** Lead use cases. */
 @Injectable()
 export class LeadsService {
@@ -38,6 +72,21 @@ export class LeadsService {
    * @param leads - Lead rows.
    */
   constructor(private readonly leads: LeadsRepository) {}
+
+  /**
+   * Reads one lead for its detail page.
+   *
+   * Does not check that the Solution's cited signals still exist: a re-scored lead can cite a
+   * deleted `Signal.id`, and the page shows that instead of hiding the pick.
+   * @param id - `Lead.id`.
+   * @returns The lead with its signals, reviews (no authors) and Solution.
+   * @throws NotFoundError when there is no such lead; Prisma errors when the database cannot be read.
+   */
+  async detail(id: string): Promise<LeadDetail> {
+    const row = await this.leads.findDetail(id);
+    if (row === null) throw new NotFoundError(`Lead "${id}" not found`);
+    return toDetail(row);
+  }
 
   /**
    * Re-queues a FAILED lead from its failed step; the worker's lead runner picks it up within a

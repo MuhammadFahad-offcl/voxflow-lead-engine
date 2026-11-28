@@ -1,13 +1,15 @@
 /**
- * Integration tests of `POST /leads/:id/retry` over HTTP on a test database: a FAILED lead is
- * re-queued from its failed step, once; anything else is refused with the right status code.
+ * Integration tests of the `/leads` routes over HTTP on a test database: `POST /leads/:id/retry`
+ * re-queues a FAILED lead from its failed step, once; `GET /leads/:id` returns one lead for its
+ * detail page, reviews without authors, and its Solution as stored.
  *
  * Serves: FR-32 (retry button); issue #15 acceptance ("given a failed lead, when retry is
- * triggered, then it runs again from the failed step").
+ * triggered, then it runs again from the failed step"); FR-30 (lead detail), FR-17, issue #24.
  * Used by: `pnpm test`, through the `api` project in jest.config.mjs.
  */
 import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
 import type { HazelApp } from '@hazeljs/core';
+import { LeadDetail } from '@voxflow/shared';
 import { resolve } from 'node:path';
 import { PrismaProvider } from '../src/db/prisma.provider.js';
 import { seed, SEED_ORGANIZATION_ID } from '../src/db/seed.js';
@@ -128,5 +130,143 @@ describe('POST /leads/:id/retry', () => {
   it('answers 404 for an unknown lead and 400 for an id that is too long', async () => {
     expect((await retry('fictional-missing-lead')).status).toBe(404);
     expect((await retry('x'.repeat(65))).status).toBe(400);
+  });
+});
+
+// Proves FR-30's lead detail: facts, signals with ids, reviews without authors, the Solution as stored.
+describe('GET /leads/:id', () => {
+  const detail = async (id: string) => {
+    const response = await fetch(`${baseUrl}/leads/${id}`);
+    return { status: response.status, text: await response.text() };
+  };
+
+  it('returns a picked lead with its signals, reviews newest first, and the Solution', async () => {
+    const id = await addLead('fictional-detail-pick', { status: 'SCORED' });
+    await prisma.lead.update({
+      where: { id },
+      data: {
+        status: 'READY_TO_CALL',
+        score: 61,
+        tier: 'WARM',
+        rating: 4.5,
+        scoreBreakdown: { pain: 25, fit: 16, reachability: 20, abilityToPay: 0 },
+      },
+    });
+    const signal = await prisma.signal.create({
+      data: {
+        leadId: id,
+        dimension: 'PAIN',
+        key: 'phone_unanswered_reviews',
+        points: 15,
+        evidence: '2 of 3 reviews',
+      },
+    });
+    await prisma.review.createMany({
+      data: [
+        {
+          leadId: id,
+          author: 'Fictional Reviewer',
+          text: 'Older',
+          rating: 2,
+          publishedAt: new Date('2026-10-01T09:00:00Z'),
+        },
+        {
+          leadId: id,
+          author: 'Fictional Reviewer',
+          text: 'Newer',
+          rating: 1,
+          publishedAt: new Date('2026-11-01T09:00:00Z'),
+          labels: ['PHONE_UNANSWERED'],
+        },
+      ],
+    });
+    const service = await prisma.service.findFirstOrThrow({ orderBy: { slug: 'asc' } });
+    await prisma.solution.create({
+      data: {
+        leadId: id,
+        serviceId: service.id,
+        reason: 'Fictional reason.',
+        signalIds: [signal.id],
+        model: 'claude-haiku-5-5',
+      },
+    });
+
+    const response = await detail(id);
+    const body = LeadDetail.parse(JSON.parse(response.text));
+
+    expect(response.status).toBe(200);
+    expect(response.text).not.toContain('Fictional Reviewer');
+    expect(response.text).not.toContain('author');
+    expect(body).toMatchObject({
+      id,
+      campaignId,
+      status: 'READY_TO_CALL',
+      tier: 'WARM',
+      rating: 4.5,
+    });
+    expect(body.signals).toEqual([
+      {
+        id: signal.id,
+        key: 'phone_unanswered_reviews',
+        dimension: 'PAIN',
+        points: 15,
+        evidence: '2 of 3 reviews',
+        sourceUrl: null,
+      },
+    ]);
+    expect(body.reviews.map((review) => [review.text, review.publishedAt, review.labels])).toEqual([
+      ['Newer', '2026-11-01T09:00:00.000Z', ['PHONE_UNANSWERED']],
+      ['Older', '2026-10-01T09:00:00.000Z', []],
+    ]);
+    expect(body.solution).toEqual({
+      serviceSlug: service.slug,
+      serviceName: service.name,
+      reason: 'Fictional reason.',
+      model: 'claude-haiku-5-5',
+      signalIds: [signal.id],
+    });
+  });
+
+  it('passes a cited signal id that no longer exists through unchanged', async () => {
+    const id = await addLead('fictional-detail-stale', { status: 'SCORED' });
+    const service = await prisma.service.findFirstOrThrow({ orderBy: { slug: 'asc' } });
+    await prisma.solution.create({
+      data: {
+        leadId: id,
+        serviceId: service.id,
+        reason: 'Fictional reason.',
+        signalIds: ['fictional-deleted-signal'],
+        model: 'claude-haiku-5-5',
+      },
+    });
+
+    const body = LeadDetail.parse(JSON.parse((await detail(id)).text));
+
+    expect(body.signals).toEqual([]);
+    expect(body.solution?.signalIds).toEqual(['fictional-deleted-signal']);
+  });
+
+  it('returns no Solution for an exit status, and the filter reason of a FILTERED_OUT lead', async () => {
+    const exit = await addLead('fictional-detail-exit', { status: 'SCORED' });
+    await prisma.lead.update({ where: { id: exit }, data: { status: 'NO_STRONG_SIGNAL' } });
+    const filtered = await addLead('fictional-detail-filtered', { status: 'SCORED' });
+    await prisma.lead.update({
+      where: { id: filtered },
+      data: { status: 'FILTERED_OUT', filterReason: 'Fictional filter reason' },
+    });
+
+    expect(LeadDetail.parse(JSON.parse((await detail(exit)).text))).toMatchObject({
+      status: 'NO_STRONG_SIGNAL',
+      solution: null,
+    });
+    expect(LeadDetail.parse(JSON.parse((await detail(filtered)).text))).toMatchObject({
+      status: 'FILTERED_OUT',
+      filterReason: 'Fictional filter reason',
+    });
+  });
+
+  it('answers 404 for an unknown lead and 400 for an id that is too long', async () => {
+    expect((await detail('fictional-missing-lead')).status).toBe(404);
+    expect((await detail('x'.repeat(65))).status).toBe(400);
   });
 });
